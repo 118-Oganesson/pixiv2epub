@@ -8,3 +8,13 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Jupyter Notebook
+*.ipynb
+
+# config files
+configs/*.toml
+
+# novel files
+pixiv_raw
+epubs

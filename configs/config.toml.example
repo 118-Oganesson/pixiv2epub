@@ -1,0 +1,49 @@
+# 設定ファイルの見本です。これをコピーして `config.toml` として使用します。
+
+[downloader]
+# ダウンロードした小説データの一時保存先ベースディレクトリ
+save_directory = "./pixiv_raw"
+# Pixiv APIへのリクエスト間隔（秒）
+api_delay = 1.0
+# APIリクエスト失敗時の最大リトライ回数
+api_retries = 3
+# trueに設定すると、既に存在する画像を常に上書きダウンロードします
+overwrite_existing_images = false
+
+[builder]
+# 生成されたEPUBファイルのデフォルト出力先ディレクトリ
+output_directory = "./epubs"
+# EPUBのスタイルシートファイルの相対パス (小説ディレクトリからのパス)
+css_file = "styles/style.css"
+
+[auth]
+# Pixivのrefresh_token。環境変数 PIXIV_REFRESH_TOKEN での上書きを推奨
+refresh_token = "your_refresh_token_here"
+
+[compression]
+# 画像圧縮を有効にするか
+enabled = true
+# 圧縮後のファイルが元より大きい場合はスキップするか
+skip_if_larger = true
+# 並列処理する際の最大ワーカー数
+max_workers = 4
+
+# pngquant の圧縮設定
+[compression.pngquant]
+colors = 256
+quality = "65-90"
+speed = 3
+strip = true
+
+# jpegoptim の圧縮設定
+[compression.jpegoptim]
+max_quality = 85
+strip_all = true
+progressive = true
+preserve_timestamp = true
+
+# cwebp の圧縮設定
+[compression.cwebp]
+quality = 75
+lossless = false
+metadata = "none"

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="ja">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title>{{ metadata.title }}</dc:title>
+        <dc:language>ja</dc:language>
+        <dc:identifier id="bookid">{{ metadata.identifier.get("uuid", "") }}</dc:identifier>
+        <dc:creator id="author">{{ metadata.authors.name }}</dc:creator>
+        <meta refines="#author" property="role" scheme="marc:relators">aut</meta>
+        <dc:date>{{ formatted_date }}</dc:date>
+        <meta property="dcterms:modified">{{ modified_time }}</meta>
+
+        {% if metadata.identifier.get("novel_id") -%}
+        <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ metadata.identifier.get("novel_id") }}</dc:identifier>
+        {% endif -%}
+
+        {% if metadata.series -%}
+        <meta property="belongs-to-collection" id="series-title">{{ metadata.series.title }}</meta>
+        <meta refines="#series-title" property="collection-type">series</meta>
+        <meta property="meta" scheme="urn:pixiv:series:id">{{ metadata.series.id }}</meta>
+        {% endif -%}
+
+        {% if metadata.description -%}
+        <dc:description>{{ metadata.description | striptags | replace('\n', ' ') }}</dc:description>
+        {% endif -%}
+        {% for tag in metadata.tags -%}
+        <dc:subject>{{ tag }}</dc:subject>
+        {% endfor -%}
+        {% if cover_image_id -%}
+        <meta name="cover" content="{{ cover_image_id }}" />
+        {% endif -%}
+    </metadata>
+    <manifest>
+        {% for item in manifest_items -%}
+        <item id="{{ item.id }}" href="{{ item.href }}" media-type="{{ item.media_type }}" {% if item.properties
+            %}properties="{{ item.properties }}" {% endif %} />
+        {% endfor -%}
+    </manifest>
+    <spine>
+        {% for item in spine_itemrefs -%}
+        <itemref idref="{{ item.idref }}" {% if not item.linear %}linear="no" {% endif %} />
+        {% endfor -%}
+    </spine>
+</package>

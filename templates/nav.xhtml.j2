@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
+
+<head>
+    <title>目次</title>
+</head>
+
+<body>
+    <nav epub:type="toc">
+        <h1>目次</h1>
+        <ol>
+            {% if has_info_page %}
+            <li><a href="text/info.xhtml">作品情報</a></li>
+            {% endif %}
+            {% for page in pages %}
+            <li><a href="{{ page.href }}">{{ page.title }}</a></li>
+            {% endfor %}
+        </ol>
+    </nav>
+    <nav epub:type="landmarks" hidden="">
+        <h2>ランドマーク</h2>
+        <ol>
+            {% if has_cover %}
+            <li><a epub:type="cover" href="text/cover.xhtml">表紙</a></li>
+            {% endif %}
+            {% if has_info_page %}
+            <li><a epub:type="bodymatter" href="text/info.xhtml">作品情報</a></li>
+            {% endif %}
+            {% if pages %}
+            <li><a epub:type="bodymatter" href="{{ pages[0].href }}">本文開始</a></li>
+            {% endif %}
+        </ol>
+    </nav>
+</body>
+
+</html>

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
+
+<head>
+    <title>{{ title }}</title>
+    <meta charset="utf-8" />
+    {% if css_path %}
+    <link rel="stylesheet" type="text/css" href="../{{ css_path }}" />{% endif %}
+</head>
+
+<body>
+    {% if novel.series_title %}
+    <p class="series-title">{{ novel.series_title }}</p>
+    {% endif %}
+
+    <h2 epub:type="title">{{ novel.title }}</h2>
+    <h3>{{ novel.author }}</h3>
+    <p>{{ novel.meta_info }}</p>
+    <hr />
+    <div>{{ novel.description | safe }}</div>
+    <hr />
+    <p>タグ: {{ novel.tags | join(', ') }}</p>
+    <p><a href="{{ novel.source_url }}">{{ novel.source_url }}</a></p>
+</body>
+
+</html>
