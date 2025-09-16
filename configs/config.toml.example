@@ -3,6 +3,15 @@
 [downloader]
 # ダウンロードした小説データの一時保存先ベースディレクトリ
 save_directory = "./pixiv_raw"
+
+# ★ 更新: 単独作品用のフォルダ構成テンプレート。使用可能: {id}, {title}, {author_name}
+# 例: ./pixiv_raw/作者名/小説ID_小説タイトル/
+raw_dir_template = "{author_name}/{id}_{title}"
+
+# ★ 更新: シリーズ用のフォルダ構成テンプレート。使用可能: {id}, {title}, {author_name}
+# 例: ./pixiv_raw/作者名/series_シリーズID_シリーズ名/
+series_dir_template = "{author_name}/series_{id}_{title}"
+
 # Pixiv APIへのリクエスト間隔（秒）
 api_delay = 1.0
 # APIリクエスト失敗時の最大リトライ回数
@@ -13,6 +22,15 @@ overwrite_existing_images = false
 [builder]
 # 生成されたEPUBファイルのデフォルト出力先ディレクトリ
 output_directory = "./epubs"
+
+# ★ 更新: 単独作品用のファイル/フォルダ構成テンプレート
+# 例: ./epubs/作者名/小説タイトル.epub
+filename_template = "{author_name}/{title}.epub"
+
+# ★ 新設: シリーズ作品用のファイル/フォルダ構成テンプレート
+# 例: ./epubs/作者名/シリーズ名/[作者名] シリーズ名 - 小説タイトル.epub
+series_filename_template = "{author_name}/{series_title}/[{author_name}] {series_title} - {title}.epub"
+
 # EPUBのスタイルシートファイルの相対パス (小説ディレクトリからのパス)
 css_file = "styles/style.css"
 
