@@ -290,7 +290,7 @@ def main():
         "--build-only",
         type=str,
         metavar="RAW_DIR",
-        help="指定ディレクトリからビルドのみ実行します",
+        help="指定ディレクトリ内を再帰的に探索し、ビルド可能なデータをすべてビルドします",
     )
 
     # --- その他のオプション ---
@@ -304,7 +304,7 @@ def main():
         "-i",
         "--interactive",
         action="store_true",
-        help="ビルド前にメタデータを対話的に編集します (シリーズモードまたはユーザーモードで使用可能)",
+        help="ビルド前にメタデータを対話的に編集します",
     )
     parser.add_argument(
         "--download-only", action="store_true", help="ダウンロードのみ実行します"
@@ -322,24 +322,53 @@ def main():
         # --- ユーザー処理モード ---
         if args.user:
             process_user_novels(args.user, config, args)
+            console.rule("[bold green]All tasks completed![/]")
             return
 
         # --- シリーズ処理モード ---
         if args.series:
             process_series(args.series, config, args)
+            console.rule("[bold green]All tasks completed![/]")
             return
 
-        # --- ビルド専用モード ---
+        # --- ビルド専用モード (再帰探索) ---
         if args.build_only:
-            logger.info(f"ビルド専用モードで実行します: {args.build_only}")
-            build_path = Path(args.build_only).resolve()
-            build_from_path(build_path, config, args)
+            base_path = Path(args.build_only).resolve()
+            logger.info(f"ビルド専用モード（再帰探索）で実行します: {base_path}")
+
+            detail_json_paths = list(base_path.rglob("detail.json"))
+
+            if not detail_json_paths:
+                logger.warning(
+                    f"指定されたディレクトリ内で 'detail.json' が見つかりませんでした: {base_path}"
+                )
+                console.print("[yellow]ビルド対象が見つかりませんでした。[/]")
+                return
+
+            total = len(detail_json_paths)
+            console.print(f"計 {total} 件のビルド対象を処理します。")
+            console.rule("[bold yellow]Starting Batch Build Process[/]")
+
+            for i, json_path in enumerate(detail_json_paths, 1):
+                novel_path = json_path.parent
+                console.print(f"\n[bold]Building {i}/{total}: {novel_path.name}[/]")
+                try:
+                    build_from_path(novel_path, config, args)
+                except Exception:
+                    logger.exception(
+                        f"パス {novel_path} のビルド中にエラーが発生しました。"
+                    )
+                    console.print(
+                        f"❌ [red]パス {novel_path.name} のビルドに失敗しました。[/]"
+                    )
+
+            console.rule("[bold green]All tasks completed![/]")
             return
 
         # --- 入力IDの解決 (単独小説) ---
         if not args.inputs:
             parser.error(
-                "処理対象の小説ID、シリーズID、またはユーザーIDを指定してください。"
+                "処理対象の小説ID、シリーズID、ユーザーID、またはビルドディレクトリを指定してください。"
             )
 
         novel_ids = []
