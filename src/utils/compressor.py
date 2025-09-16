@@ -10,16 +10,21 @@ import concurrent.futures
 from ..data.models import CompressionResult
 
 
-def _human_readable_size(n: Optional[int]) -> str:
+def _human_readable_size(size_bytes: Optional[int]) -> str:
+    """バイト数を人間が読みやすい形式の文字列 (kB, MBなど) に変換します。
+
+    Args:
+        size_bytes (Optional[int]): バイト単位のファイルサイズ。Noneの場合は 'N/A' を返します。
+
+    Returns:
+        str: 人間が読みやすい形式にフォーマットされたファイルサイズの文字列。
     """
-    バイト数を人間が読みやすい単位に変換して返す（1 kB = 1024 B）。
-    例: 123 -> "123 B", 2048 -> "2.00 kB", 3145728 -> "3.00 MB"
-    """
-    if n is None:
+    if size_bytes is None:
         return "N/A"
-    n_float = float(n)
+    n_float = float(size_bytes)
     units = ["B", "kB", "MB", "GB", "TB"]
     i = 0
+    # 1024未満になるまで単位を大きくしていく
     while n_float >= 1024 and i < len(units) - 1:
         n_float /= 1024.0
         i += 1
@@ -29,12 +34,24 @@ def _human_readable_size(n: Optional[int]) -> str:
 
 
 class ImageCompressor:
+    """pngquant, jpegoptim, cwebp を利用して画像を圧縮するクラス。
+
+    システムにインストールされている対応ツールを自動的に検出し、
+    ファイル形式に応じて最適なツールを使用して圧縮処理を実行します。
+    並列処理によるバッチ圧縮もサポートします。
+    """
+
     REQUIRED_TOOLS = ["pngquant", "jpegoptim", "cwebp"]
 
     def __init__(self, config: Dict):
-        """
-        画像圧縮クラス初期化。
-        初期化時に必要なコマンドラインツールの存在を確認します。
+        """ImageCompressorを初期化します。
+
+        設定辞書から圧縮オプションを読み込み、必須コマンドラインツールが
+        システムに存在するかどうかを確認します。
+
+        Args:
+            config (Dict): アプリケーション全体の設定辞書。
+                'compression' キーに本クラス用の設定が含まれていることを想定しています。
         """
         self.logger = logging.getLogger(self.__class__.__name__)
 
@@ -51,7 +68,6 @@ class ImageCompressor:
         self.jpeg_options.setdefault("skip_if_larger", self.skip_if_larger)
         self.webp_options.setdefault("skip_if_larger", self.skip_if_larger)
 
-        # コマンドラインツールの存在チェック
         self.tools_available: Dict[str, bool] = {}
         for tool in self.REQUIRED_TOOLS:
             if shutil.which(tool):
@@ -63,6 +79,15 @@ class ImageCompressor:
                 )
 
     def detect_format(self, path: Union[str, Path]) -> Optional[str]:
+        """ファイルパスの拡張子から画像フォーマットを判定します。
+
+        Args:
+            path (Union[str, Path]): 判定対象のファイルパス。
+
+        Returns:
+            Optional[str]: 'png', 'jpeg', 'webp' のいずれか。
+                対応していないフォーマットの場合は None を返します。
+        """
         path = Path(path)
         ext = path.suffix.lower()
         if ext == ".png":
@@ -75,8 +100,18 @@ class ImageCompressor:
             return None
 
     def _make_output_path(self, input_path: Path, output_dir: Optional[Path]) -> Path:
+        """出力ファイルのパスを生成し、必要に応じて出力ディレクトリを作成します。
+
+        Args:
+            input_path (Path): 入力ファイルのパス。
+            output_dir (Optional[Path]): 出力先のディレクトリ。
+                Noneの場合は入力ファイルと同じディレクトリを使用します。
+
+        Returns:
+            Path: 生成された出力ファイルのパス。
+        """
         if output_dir is None:
-            output_dir = input_path.parent / self.output_dir_name
+            output_dir = input_path.parent
         output_dir.mkdir(parents=True, exist_ok=True)
         return output_dir / input_path.name
 
@@ -89,7 +124,27 @@ class ImageCompressor:
         return_bytes: bool = False,
         write_output: bool = True,
     ) -> CompressionResult:
-        """単一ファイルを圧縮します。"""
+        """単一の画像ファイルを圧縮します。
+
+        ファイル形式を自動検出し、対応するコマンドラインツールを呼び出します。
+        圧縮処理は一時ディレクトリ内で行われ、安全に処理されます。
+
+        Args:
+            input_path (Union[str, Path]): 圧縮する画像のパス。
+            output_dir (Optional[Union[str, Path]], optional): 圧縮後のファイルの
+                保存先ディレクトリ。None の場合は入力ファイルと同じ場所に保存されます。
+                Defaults to None.
+            options (Optional[Dict], optional): 圧縮ツールに渡す追加オプション。
+                Defaults to None.
+            return_bytes (bool, optional): Trueの場合、圧縮後のファイル内容を
+                bytesとして `CompressionResult` に含めます。 Defaults to False.
+            write_output (bool, optional): Trueの場合、圧縮後のファイルをディスクに
+                書き込みます。Falseの場合、`return_bytes`がTrueでなければ圧縮結果は
+                破棄されます。 Defaults to True.
+
+        Returns:
+            CompressionResult: 圧縮処理の結果を格納したデータクラス。
+        """
         input_path = Path(input_path)
         start_time = time.time()
 
@@ -174,8 +229,8 @@ class ImageCompressor:
                     duration=duration,
                 )
 
+            # 稀にコマンドが成功(exit code 0)しても出力ファイルが生成されないケースに対応する。
             if not tmp_out_path.is_file() or tmp_out_path.stat().st_size == 0:
-                # ツールがエラーコード0を返してもファイルが生成されない場合がある
                 self.logger.error(
                     f"予期せぬエラー: 一時出力ファイルが見つかりません: {tmp_out_path}"
                 )
@@ -273,8 +328,29 @@ class ImageCompressor:
         return_bytes: bool = False,
         write_output: bool = True,
     ) -> List[CompressionResult]:
-        """
-        バッチ圧縮。return_bytes/write_output を各ファイルに適用します。
+        """複数の画像ファイルやディレクトリを並列で圧縮します。
+
+        Args:
+            input_paths (Union[List[Union[str, Path]], str]): 圧縮対象の
+                ファイルパスのリスト、またはディレクトリのパス。
+            recursive (bool, optional): `input_paths` がディレクトリの場合に
+                再帰的に探索するかどうか。 Defaults to False.
+            output_dir (Optional[Union[str, Path]], optional): 圧縮後のファイルの
+                保存先ディレクトリ。 Defaults to None.
+            max_workers (Optional[int], optional): 並列実行する最大スレッド数。
+                Noneの場合はクラスのデフォルト値を使用します。 Defaults to None.
+            options (Optional[Dict], optional): 各圧縮ツールに渡す追加オプション。
+                Defaults to None.
+            return_bytes (bool, optional): 圧縮結果をbytesで返すかどうか。
+                Defaults to False.
+            write_output (bool, optional): 圧縮結果をファイルに書き込むかどうか。
+                Defaults to True.
+
+        Returns:
+            List[CompressionResult]: 各ファイルの圧縮結果のリスト。
+
+        Raises:
+            ValueError: `input_paths` が不正な場合に送出されます。
         """
         paths_to_process: List[Path] = []
         if isinstance(input_paths, (str, Path)) and Path(input_paths).is_dir():
@@ -293,18 +369,17 @@ class ImageCompressor:
         max_workers = max_workers or self.max_workers
         results: List[CompressionResult] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = []
-            for p in paths_to_process:
-                futures.append(
-                    executor.submit(
-                        self.compress_file,
-                        p,
-                        output_dir,
-                        options,
-                        return_bytes=return_bytes,
-                        write_output=write_output,
-                    )
+            futures = [
+                executor.submit(
+                    self.compress_file,
+                    p,
+                    output_dir,
+                    options,
+                    return_bytes=return_bytes,
+                    write_output=write_output,
                 )
+                for p in paths_to_process
+            ]
             for future in concurrent.futures.as_completed(futures):
                 try:
                     result = future.result()
@@ -317,6 +392,16 @@ class ImageCompressor:
     def _run_command(
         self, cmd: List[str], timeout: int = 60
     ) -> Dict[str, Union[bytes, int]]:
+        """外部コマンドを実行し、結果をキャプチャします。
+
+        Args:
+            cmd (List[str]): 実行するコマンドと引数のリスト。
+            timeout (int, optional): コマンドのタイムアウト時間（秒）。Defaults to 60.
+
+        Returns:
+            Dict[str, Union[bytes, int]]: コマンドの実行結果。
+                'returncode', 'stdout', 'stderr' のキーを持つ辞書。
+        """
         try:
             self.logger.debug(f"コマンド実行: {' '.join(cmd)}")
             proc = subprocess.run(
@@ -340,6 +425,16 @@ class ImageCompressor:
     def _compress_pngquant(
         self, input_path: Path, tmp_out_path: Path, options: Dict
     ) -> CompressionResult:
+        """pngquant を使用してPNG画像を圧縮します。
+
+        Args:
+            input_path (Path): 入力PNGファイルのパス。
+            tmp_out_path (Path): 圧縮後の一時出力先パス。
+            options (Dict): pngquantに渡すオプション。
+
+        Returns:
+            CompressionResult: 圧縮処理の結果。
+        """
         if not self.tools_available.get("pngquant"):
             return CompressionResult(
                 input_path,
@@ -367,8 +462,8 @@ class ImageCompressor:
         cmd.extend(["--speed", str(speed)])
         if strip:
             cmd.append("--strip")
-        # 出力は tmp_out_path に
         cmd.extend(["--force", "--output", str(tmp_out_path), str(input_path)])
+
         result = self._run_command(cmd)
         stdout_text = (
             result["stdout"].decode("utf-8", errors="replace")
@@ -381,8 +476,10 @@ class ImageCompressor:
             else ""
         )
         success = result["returncode"] == 0 and tmp_out_path.is_file()
+
         if not success:
             self.logger.error(f"pngquantによる圧縮に失敗しました: {stderr_text}")
+
         return CompressionResult(
             input_path,
             tmp_out_path if success else None,
@@ -400,6 +497,16 @@ class ImageCompressor:
     def _compress_jpegoptim(
         self, input_path: Path, tmp_out_path: Path, options: Dict
     ) -> CompressionResult:
+        """jpegoptim を使用してJPEG画像を圧縮します。
+
+        Args:
+            input_path (Path): 入力JPEGファイルのパス。
+            tmp_out_path (Path): 圧縮後の一時出力先パス。
+            options (Dict): jpegoptimに渡すオプション。
+
+        Returns:
+            CompressionResult: 圧縮処理の結果。
+        """
         if not self.tools_available.get("jpegoptim"):
             return CompressionResult(
                 input_path,
@@ -415,15 +522,14 @@ class ImageCompressor:
                 False,
                 skipped=True,
             )
-        # jpegoptimはstdoutでなく一時ファイルへ書き出すようにして、バイナリ取得を簡単にする
+
+        tmp_out_path.parent.mkdir(parents=True, exist_ok=True)
+        cmd = ["jpegoptim"]
         max_quality = options.get("max_quality", 85)
         strip_all = options.get("strip_all", True)
         progressive = options.get("progressive", None)
         preserve_timestamp = options.get("preserve_timestamp", True)
-        # jpegoptim は --dest ディレクトリ指定が可能なので tmp_dir を使う
-        # tmp_out_path.parent を作る（tmp_out_path は tmp_dir/<name>）
-        tmp_out_path.parent.mkdir(parents=True, exist_ok=True)
-        cmd = ["jpegoptim"]
+
         cmd.append(f"-m{max_quality}")
         if strip_all:
             cmd.append("--strip-all")
@@ -433,10 +539,12 @@ class ImageCompressor:
             cmd.append("--all-normal")
         if preserve_timestamp:
             cmd.append("--preserve")
-        # --stdoutではなく、--dest を使って一時ディレクトリへ出力
-        # jpegoptim の --dest は出力先ディレクトリを指定する形式
+
+        # jpegoptimは標準出力への出力をサポートしていないため、
+        # --dest オプションで一時ディレクトリに出力する。
         tmp_dest_dir = str(tmp_out_path.parent)
         cmd.extend(["--dest", tmp_dest_dir, str(input_path)])
+
         result = self._run_command(cmd)
         stdout_text = (
             result["stdout"].decode("utf-8", errors="replace")
@@ -448,11 +556,11 @@ class ImageCompressor:
             if result["stderr"]
             else ""
         )
-        # jpegoptim は tmp_dest_dir に同名ファイルを書き出すはず
-        generated = tmp_out_path.is_file()
-        success = result["returncode"] == 0 and generated
+        success = result["returncode"] == 0 and tmp_out_path.is_file()
+
         if not success:
             self.logger.error(f"jpegoptimによる圧縮に失敗しました: {stderr_text}")
+
         return CompressionResult(
             input_path,
             tmp_out_path if success else None,
@@ -470,6 +578,16 @@ class ImageCompressor:
     def _compress_cwebp(
         self, input_path: Path, tmp_out_path: Path, options: Dict
     ) -> CompressionResult:
+        """cwebp を使用して画像をWebP形式に変換・圧縮します。
+
+        Args:
+            input_path (Path): 入力画像のパス。
+            tmp_out_path (Path): 圧縮後のWebPファイルの一時出力先パス。
+            options (Dict): cwebpに渡すオプション。
+
+        Returns:
+            CompressionResult: 圧縮処理の結果。
+        """
         if not self.tools_available.get("cwebp"):
             return CompressionResult(
                 input_path,
@@ -494,6 +612,7 @@ class ImageCompressor:
         m_level = options.get("m", 4)
         alpha_q = options.get("alpha_q", 100)
         metadata = options.get("metadata", "none")
+
         if lossless:
             cmd.append("-lossless")
         else:
@@ -506,6 +625,7 @@ class ImageCompressor:
         cmd.extend(["-alpha_q", str(alpha_q)])
         cmd.extend(["-metadata", metadata])
         cmd.extend([str(input_path), "-o", str(tmp_out_path)])
+
         result = self._run_command(cmd)
         stdout_text = (
             result["stdout"].decode("utf-8", errors="replace")
@@ -518,8 +638,10 @@ class ImageCompressor:
             else ""
         )
         success = result["returncode"] == 0 and tmp_out_path.is_file()
+
         if not success:
             self.logger.error(f"cwebpによる圧縮に失敗しました: {stderr_text}")
+
         return CompressionResult(
             input_path,
             tmp_out_path if success else None,

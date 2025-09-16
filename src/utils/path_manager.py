@@ -2,18 +2,23 @@ from pathlib import Path
 
 
 class PathManager:
-    """
-    小説ダウンロードに関するファイルパスの管理を専門に行うクラス。
+    """小説の各種ファイルを管理するためのパス操作をまとめたクラス。
+
+    小説ごとに生成されるディレクトリや、その中の各種ファイルへのパスを
+    一元的に管理し、一貫性のあるパス操作を提供します。
     """
 
     def __init__(self, base_dir: Path, novel_dir_name: str):
-        """
-        PathManagerを初期化します。
+        """PathManagerを初期化します。
 
         Args:
-            base_dir (Path): 保存先のベースディレクトリ。
-            novel_dir_name (str): ベースディレクトリ内に作成される小説ごとのディレクトリ名。
+            base_dir (Path): すべての小説が保存されるルートディレクトリ。
+            novel_dir_name (str): `base_dir`内に作成される、
+                このインスタンスが管理する小説固有のディレクトリ名。
+                空文字が渡された場合は 'novel_unknown' を使用します。
         """
+        # ディレクトリ名が指定されていない場合、予期せぬエラーを防ぐために
+        # デフォルトのディレクトリ名を設定する。
         if not novel_dir_name:
             novel_dir_name = "novel_unknown"
 
@@ -22,13 +27,24 @@ class PathManager:
 
     @property
     def detail_json_path(self) -> Path:
-        """detail.json ファイルのパスを返すプロパティ。"""
+        """小説のメタデータを格納する `detail.json` ファイルのパス。"""
         return self.novel_dir / "detail.json"
 
     def page_path(self, page_number: int) -> Path:
-        """指定されたページ番号のXHTMLファイルパスを返します。"""
+        """指定されたページ番号に対応するXHTMLファイルのパスを生成します。
+
+        Args:
+            page_number (int): ページの番号。
+
+        Returns:
+            Path: ページファイルへのPathオブジェクト。
+        """
         return self.novel_dir / f"page-{page_number}.xhtml"
 
     def setup_directories(self) -> None:
-        """保存に必要なディレクトリ（小説ルート、画像）を作成します。"""
+        """小説ファイルと画像ファイルを保存するためのディレクトリを作成します。
+
+        `exist_ok=True` を指定しているため、ディレクトリが既に存在していても
+        エラーは発生しません。
+        """
         self.image_dir.mkdir(parents=True, exist_ok=True)

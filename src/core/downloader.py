@@ -18,9 +18,11 @@ console = Console()
 
 
 class PixivNovelDownloader:
-    """
-    特定の一つのPixiv小説をダウンロードし、整理して保存するクラス。
-    インスタンスは単一の小説ダウンロードジョブを表します。
+    """特定の一つのPixiv小説をダウンロードし、整理して保存するクラス。
+
+    小説本文、表紙画像、挿絵画像などを取得し、タグ変換を行った上で、
+    指定されたディレクトリ構造に従ってファイルに保存します。
+    インスタンスは単一の小説ダウンロードジョブに対応します。
     """
 
     def __init__(
@@ -29,16 +31,26 @@ class PixivNovelDownloader:
         config: Dict[str, Any],
         override_base_dir: Optional[Path] = None,
     ):
-        """
-        PixivNovelDownloaderを初期化し、ダウンロードの準備を行います。
+        """PixivNovelDownloaderを初期化します。
+
+        APIクライアントの設定、小説データの取得、保存先ディレクトリの準備など、
+        ダウンロード処理に必要な初期設定を行います。
+
+        Args:
+            novel_id (int): ダウンロード対象のPixiv小説ID。
+            config (Dict[str, Any]): アプリケーションの設定情報を含む辞書。
+            override_base_dir (Optional[Path]): 指定された場合、設定ファイルの値に
+                優先して、このパスを保存先の基底ディレクトリとして使用します。
+                主にシリーズダウンロード機能から呼び出される際に利用されます。
+
+        Raises:
+            ValueError: 設定に有効なPixivの`refresh_token`が見つからない場合。
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.novel_id = novel_id
 
-        # --- 設定の読み込み ---
         downloader_conf = self.config.get("downloader", {})
-        # override_base_dirが指定されていればそれを使用し、なければ設定ファイルの値を使用
         self.base_dir = override_base_dir or Path(
             downloader_conf.get("save_directory", "./pixiv_raw")
         )
@@ -48,38 +60,31 @@ class PixivNovelDownloader:
             downloader_conf.get("overwrite_existing_images", False)
         )
 
-        # --- APIクライアントの初期化 ---
         self.api = AppPixivAPI()
         refresh_token = self.config.get("auth", {}).get("refresh_token")
         if not refresh_token or refresh_token == "your_refresh_token_here":
             raise ValueError("設定に有効なPixivのrefresh_tokenが見つかりません。")
         self.api.auth(refresh_token=refresh_token)
 
-        # --- データの取得 ---
         self.logger.debug(f"小説ID: {self.novel_id} の処理準備を開始します。")
         novel_data_dict = self._fetch_data(
-            self.api.webview_novel, self.novel_id, "小説データ"
+            self.api.webview_novel, self.novel_id, "小説本文データ"
         )
         self.novel_data = NovelApiResponse.from_dict(novel_data_dict)
         self.detail_data_dict = self._fetch_data(
-            self.api.novel_detail, self.novel_id, "詳細データ"
+            self.api.novel_detail, self.novel_id, "小説詳細データ"
         )
 
-        # ★ --- PathManagerの初期化ロジックを修正 ---
         template = downloader_conf.get("raw_dir_template", "{id}_{title}")
-
-        # テンプレートで使用する変数を準備
         novel_detail = self.detail_data_dict.get("novel", {})
         template_vars = {
             "id": self.novel_data.id,
             "title": self.novel_data.title,
             "author_name": novel_detail.get("user", {}).get("name", "unknown_author"),
         }
-
-        # テンプレートから相対パスを生成
         relative_path_str = template.format(**template_vars)
 
-        # パスの各要素をサニタイズ
+        # ファイルシステムで無効な文字をアンダースコアに置換し、安全なディレクトリ名を生成する。
         invalid_chars = r'[\\/:*?"<>|]'
         safe_parts = [
             re.sub(invalid_chars, "_", part).strip()
@@ -89,7 +94,7 @@ class PixivNovelDownloader:
 
         self.paths = PathManager(
             base_dir=self.base_dir,
-            novel_dir_name=safe_dir_name,  # サニタイズ済みのパス文字列を渡す
+            novel_dir_name=safe_dir_name,
         )
         self.paths.setup_directories()
         self.logger.info(f"保存先ディレクトリ: {self.paths.novel_dir}")
@@ -97,8 +102,10 @@ class PixivNovelDownloader:
         self.image_paths: Dict[str, str] = {}
 
     def run(self) -> Path:
-        """
-        初期化時に指定された小説のダウンロード処理全体を実行します。
+        """小説のダウンロード処理全体を実行します。
+
+        Returns:
+            Path: 小説が保存されたディレクトリへのパス。
         """
         self.logger.debug(
             f"小説「{self.novel_data.title}」のダウンロード処理を開始します。"
@@ -110,7 +117,20 @@ class PixivNovelDownloader:
         return self.paths.novel_dir
 
     def _fetch_data(self, func: Callable, arg: Any, label: str) -> Dict:
-        """Pixiv APIからデータを取得するための共通ラッパー関数。"""
+        """Pixiv APIからデータを取得するための共通ラッパー。
+
+        Args:
+            func (Callable): 呼び出すpixivpy3のAPI関数。
+            arg (Any): API関数に渡す引数（小説IDなど）。
+            label (str): ログ出力用のデータ名。
+
+        Returns:
+            Dict: APIから返されたJSONデータを格納した辞書。
+
+        Raises:
+            ValueError: APIがPixivErrorを返した場合。
+            RuntimeError: その他の予期せぬ例外が発生した場合。
+        """
         try:
             return func(arg)
         except PixivError as e:
@@ -123,7 +143,21 @@ class PixivNovelDownloader:
             ) from e
 
     def _safe_api_call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """API呼び出しをリトライロジック付きで安全に実行します。"""
+        """API呼び出しをリトライ機構付きで安全に実行します。
+
+        一時的なネットワークエラーやAPIの不安定さに対する耐性を高めることを目的とします。
+
+        Args:
+            func (Callable): 実行するAPI関数。
+            *args: API関数に渡す可変長引数。
+            **kwargs: API関数に渡すキーワード引数。
+
+        Returns:
+            Any: API関数の実行結果。
+
+        Raises:
+            RuntimeError: 全てのリトライが失敗した場合。
+        """
         for attempt in range(1, self.retry + 1):
             try:
                 result = func(*args, **kwargs)
@@ -139,11 +173,19 @@ class PixivNovelDownloader:
                     )
                     raise
                 time.sleep(self.delay * attempt)
-
+        # この行は論理的に到達不能ですが、静的解析のために残しています。
         raise RuntimeError("API呼び出しがリトライ回数を超えました。")
 
     def _download_image(self, url: str, filename: str) -> Optional[str]:
-        """指定されたURLから画像をダウンロードし、保存先の相対パスを返します。"""
+        """指定されたURLから単一の画像をダウンロードします。
+
+        Args:
+            url (str): ダウンロードする画像のURL。
+            filename (str): 保存する際のファイル名。
+
+        Returns:
+            Optional[str]: 保存に成功した場合、画像への相対パス。失敗した場合はNone。
+        """
         target_path = self.paths.image_dir / filename
         relative_path = f"./images/{filename}"
 
@@ -156,11 +198,11 @@ class PixivNovelDownloader:
             )
             return relative_path
         except Exception as e:
-            # 警告やエラーは重要なので残す
             self.logger.warning(f"画像 ({url}) のダウンロードに失敗しました: {e}")
             return None
 
     def _prepare_and_download_all_images(self) -> None:
+        """小説本文を解析し、含まれる全ての挿絵・イラスト画像をダウンロードします。"""
         text = self.novel_data.text
         uploaded_ids: Set[str] = set(re.findall(r"\[uploadedimage:(\d+)\]", text))
         pixiv_ids: Set[str] = set(re.findall(r"\[pixivimage:(\d+)\]", text))
@@ -174,9 +216,8 @@ class PixivNovelDownloader:
                 "[cyan]Downloading images...", total=len(all_images)
             )
 
-            # --- uploadedimage ---
             for image_id in uploaded_ids:
-                filename = f"uploaded_{image_id}.png"  # 初期値
+                filename = f"uploaded_{image_id}.png"
                 if image_id in self.image_paths:
                     progress.update(
                         task, advance=1, description=f"[cyan]Skipped: {filename}"
@@ -195,10 +236,8 @@ class PixivNovelDownloader:
                             task, advance=1, description=f"[green]Processed: {filename}"
                         )
                         continue
-
                 progress.update(task, advance=1, description=f"[red]Failed: {filename}")
 
-            # --- pixivimage ---
             for illust_id in pixiv_ids:
                 filename = f"pixiv_{illust_id}.jpg"
                 if illust_id in self.image_paths:
@@ -212,7 +251,6 @@ class PixivNovelDownloader:
                         self.api.illust_detail, int(illust_id)
                     )
                     illust = illust_resp.get("illust", {})
-
                     url: Optional[str] = None
                     if illust.get("page_count", 1) == 1:
                         url = illust.get("meta_single_page", {}).get(
@@ -235,32 +273,40 @@ class PixivNovelDownloader:
                                 description=f"[green]Processed: {filename}",
                             )
                             continue
-
                     progress.update(
                         task, advance=1, description=f"[red]Failed: {filename}"
                     )
-
                 except Exception as e:
                     self.logger.warning(f"イラスト {illust_id} の取得に失敗: {e}")
                     progress.update(
                         task, advance=1, description=f"[red]Failed: {filename}"
                     )
-
         self.logger.debug("画像ダウンロード処理が完了しました。")
 
     def _download_cover_image(self, novel: Dict) -> Optional[str]:
-        """小説のカバー画像をダウンロードし、保存先の相対パスを返します。"""
+        """小説の表紙画像をダウンロードします。
+
+        サムネイル用のURLから高解像度版のURLを推測し、まずそちらを試行します。
+
+        Args:
+            novel (Dict): APIから取得した小説の詳細情報を含む辞書。
+
+        Returns:
+            Optional[str]: 保存に成功した場合、画像への相対パス。失敗した場合はNone。
+        """
         cover_url = novel.get("image_urls", {}).get("large")
         if not cover_url:
             self.logger.info("この小説にはカバー画像がありません。")
             return None
 
         def convert_url(url: str) -> str:
+            """サムネイルURLを高解像度版のURLに変換する。"""
             return re.sub(r"/c/\d+x\d+(?:_\d+)?/", "/c/600x600/", url)
 
         ext = cover_url.split(".")[-1].split("?")[0]
         cover_filename = f"cover.{ext}"
 
+        # 高解像度版を優先して試し、失敗した場合は元のURLで再試行する。
         for url in (convert_url(cover_url), cover_url):
             if path := self._download_image(url, cover_filename):
                 return path
@@ -271,28 +317,28 @@ class PixivNovelDownloader:
     def _get_tag_replacement_strategies(
         self,
     ) -> List[Tuple[re.Pattern, Union[str, Callable]]]:
-        """
-        Pixiv独自タグを置換するためのルール（ストラテジー）のリストを返します。
+        """Pixiv独自タグをHTMLに置換するためのルールリストを返します。
 
         Returns:
-            List[Tuple[re.Pattern, Union[str, Callable]]]: (正規表現オブジェクト, 置換文字列または関数) のタプルのリスト。
+            List[Tuple[re.Pattern, Union[str, Callable]]]: 各要素は
+                (正規表現オブジェクト, 置換文字列または置換用関数) のタプル。
         """
         return [
-            # 画像タグ: [uploadedimage:id] or [pixivimage:id] -> <img ... />
+            # 画像タグ: [uploadedimage:id] or [pixivimage:id]
             (
                 re.compile(r"\[(uploadedimage|pixivimage):(\d+)\]"),
                 self._replace_image_tag,
             ),
-            # ページジャンプタグ: [jump:id] -> <a ...>
+            # ページジャンプタグ: [jump:id]
             (re.compile(r"\[jump:(\d+)\]"), r'<a href="page-\1.xhtml">\1ページへ</a>'),
-            # 章タイトルタグ: [chapter:title] -> <h2>...</h2>
+            # 章タイトルタグ: [chapter:title]
             (re.compile(r"\[chapter:(.+?)\]"), r"<h2>\1</h2>"),
-            # ルビタグ: [[rb:漢字 > ふりがな]] -> <ruby>...</ruby>
+            # ルビタグ: [[rb:漢字 > ふりがな]]
             (
                 re.compile(r"\[\[rb:(.+?)\s*>\s*(.+?)\]\]"),
                 r"<ruby>\1<rt>\2</rt></ruby>",
             ),
-            # 外部リンクタグ: [[jumpuri:text > url]] -> <a ...>
+            # 外部リンクタグ: [[jumpuri:text > url]]
             (
                 re.compile(r"\[\[jumpuri:(.+?)\s*>\s*(https?://.+?)\]\]"),
                 r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
@@ -300,35 +346,37 @@ class PixivNovelDownloader:
         ]
 
     def _replace_image_tag(self, match: re.Match) -> str:
-        """
-        画像タグ `[uploadedimage:id]` または `[pixivimage:id]` を置換するためのヘルパー関数。
+        """画像タグをHTMLの<img>タグに置換するためのヘルパー関数。
 
         Args:
             match (re.Match): 正規表現のマッチオブジェクト。
 
         Returns:
-            str: 置換後のHTML文字列 (`<img ... />`) または元のタグ文字列。
+            str: 置換後のHTML文字列、または画像が見つからない場合は元のタグ文字列。
         """
-        tag_type = match.group(1).replace("image", "")  # "uploaded" or "pixiv"
+        tag_type = match.group(1).replace("image", "")
         image_id = match.group(2)
 
-        # 挿絵画像とイラスト画像でID空間が異なる可能性があるため、
-        # `image_paths`のキーを `uploaded_123` のように一意にする方法も考えられるが、
-        # 現在の実装ではIDの重複がないため、このままとする。
+        # 現在の実装では、uploadedimageとpixivimageのID空間が重複しないことを
+        # 前提としているため、image_idのみをキーとして画像パスを検索する。
         path = self.image_paths.get(image_id)
 
         if path:
             return f'<img alt="{tag_type}_{image_id}" src="{path}" />'
 
-        # 画像が見つからなかった場合は、元のタグをそのまま返す
         self.logger.warning(
             f"置換対象の画像ID '{image_id}' のパスが見つかりませんでした。"
         )
         return match.group(0)
 
     def _replace_tags(self, text: str) -> str:
-        """
-        小説本文に含まれるPixiv特有のタグを、定義されたストラテジーに従ってHTMLタグに置換します。
+        """小説本文に含まれるPixiv特有のタグをHTMLタグに一括で置換します。
+
+        Args:
+            text (str): Pixivタグを含む生の小説本文。
+
+        Returns:
+            str: タグがHTMLに変換された本文。
         """
         strategies = self._get_tag_replacement_strategies()
         for pattern, replacement in strategies:
@@ -337,7 +385,7 @@ class PixivNovelDownloader:
         return text.replace("\n", "<br />\n")
 
     def _save_pages(self) -> None:
-        """小説本文をページごとに分割し、.xhtml ファイルとして保存します。"""
+        """小説本文をページごとに分割し、XHTMLファイルとして保存します。"""
         self.logger.debug("本文ページの保存を開始します。")
         text = self._replace_tags(self.novel_data.text)
         pages = text.split("[newpage]")
@@ -351,12 +399,13 @@ class PixivNovelDownloader:
         self.logger.debug(f"{len(pages)}ページの保存が完了しました。")
 
     def _save_detail_json(self) -> None:
-        """小説のメタデータを抽出し、'detail.json' として保存します。"""
+        """小説のメタデータを抽出し、'detail.json'として保存します。"""
         self.logger.debug("詳細情報(detail.json)の作成と保存を開始します。")
         novel = self.detail_data_dict.get("novel", {})
         cover_path = self._download_cover_image(novel)
 
         def extract_page_title(page_content: str, page_number: int) -> str:
+            """ページ内容から章タイトル(h2)を抽出、なければデフォルト名を返す。"""
             match = re.search(r"<h2>(.*?)</h2>", page_content)
             return match.group(1) if match else f"ページ {page_number}"
 
@@ -400,68 +449,76 @@ class PixivNovelDownloader:
 
 
 class PixivSeriesDownloader:
-    """
-    特定のPixiv小説シリーズをダウンロードし、整理して保存するクラス。
-    シリーズ用の親ディレクトリを作成し、その中に各小説のデータをダウンロードします。
+    """特定のPixiv小説シリーズに含まれる全作品をダウンロードするクラス。
+
+    シリーズ用の親ディレクトリを作成し、その中に各小説のデータを
+    `PixivNovelDownloader` を使ってダウンロードします。
     """
 
     def __init__(self, series_id: int, config: Dict[str, Any]):
-        """PixivSeriesDownloaderを初期化します。"""
+        """PixivSeriesDownloaderを初期化します。
+
+        Args:
+            series_id (int): ダウンロード対象のPixivシリーズID。
+            config (Dict[str, Any]): アプリケーションの設定情報を含む辞書。
+
+        Raises:
+            ValueError: 設定に有効なPixivの`refresh_token`が見つからない場合。
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.series_id = series_id
 
-        # --- 設定の読み込み ---
         downloader_conf = self.config.get("downloader", {})
         self.base_dir = Path(downloader_conf.get("save_directory", "./pixiv_raw"))
 
-        # --- APIクライアントの初期化 ---
         self.api = AppPixivAPI()
         refresh_token = self.config.get("auth", {}).get("refresh_token")
         if not refresh_token or refresh_token == "your_refresh_token_here":
             raise ValueError("設定に有効なPixivのrefresh_tokenが見つかりません。")
         self.api.auth(refresh_token=refresh_token)
 
-        # --- シリーズ情報の取得 ---
         self.logger.debug(f"シリーズID: {self.series_id} の情報取得を開始します。")
         series_data_dict = self.api.novel_series(series_id=self.series_id)
         self.series_data = NovelSeriesApiResponse.from_dict(series_data_dict)
 
-        # ★ --- 保存先ディレクトリの決定ロジックを修正 ---
         template = downloader_conf.get("series_dir_template", "series_{id}_{title}")
-
-        # テンプレートで使用する変数を準備
         template_vars = {
             "id": self.series_data.detail.id,
             "title": self.series_data.detail.title,
             "author_name": self.series_data.detail.user.name,
         }
-
-        # テンプレートから相対パスを生成
         relative_path_str = template.format(**template_vars)
 
-        # パスの各要素をサニタイズ
+        # ファイルシステムで無効な文字を置換し、安全なディレクトリ名を生成する。
         invalid_chars = r'[\\/:*?"<>|]'
         safe_parts = [
             re.sub(invalid_chars, "_", part).strip()
             for part in relative_path_str.split("/")
         ]
-        safe_dir_name = Path(*safe_parts)  # Pathオブジェクトに変換
+        safe_dir_name = Path(*safe_parts)
 
         self.series_dir = self.base_dir / safe_dir_name
         self.series_dir.mkdir(parents=True, exist_ok=True)
         self.logger.info(f"シリーズ保存先ディレクトリ: {self.series_dir}")
 
     def run(self, interactive: bool = False) -> List[Path]:
-        """シリーズのダウンロード処理を実行し、ダウンロード先のパスリストを返します。"""
-        downloaded_paths = []  # ダウンロードしたパスを保存するリスト
+        """シリーズ全体のダウンロード処理を実行します。
+
+        Args:
+            interactive (bool): Trueの場合、対話モードでダウンロード対象の
+                小説を選択させます。Falseの場合はシリーズの全小説をダウンロードします。
+
+        Returns:
+            List[Path]: 正常にダウンロードされた各小説のディレクトリパスのリスト。
+        """
         if interactive:
             novel_ids_to_download = self._select_novels_interactive()
             if not novel_ids_to_download:
                 self.logger.info(
                     "ダウンロード対象が選択されなかったため、処理を終了します。"
                 )
-                return downloaded_paths
+                return []
         else:
             novel_ids_to_download = [novel.id for novel in self.series_data.novels]
 
@@ -470,17 +527,19 @@ class PixivSeriesDownloader:
             f"計 {total} 件の小説をシリーズフォルダ内にダウンロードします。"
         )
 
+        downloaded_paths = []
         for i, novel_id in enumerate(novel_ids_to_download, 1):
             console.rule(f"[bold]Processing Novel {i}/{total} (ID: {novel_id})[/]")
             try:
-                # override_base_dir を使用して、保存先をシリーズディレクトリに指定
+                # 各小説の保存先をシリーズディレクトリ内に強制するため、
+                # override_base_dir を指定してNovelDownloaderを初期化する。
                 downloader = PixivNovelDownloader(
                     novel_id=novel_id,
                     config=self.config,
                     override_base_dir=self.series_dir,
                 )
                 novel_path = downloader.run()
-                downloaded_paths.append(novel_path)  # 成功したパスを追加
+                downloaded_paths.append(novel_path)
             except Exception as e:
                 self.logger.error(
                     f"小説ID {novel_id} のダウンロードに失敗しました: {e}",
@@ -494,7 +553,11 @@ class PixivSeriesDownloader:
         return downloaded_paths
 
     def _select_novels_interactive(self) -> List[int]:
-        """対話モードでダウンロードする小説を選択させます。"""
+        """対話形式でユーザーにダウンロードする小説を選択させます。
+
+        Returns:
+            List[int]: ユーザーによって選択された小説IDのリスト。
+        """
         console.print("\n[cyan]-- ダウンロード対象の小説を選択 --[/]")
         novels = sorted(self.series_data.novels, key=lambda n: n.order)
 

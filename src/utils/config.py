@@ -6,9 +6,22 @@ DEFAULT_CONFIG_PATH = "./configs/config.toml"
 
 
 def load_config(path: str = DEFAULT_CONFIG_PATH) -> Dict[str, Any]:
-    """
-    TOML設定ファイルを読み込み、辞書として返します。
-    環境変数 PIXIV_REFRESH_TOKEN があれば、設定を上書きします。
+    """TOML設定ファイルを読み込み、辞書として返します。
+
+    環境変数 `PIXIV_REFRESH_TOKEN` が設定されている場合、
+    ファイル内の設定よりも優先して認証情報として使用します。
+
+    Args:
+        path (str, optional): 読み込む設定ファイルのパス。
+            Defaults to DEFAULT_CONFIG_PATH.
+
+    Returns:
+        Dict[str, Any]: 読み込まれた設定情報の辞書。
+
+    Raises:
+        FileNotFoundError: 指定されたパスに設定ファイルが見つからない場合。
+        ValueError: 設定ファイルの解析に失敗した場合、または
+            `refresh_token` が設定ファイルにも環境変数にも見つからない場合。
     """
     try:
         with open(path, "rb") as f:
@@ -18,7 +31,8 @@ def load_config(path: str = DEFAULT_CONFIG_PATH) -> Dict[str, Any]:
     except tomllib.TOMLDecodeError as e:
         raise ValueError(f"設定ファイルの解析に失敗しました: {e}")
 
-    # 環境変数で認証情報を上書き（推奨）
+    # 環境変数からの認証情報の上書きは、トークンをコードやファイルに
+    # 直接記述することを避けるための推奨される方法です。
     if "PIXIV_REFRESH_TOKEN" in os.environ:
         config.setdefault("auth", {})["refresh_token"] = os.environ[
             "PIXIV_REFRESH_TOKEN"

@@ -13,9 +13,20 @@ from ..utils.path_manager import PathManager
 
 
 class ComponentGenerator:
-    """EPUBの構造ファイル(OPF, Nav, XHTMLページ)の生成を担当するクラス。"""
+    """EPUBの構造ファイル(OPF, Nav)とXHTMLページの生成を担当します。
+
+    収集されたアセット情報とメタデータを元に、Jinja2テンプレートを用いて
+    EPUBを構成する各XML/XHTMLファイルを生成する責務を持ちます。
+    """
 
     def __init__(self, config: Dict, metadata: NovelMetadata, paths: PathManager):
+        """ComponentGeneratorのインスタンスを初期化します。
+
+        Args:
+            config (Dict): アプリケーション全体の設定情報。
+            metadata (NovelMetadata): 小説のメタデータ。
+            paths (PathManager): パス管理用のユーティリティインスタンス。
+        """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.config = config
         self.metadata = metadata
@@ -24,14 +35,13 @@ class ComponentGenerator:
             "css_file", "styles/style.css"
         )
 
-        # Jinja2のテンプレート環境を初期化
         self.template_env = Environment(
             loader=FileSystemLoader("./templates/"),
             autoescape=True,
             trim_blocks=True,
             lstrip_blocks=True,
         )
-        # テンプレート内で使えるカスタムフィルタを登録
+        # テンプレート内でHTMLタグを除去するためのカスタムフィルタを登録
         self.template_env.filters["striptags"] = (
             lambda v: re.sub(r"<[^>]*?>", "", v) if v else ""
         )
@@ -42,7 +52,16 @@ class ComponentGenerator:
         raw_pages_info: List[PageInfo],
         cover_image_asset: Optional[ImageAsset],
     ) -> EpubComponents:
-        """収集されたアセットを元に、EPUBの全構成要素を生成する。"""
+        """収集されたアセットを元に、EPUBの全構成要素を生成します。
+
+        Args:
+            final_images (List[ImageAsset]): EPUBに含める画像アセットのリスト。
+            raw_pages_info (List[PageInfo]): 元となるページ情報のリスト。
+            cover_image_asset (Optional[ImageAsset]): カバー画像アセット。
+
+        Returns:
+            EpubComponents: 生成された全コンポーネントを格納したデータクラス。
+        """
         final_pages = self._create_final_pages(
             raw_pages_info, [img.filename for img in final_images]
         )
@@ -79,7 +98,17 @@ class ComponentGenerator:
     def _create_final_pages(
         self, raw_pages_info: List[PageInfo], known_image_filenames: List[str]
     ) -> List[PageAsset]:
-        """本文ファイル群を読み込み、最終的なXHTMLコンテンツを生成する。"""
+        """本文ファイル群を読み込み、最終的なXHTMLコンテンツを生成します。
+
+        不完全なHTMLを完全なXHTML文書でラップし、画像パスをEPUB内の構造に合わせて修正します。
+
+        Args:
+            raw_pages_info (List[PageInfo]): 処理対象のページ情報リスト。
+            known_image_filenames (List[str]): EPUBに含まれることが確定している画像ファイル名のリスト。
+
+        Returns:
+            List[PageAsset]: 処理済みのページアセットのリスト。
+        """
         final_pages = []
         for i, p_info in enumerate(raw_pages_info, 1):
             page_file = self.paths.novel_dir / p_info.body_path.lstrip("./")
@@ -107,7 +136,11 @@ class ComponentGenerator:
         return final_pages
 
     def _build_info_page(self) -> PageAsset:
-        """作品情報ページのXHTMLを生成する。"""
+        """作品情報ページのXHTMLコンテンツを生成します。
+
+        Returns:
+            PageAsset: 生成された作品情報ページのページアセット。
+        """
         template = self.template_env.get_template("info_page.xhtml.j2")
 
         parts = []
@@ -138,7 +171,16 @@ class ComponentGenerator:
     def _build_cover_page(
         self, cover_image_asset: Optional[ImageAsset]
     ) -> Optional[PageAsset]:
-        """カバーページのXHTMLを生成する。"""
+        """カバーページのXHTMLコンテンツを生成します。
+
+        Args:
+            cover_image_asset (Optional[ImageAsset]):
+                カバー画像のアセット。存在しない場合はNone。
+
+        Returns:
+            Optional[PageAsset]: 生成されたカバーページのページアセット。
+                                 カバーが存在しない場合はNone。
+        """
         if not cover_image_asset:
             return None
         template = self.template_env.get_template("cover_page.xhtml.j2")
@@ -154,7 +196,17 @@ class ComponentGenerator:
         info_page: PageAsset,
         cover_page: Optional[PageAsset],
     ) -> Tuple[List[Dict], List[Dict]]:
-        """manifestとspineの項目リストを構築する。"""
+        """content.opf用のmanifestとspineの項目リストを構築します。
+
+        Args:
+            final_pages (List[PageAsset]): 全ての本文ページアセット。
+            final_images (List[ImageAsset]): 全ての画像アセット。
+            info_page (PageAsset): 作品情報ページのアセット。
+            cover_page (Optional[PageAsset]): カバーページのアセット。
+
+        Returns:
+            Tuple[List[Dict], List[Dict]]: manifest項目リストとspine項目リストのタプル。
+        """
         manifest_items = [
             {
                 "id": "nav",
@@ -174,6 +226,7 @@ class ComponentGenerator:
                     "properties": "",
                 }
             )
+            # カバーは通常、本文とは別のフローで表示されるため linear="no" 相当の扱いとする
             spine_itemrefs.append({"idref": cover_page.id, "linear": False})
 
         manifest_items.append(
@@ -230,7 +283,16 @@ class ComponentGenerator:
         spine_itemrefs: List[Dict],
         cover_image_id: Optional[str],
     ) -> bytes:
-        """content.opf ファイルのコンテンツをテンプレートから生成する。"""
+        """content.opfファイルのコンテンツをテンプレートから生成します。
+
+        Args:
+            manifest_items (List[Dict]): manifestに記載する全アイテムのリスト。
+            spine_itemrefs (List[Dict]): spineに記載する全アイテム参照のリスト。
+            cover_image_id (Optional[str]): カバー画像のmanifest上のID。
+
+        Returns:
+            bytes: 生成されたcontent.opfのコンテンツ（UTF-8エンコード）。
+        """
         template = self.template_env.get_template("content.opf.j2")
 
         context = {
@@ -249,7 +311,16 @@ class ComponentGenerator:
     def _build_nav_xhtml(
         self, pages: List[PageAsset], has_info_page: bool, has_cover: bool
     ) -> bytes:
-        """nav.xhtml ファイルのコンテンツをテンプレートから生成する。"""
+        """nav.xhtml（目次ファイル）のコンテンツをテンプレートから生成します。
+
+        Args:
+            pages (List[PageAsset]): 目次に含める本文ページのリスト。
+            has_info_page (bool): 作品情報ページが存在するかどうか。
+            has_cover (bool): カバーページが存在するかどうか。
+
+        Returns:
+            bytes: 生成されたnav.xhtmlのコンテンツ（UTF-8エンコード）。
+        """
         template = self.template_env.get_template("nav.xhtml.j2")
         rendered = template.render(
             pages=pages, has_info_page=has_info_page, has_cover=has_cover
@@ -257,7 +328,17 @@ class ComponentGenerator:
         return rendered.encode("utf-8")
 
     def _ensure_xhtml_wrapper(self, content: str, title: str) -> str:
-        """コンテンツが完全なXHTMLでない場合、テンプレートを使ってラップする。"""
+        """コンテンツが<body>タグのみなどの断片である場合、完全なXHTML文書でラップします。
+
+        EPUBの仕様に準拠するため、全てのコンテンツページが妥当なXHTMLである必要があります。
+
+        Args:
+            content (str): 元のHTMLコンテンツ。
+            title (str): ページのタイトル。
+
+        Returns:
+            str: 必要に応じてラップされた、完全なXHTML文字列。
+        """
         if "<html" in content.lower() and (
             "<head" in content.lower() or "<body" in content.lower()
         ):
@@ -272,10 +353,21 @@ class ComponentGenerator:
     def _fix_image_paths_in_xhtml(
         self, content: str, known_image_filenames: List[str]
     ) -> str:
-        """XHTML内の画像パスを修正する。"""
+        """XHTML内の画像パスを、EPUBのディレクトリ構造に合わせた相対パスに修正します。
+
+        例: `src="my_image.jpg"` -> `src="../images/my_image.jpg"`
+
+        Args:
+            content (str): 修正対象のXHTMLコンテンツ。
+            known_image_filenames (List[str]): 有効な画像ファイル名のリスト。
+
+        Returns:
+            str: 画像パスが修正されたXHTMLコンテンツ。
+        """
 
         def repl(match: re.Match) -> str:
             path = match.group(2).strip()
+            # 絶対パスや親ディレクトリ参照を持つパスは、意図しない挙動を避けるため変更しない
             if path.startswith(("http", "/", "../")):
                 return f'src="{path}"'
 
@@ -289,7 +381,14 @@ class ComponentGenerator:
         return re.sub(r'src=(["\'])([^"\']+)\1', repl, content, flags=re.IGNORECASE)
 
     def _format_date(self, date_str: str) -> str:
-        """日付文字列をYYYY-MM-DD形式に整形する。"""
+        """日付文字列を `YYYY-MM-DD` 形式に整形します。
+
+        Args:
+            date_str (str): ISO形式などの日付文字列。
+
+        Returns:
+            str: フォーマットされた日付文字列。失敗した場合は元の文字列の一部。
+        """
         if not date_str:
             return ""
         try:
@@ -299,9 +398,10 @@ class ComponentGenerator:
             return date_str.split("T")[0] if "T" in date_str else date_str
 
     def _recalculate_and_update_text_length(self, final_pages: List[PageAsset]):
-        """
-        最終的なページコンテンツからHTMLタグを除外した文字数を再計算し、
-        メタデータオブジェクトを更新します。
+        """最終的なページコンテンツからHTMLタグを除外し、正確な文字数を再計算してメタデータを更新します。
+
+        Args:
+            final_pages (List[PageAsset]): 最終的に生成されたページアセットのリスト。
         """
         self.logger.debug("ビルド内容から文字数を再計算しています...")
         total_length = 0

@@ -1,3 +1,16 @@
+"""
+Pixiv小説ダウンローダー＆EPUBコンバーターのメインスクリプト。
+
+コマンドラインインターフェースを提供し、指定された小説IDやシリーズIDに基づいて
+小説データをダウンロードし、EPUBファイルとして整形・出力します。
+
+主な機能:
+- 単一または複数の小説IDを指定して処理
+- シリーズIDを指定してシリーズ作品をまとめて処理
+- ダウンロード済みのデータからEPUBを生成
+- EPUB生成前にメタデータを対話的に編集
+"""
+
 import argparse
 import logging
 import json
@@ -12,15 +25,23 @@ from src.utils.log_setup import setup_logging
 from rich.console import Console
 from rich.panel import Panel
 
-# ロガーとRichコンソール
 logger = logging.getLogger(__name__)
 console = Console()
 
 
 def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
     """
-    detail.jsonを対話的に編集し、更新された辞書データを返す。
-    変更がなかった場合やファイルが存在しない場合はNoneを返す。
+    `detail.json`の内容を対話的に編集します。
+
+    ユーザーにタイトル、作者名、あらすじの変更を促し、
+    変更があった場合のみファイルを更新して、新しいメタデータ辞書を返します。
+
+    Args:
+        detail_path (Path): 編集対象の`detail.json`ファイルへのパス。
+
+    Returns:
+        Optional[Dict[str, Any]]: 変更が加えられた場合に、更新後のメタデータ辞書を返します。
+                                 変更がなかった場合や、ファイルが存在しない場合はNoneを返します。
     """
     if not detail_path.is_file():
         logger.error(f"メタデータファイルが見つかりません: {detail_path}")
@@ -31,7 +52,7 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
     with open(detail_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    # 編集したい項目を定義 (label, path_keys)
+    # 編集対象のフィールドを定義: (表示ラベル, データ内のキー階層)
     editable_fields = {
         "title": ("小説タイトル", ["title"]),
         "author": ("作者名", ["authors", "name"]),
@@ -41,7 +62,7 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
     made_changes = False
     for key, (label, path_keys) in editable_fields.items():
         try:
-            # ネストされた値を取得
+            # ネストされた辞書から値を取得
             temp = data
             for p_key in path_keys:
                 temp = temp[p_key]
@@ -56,7 +77,7 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
         new_value = console.input("新しい値を入力 (変更しない場合はEnter): ").strip()
 
         if new_value:
-            # ネストされた値を更新
+            # ネストされた辞書の値を更新
             temp = data
             for p_key in path_keys[:-1]:
                 temp = temp[p_key]
@@ -65,7 +86,6 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
             made_changes = True
 
     if made_changes:
-        # 変更をファイルに書き戻す
         with open(detail_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
         console.print("✅ [bold]メタデータをファイルに保存しました。[/]")
@@ -76,7 +96,18 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
 
 
 def build_from_path(novel_path: Path, config: dict, args: argparse.Namespace):
-    """指定されたパスからEPUBをビルドする関数"""
+    """
+    指定されたローカルパスからEPUBを生成します。
+
+    `detail.json`を含むディレクトリパスを受け取り、EpubBuilderを初期化して
+    EPUB生成プロセスを実行します。
+
+    Args:
+        novel_path (Path): `detail.json`が格納されている小説データディレクトリのパス。
+        config (dict): アプリケーション全体の設定情報。
+        args (argparse.Namespace): コマンドライン引数。
+                                   `--interactive`フラグの判定に使用します。
+    """
     if not (novel_path / "detail.json").exists():
         logger.error(
             f"指定されたディレクトリに detail.json が見つかりません: {novel_path}"
@@ -102,20 +133,28 @@ def build_from_path(novel_path: Path, config: dict, args: argparse.Namespace):
 
 
 def process_single_novel(novel_id: int, config: dict, args: argparse.Namespace):
-    """単一の小説をダウンロードし、ビルドする関数"""
-    # --- ダウンロード処理 ---
+    """
+    単一の小説IDに対してダウンロードからビルドまでの一連の処理を実行します。
+
+    Args:
+        novel_id (int): 処理対象のPixiv小説ID。
+        config (dict): アプリケーション全体の設定情報。
+        args (argparse.Namespace): コマンドライン引数。
+                                   `--download-only`フラグの判定に使用します。
+    """
     console.print("\n[yellow]STEP 1: 小説データのダウンロード中...[/]")
     downloader = PixivNovelDownloader(novel_id=novel_id, config=config)
     novel_path = downloader.run()
     console.print(f"✅ [bold]ダウンロード完了[/] -> [green]{novel_path}[/]")
 
-    # --- ビルド処理 ---
     if not args.download_only:
         build_from_path(novel_path, config, args)
 
 
 def main():
-    """メイン処理"""
+    """
+    コマンドライン引数を解析し、アプリケーションのメイン処理を実行します。
+    """
     parser = argparse.ArgumentParser(
         description="Pixiv小説をダウンロードしてEPUBに変換します。",
         formatter_class=argparse.RawTextHelpFormatter,
@@ -159,8 +198,8 @@ def main():
     try:
         config = load_config(args.config)
 
+        # --- シリーズ処理モード ---
         if args.series:
-            # --- シリーズ処理モード ---
             if not args.inputs:
                 parser.error("処理対象のシリーズIDを指定してください。")
 
@@ -172,7 +211,6 @@ def main():
             series_downloader = PixivSeriesDownloader(series_id, config)
             downloaded_paths = series_downloader.run(interactive=args.interactive)
 
-            # ダウンロードが完了し、--download-onlyでなければビルド処理に入る
             if not args.download_only and downloaded_paths:
                 console.rule("[bold yellow]Starting Series Build Process[/]")
                 for i, path in enumerate(downloaded_paths, 1):
@@ -188,31 +226,34 @@ def main():
                         )
             return
 
+        # --- ビルド専用モード ---
         if args.build_only:
-            # --- ビルドのみモード ---
-            logger.info(f"ビルドのみモードで実行します: {args.build_only}")
+            logger.info(f"ビルド専用モードで実行します: {args.build_only}")
             build_path = Path(args.build_only).resolve()
             build_from_path(build_path, config, args)
             return
 
-        # --- IDリストの解決 ---
+        # --- 入力IDの解決 ---
         if not args.inputs:
             parser.error("処理対象の小説IDまたはIDリストファイルを指定してください。")
 
         novel_ids = []
         input_path = Path(args.inputs[0])
+        # 入力がファイルパスであり、かつそれが一つだけ指定されている場合、
+        # ファイルからIDリストを読み込む
         if len(args.inputs) == 1 and input_path.is_file():
             logger.info(f"ファイルからIDを読み込みます: {input_path}")
             with open(input_path, "r", encoding="utf-8") as f:
                 novel_ids = [int(line.strip()) for line in f if line.strip().isdigit()]
         else:
+            # それ以外の場合は、引数を直接IDとして解釈する
             novel_ids = [int(val) for val in args.inputs if val.isdigit()]
 
         if not novel_ids:
             logger.error("処理対象の小説IDが見つかりません。")
             return
 
-        # --- メインループ ---
+        # --- メインループ (単一小説処理) ---
         total = len(novel_ids)
         logger.info(f"計 {total} 件の小説を処理します。")
         for i, novel_id in enumerate(novel_ids, 1):
@@ -231,7 +272,7 @@ def main():
         console.rule("[bold green]All tasks completed![/]")
 
     except (FileNotFoundError, ValueError) as e:
-        logger.error(f"エラーが発生しました: {e}")
+        logger.error(f"設定ファイルや入力ファイルが見つからないか、値が不正です: {e}")
     except Exception:
         logger.exception("予期せぬエラーが発生しました。")
 
