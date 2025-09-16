@@ -7,6 +7,7 @@ Pixiv小説ダウンローダー＆EPUBコンバーターのメインスクリ�
 主な機能:
 - 単一または複数の小説IDを指定して処理
 - シリーズIDを指定してシリーズ作品をまとめて処理
+- ユーザーIDを指定して、そのユーザーの全作品をまとめて処理
 - ダウンロード済みのデータからEPUBを生成
 - EPUB生成前にメタデータを対話的に編集
 """
@@ -16,6 +17,8 @@ import logging
 import json
 from pathlib import Path
 from typing import Dict, Any, Optional
+
+from pixivpy3 import AppPixivAPI
 
 from src.utils.config import load_config
 from src.core.downloader import PixivNovelDownloader, PixivSeriesDownloader
@@ -151,6 +154,108 @@ def process_single_novel(novel_id: int, config: dict, args: argparse.Namespace):
         build_from_path(novel_path, config, args)
 
 
+def process_series(series_id: int, config: dict, args: argparse.Namespace):
+    """
+    単一のシリーズIDに対してダウンロードからビルドまでの一連の処理を実行します。
+
+    Args:
+        series_id (int): 処理対象のPixivシリーズID。
+        config (dict): アプリケーション全体の設定情報。
+        args (argparse.Namespace): コマンドライン引数。
+    """
+    console.print(f"シリーズモードで実行します。シリーズID: [cyan]{series_id}[/]")
+    series_downloader = PixivSeriesDownloader(series_id, config)
+    downloaded_paths = series_downloader.run(interactive=args.interactive)
+
+    if not args.download_only and downloaded_paths:
+        console.rule("[bold yellow]Starting Series Build Process[/]")
+        for i, path in enumerate(downloaded_paths, 1):
+            console.print(f"\n[bold]Building {i}/{len(downloaded_paths)}[/]")
+            try:
+                build_from_path(path, config, args)
+            except Exception:
+                logger.exception(f"パス {path} のビルド中にエラーが発生しました。")
+                console.print(f"❌ [red]パス {path.name} のビルドに失敗しました。[/]")
+
+
+def process_user_novels(user_id: int, config: dict, args: argparse.Namespace):
+    """
+    指定されたユーザーのすべての小説をダウンロード・ビルドします。
+
+    シリーズ作品と単独作品を自動的に分類し、それぞれ適切に処理します。
+
+    Args:
+        user_id (int): 処理対象のPixivユーザーID。
+        config (dict): アプリケーション全体の設定情報。
+        args (argparse.Namespace): コマンドライン引数。
+    """
+    console.print(f"ユーザーモードで実行します。ユーザーID: [cyan]{user_id}[/]")
+
+    api = AppPixivAPI()
+    refresh_token = config.get("auth", {}).get("refresh_token")
+    if not refresh_token or refresh_token == "your_refresh_token_here":
+        raise ValueError("設定に有効なPixivのrefresh_tokenが見つかりません。")
+    api.auth(refresh_token=refresh_token)
+
+    console.print("ユーザーの作品リストを取得中...")
+    single_novel_ids = []
+    series_ids = set()
+    next_url = None
+
+    # ページネーションを処理しながら全作品のIDを取得
+    while True:
+        if next_url:
+            params = api.parse_qs(next_url)
+            res = api.user_novels(**params)
+        else:
+            res = api.user_novels(user_id=user_id)
+
+        if "novels" in res:
+            for novel in res.novels:
+                if novel.series and novel.series.id:
+                    series_ids.add(novel.series.id)
+                else:
+                    single_novel_ids.append(novel.id)
+
+        next_url = res.get("next_url")
+        if not next_url:
+            break
+
+    console.print(
+        f"取得結果: [bold cyan]{len(series_ids)}[/]件のシリーズ、[bold cyan]{len(single_novel_ids)}[/]件の単独作品が見つかりました。"
+    )
+
+    # シリーズ作品の処理
+    if series_ids:
+        console.rule("[bold yellow]Processing Series[/]")
+        for i, series_id in enumerate(series_ids, 1):
+            console.print(f"\n[bold]Processing Series {i}/{len(series_ids)}[/]")
+            try:
+                process_series(series_id, config, args)
+            except Exception:
+                logger.exception(
+                    f"シリーズID {series_id} の処理中にエラーが発生しました。"
+                )
+                console.print(
+                    f"❌ [red]シリーズID {series_id} の処理に失敗しました。[/]"
+                )
+
+    # 単独作品の処理
+    if single_novel_ids:
+        console.rule("[bold yellow]Processing Single Novels[/]")
+        total_singles = len(single_novel_ids)
+        for i, novel_id in enumerate(single_novel_ids, 1):
+            console.rule(f"[bold]Processing Single Novel {i}/{total_singles}[/]")
+            console.print(f"Novel ID: [cyan]{novel_id}[/]")
+            try:
+                process_single_novel(novel_id, config, args)
+            except Exception:
+                logger.exception(
+                    f"小説ID {novel_id} の処理中に予期せぬエラーが発生しました。"
+                )
+                console.print(f"❌ [red]小説ID {novel_id} の処理に失敗しました。[/]")
+
+
 def main():
     """
     コマンドライン引数を解析し、アプリケーションのメイン処理を実行します。
@@ -159,9 +264,36 @@ def main():
         description="Pixiv小説をダウンロードしてEPUBに変換します。",
         formatter_class=argparse.RawTextHelpFormatter,
     )
-    parser.add_argument(
-        "inputs", nargs="*", help="小説ID(複数可)またはIDリストファイルへのパス"
+
+    # --- 入力モードの定義 ---
+    input_group = parser.add_mutually_exclusive_group()
+    input_group.add_argument(
+        "inputs",
+        nargs="*",
+        default=None,
+        help="小説ID(複数可)またはIDリストファイルへのパス",
     )
+    input_group.add_argument(
+        "-s",
+        "--series",
+        type=int,
+        metavar="SERIES_ID",
+        help="入力をシリーズIDとして扱います",
+    )
+    input_group.add_argument(
+        "--user",
+        type=int,
+        metavar="USER_ID",
+        help="指定したユーザーIDのすべての小説をダウンロードします",
+    )
+    input_group.add_argument(
+        "--build-only",
+        type=str,
+        metavar="RAW_DIR",
+        help="指定ディレクトリからビルドのみ実行します",
+    )
+
+    # --- その他のオプション ---
     parser.add_argument(
         "-c", "--config", default="./configs/config.toml", help="設定ファイルのパス"
     )
@@ -172,21 +304,10 @@ def main():
         "-i",
         "--interactive",
         action="store_true",
-        help="ビルド前にメタデータを対話的に編集します",
+        help="ビルド前にメタデータを対話的に編集します (シリーズモードまたはユーザーモードで使用可能)",
     )
     parser.add_argument(
-        "-s", "--series", action="store_true", help="入力をシリーズIDとして扱います"
-    )
-
-    mode_group = parser.add_mutually_exclusive_group()
-    mode_group.add_argument(
         "--download-only", action="store_true", help="ダウンロードのみ実行します"
-    )
-    mode_group.add_argument(
-        "--build-only",
-        type=str,
-        metavar="RAW_DIR",
-        help="指定ディレクトリからビルドのみ実行します",
     )
 
     args = parser.parse_args()
@@ -198,32 +319,14 @@ def main():
     try:
         config = load_config(args.config)
 
+        # --- ユーザー処理モード ---
+        if args.user:
+            process_user_novels(args.user, config, args)
+            return
+
         # --- シリーズ処理モード ---
         if args.series:
-            if not args.inputs:
-                parser.error("処理対象のシリーズIDを指定してください。")
-
-            series_id = int(args.inputs[0])
-            console.print(
-                f"シリーズモードで実行します。シリーズID: [cyan]{series_id}[/]"
-            )
-
-            series_downloader = PixivSeriesDownloader(series_id, config)
-            downloaded_paths = series_downloader.run(interactive=args.interactive)
-
-            if not args.download_only and downloaded_paths:
-                console.rule("[bold yellow]Starting Series Build Process[/]")
-                for i, path in enumerate(downloaded_paths, 1):
-                    console.print(f"\n[bold]Building {i}/{len(downloaded_paths)}[/]")
-                    try:
-                        build_from_path(path, config, args)
-                    except Exception:
-                        logger.exception(
-                            f"パス {path} のビルド中にエラーが発生しました。"
-                        )
-                        console.print(
-                            f"❌ [red]パス {path.name} のビルドに失敗しました。[/]"
-                        )
+            process_series(args.series, config, args)
             return
 
         # --- ビルド専用モード ---
@@ -233,9 +336,11 @@ def main():
             build_from_path(build_path, config, args)
             return
 
-        # --- 入力IDの解決 ---
+        # --- 入力IDの解決 (単独小説) ---
         if not args.inputs:
-            parser.error("処理対象の小説IDまたはIDリストファイルを指定してください。")
+            parser.error(
+                "処理対象の小説ID、シリーズID、またはユーザーIDを指定してください。"
+            )
 
         novel_ids = []
         input_path = Path(args.inputs[0])
