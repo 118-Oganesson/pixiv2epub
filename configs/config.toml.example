@@ -1,67 +1,87 @@
-# 設定ファイルの見本です。これをコピーして `config.toml` として使用します。
+# このファイルを `config.toml` としてコピーし、環境に合わせて設定値を変更してください。
 
+# ------------------------------------------------------------------------------
+# ダウンローダー設定
+# ------------------------------------------------------------------------------
 [downloader]
-# ダウンロードした小説データの一時保存先ベースディレクトリ
+# ダウンロードした小説データや画像の一時保存先ディレクトリ
 save_directory = "./pixiv_raw"
 
-# ★ 更新: 単独作品用のフォルダ構成テンプレート。使用可能: {id}, {title}, {author_name}
-# 例: ./pixiv_raw/作者名/小説ID_小説タイトル/
+# 単独作品の保存フォルダ構成。
+# 使用可能変数: {id}, {title}, {author_name}
 raw_dir_template = "{author_name}/{id}_{title}"
 
-# ★ 更新: シリーズ用のフォルダ構成テンプレート。使用可能: {id}, {title}, {author_name}
-# 例: ./pixiv_raw/作者名/series_シリーズID_シリーズ名/
+# シリーズ作品の保存フォルダ構成。
+# 使用可能変数: {id}, {title}, {author_name}
 series_dir_template = "{author_name}/series_{id}_{title}"
 
-# Pixiv APIへのリクエスト間隔（秒）
+# Pixiv APIへのリクエスト間隔 (秒)。サーバー負荷を軽減するために設定します。
 api_delay = 1.0
+
 # APIリクエスト失敗時の最大リトライ回数
 api_retries = 3
-# trueに設定すると、既に存在する画像を常に上書きダウンロードします
+
+# true の場合、ダウンロード先に同名ファイルがあっても常に上書き保存します。
 overwrite_existing_images = false
 
+
+# ------------------------------------------------------------------------------
+# EPUBビルダー設定
+# ------------------------------------------------------------------------------
 [builder]
-# 生成されたEPUBファイルのデフォルト出力先ディレクトリ
+# 生成されたEPUBファイルの出力先ディレクトリ
 output_directory = "./epubs"
 
-# ★ 更新: 単独作品用のファイル/フォルダ構成テンプレート
-# 例: ./epubs/作者名/小説タイトル.epub
+# 単独作品のEPUBファイル名とフォルダ構成。
+# 使用可能変数: {author_name}, {title}
 filename_template = "{author_name}/{title}.epub"
 
-# ★ 新設: シリーズ作品用のファイル/フォルダ構成テンプレート
-# 例: ./epubs/作者名/シリーズ名/[作者名] シリーズ名 - 小説タイトル.epub
+# シリーズ作品のEPUBファイル名とフォルダ構成。
+# 使用可能変数: {author_name}, {series_title}, {title}
 series_filename_template = "{author_name}/{series_title}/[{author_name}] {series_title} - {title}.epub"
 
-# EPUBのスタイルシートファイルの相対パス (小説ディレクトリからのパス)
+# EPUBに適用するCSSファイルへのパス (一時保存先ディレクトリからの相対パス)
 css_file = "styles/style.css"
 
+
+# ------------------------------------------------------------------------------
+# 認証設定
+# ------------------------------------------------------------------------------
 [auth]
-# Pixivのrefresh_token。環境変数 PIXIV_REFRESH_TOKEN での上書きを推奨
+# Pixivの `refresh_token` を設定します。
+# セキュリティのため、このファイルに直接書き込まず、環境変数 `PIXIV_REFRESH_TOKEN` で設定することを強く推奨します。
 refresh_token = "your_refresh_token_here"
 
+
+# ------------------------------------------------------------------------------
+# 画像圧縮設定
+# ------------------------------------------------------------------------------
 [compression]
-# 画像圧縮を有効にするか
+# true にすると、ダウンロードした画像を圧縮してEPUBファイルのサイズを削減します。
 enabled = true
-# 圧縮後のファイルが元より大きい場合はスキップするか
+
+# true の場合、圧縮によってファイルサイズが増加する画像は、圧縮前のオリジナルファイルを使用します。
 skip_if_larger = true
-# 並列処理する際の最大ワーカー数
+
+# 画像圧縮を並列処理する際の最大ワーカー数。CPUコア数に合わせると効果的です。
 max_workers = 4
 
-# pngquant の圧縮設定
+# --- pngquant (PNG画像) の圧縮設定 ---
 [compression.pngquant]
-colors = 256
-quality = "65-90"
-speed = 3
-strip = true
+colors = 256          # 減色後の最大色数 (2-256)
+quality = "65-90"     # 圧縮品質 (min-max, 0-100)
+speed = 3             # 圧縮速度 (1-11)。高いほど速いが品質は低下
+strip = true          # メタデータを削除するか
 
-# jpegoptim の圧縮設定
+# --- jpegoptim (JPEG画像) の圧縮設定 ---
 [compression.jpegoptim]
-max_quality = 85
-strip_all = true
-progressive = true
-preserve_timestamp = true
+max_quality = 85      # 最大圧縮品質 (0-100)。画質をこの値以下に抑える
+strip_all = true      # すべてのメタデータ (コメント, Exif, etc.) を削除するか
+progressive = true    # プログレッシブJPEGを生成するか
+preserve_timestamp = true # 元ファイルのタイムスタンプを維持するか
 
-# cwebp の圧縮設定
+# --- cwebp (WebP画像) の圧縮設定 ---
 [compression.cwebp]
-quality = 75
-lossless = false
-metadata = "none"
+quality = 75          # 圧縮品質 (0-100)。非可逆圧縮時に使用
+lossless = false      # 可逆圧縮モードを有効にするか
+metadata = "none"     # 保持するメタデータ (all, none, exif, icc, xmp)
