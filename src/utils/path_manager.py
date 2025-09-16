@@ -6,25 +6,18 @@ class PathManager:
     小説ダウンロードに関するファイルパスの管理を専門に行うクラス。
     """
 
-    def __init__(self, base_dir: Path, novel_title: str, novel_id: str):
+    def __init__(self, base_dir: Path, novel_dir_name: str):
         """
         PathManagerを初期化します。
 
         Args:
             base_dir (Path): 保存先のベースディレクトリ。
-            novel_title (str): 小説のタイトル。
-            novel_id (str): 小説ID。
+            novel_dir_name (str): ベースディレクトリ内に作成される小説ごとのディレクトリ名。
         """
-        # ファイル名として安全な文字列に変換
-        safe_title = "".join(
-            c for c in novel_title if c.isalnum() or c in " _-"
-        ).strip()
+        if not novel_dir_name:
+            novel_dir_name = "novel_unknown"
 
-        # タイトルが空、または記号のみだった場合のフォールバック
-        if not safe_title:
-            safe_title = f"novel_{novel_id}"
-
-        self.novel_dir: Path = base_dir / safe_title
+        self.novel_dir: Path = base_dir / novel_dir_name
         self.image_dir: Path = self.novel_dir / "images"
 
     @property

@@ -54,10 +54,13 @@ class PixivNovelDownloader:
         )
 
         # --- PathManagerを初期化して利用 ---
+        template = downloader_conf.get("raw_dir_template", "{id}_{title}")
+        safe_title = "".join(c for c in self.novel_data.title if c.isalnum() or c in " _-").strip()
+        dir_name = template.format(id=self.novel_data.id, title=safe_title)
+
         self.paths = PathManager(
             base_dir=self.base_dir,
-            novel_title=self.novel_data.title,
-            novel_id=self.novel_data.id,
+            novel_dir_name=dir_name,
         )
         self.paths.setup_directories()
         self.logger.info(f"保存先ディレクトリ: {self.paths.novel_dir}")

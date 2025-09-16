@@ -1,7 +1,9 @@
 import json
 import logging
 import os
+import re
 from pathlib import Path
+from typing import Any, Dict, Optional
 
 from ..data.models import NovelMetadata
 from ..utils.path_manager import PathManager
@@ -13,24 +15,38 @@ from .archiver import Archiver
 class EpubBuilder:
     """EPUB生成プロセス全体を統括するオーケストレータークラス。"""
 
-    def __init__(self, novel_dir: str, config: dict):
+    def __init__(
+        self,
+        novel_dir: str,
+        config: dict,
+        custom_metadata: Optional[Dict[str, Any]] = None,
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.novel_dir_path = Path(novel_dir).resolve()
         self.config = config
 
-        # 1. メタデータとパス管理の準備
-        detail_json_path = self.novel_dir_path / "detail.json"
-        if not detail_json_path.is_file():
-            raise FileNotFoundError(f"detail.jsonが見つかりません: {detail_json_path}")
-
-        with open(detail_json_path, "r", encoding="utf-8") as f:
-            metadata_dict = json.load(f)
+        if custom_metadata:
+            # 外部から渡されたメタデータを使用
+            metadata_dict = custom_metadata
+            self.logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
+        else:
+            # 従来通り detail.json を読み込む
+            detail_json_path = self.novel_dir_path / "detail.json"
+            if not detail_json_path.is_file():
+                raise FileNotFoundError(
+                    f"detail.jsonが見つかりません: {detail_json_path}"
+                )
+            with open(detail_json_path, "r", encoding="utf-8") as f:
+                metadata_dict = json.load(f)
 
         self.metadata = NovelMetadata.from_dict(metadata_dict)
+        # self.novel_dir_path は Path オブジェクトなので、.name でディレクトリ名を取得
+        novel_directory_name = self.novel_dir_path.name
+
         self.paths = PathManager(
             base_dir=self.novel_dir_path.parent,
-            novel_title=self.metadata.title,
-            novel_id=self.metadata.identifier.get("novel_id"),
+            # 'novel_title' と 'novel_id' の代わりに 'novel_dir_name' を使用
+            novel_dir_name=novel_directory_name,
         )
 
         # 2. 専門家クラスのインスタンス化
@@ -76,16 +92,29 @@ class EpubBuilder:
 
     def _determine_output_path(self) -> Path:
         """メタデータと設定から最終的な出力ファイルパスを決定します。"""
-        title = self.metadata.title or self.novel_dir_path.name
-        safe_name = (
-            "".join(c for c in title if c.isalnum() or c in " _-").strip() or "book"
-        )
-        epub_filename = f"{safe_name}.epub"
+        builder_conf = self.config.get("builder", {})
+        template = builder_conf.get("filename_template", "{title}.epub")
 
-        output_dir_str = self.config.get("builder", {}).get("output_directory", ".")
+        # テンプレート用の変数を準備 (キーが存在しない場合もエラーにならないように)
+        template_vars = {
+            "title": self.metadata.title or "untitled",
+            "id": self.metadata.identifier.get("novel_id", "0"),
+            "author_name": self.metadata.authors.name or "unknown_author",
+            "author_id": str(self.metadata.authors.id or "0"),
+            "series_title": self.metadata.series.title if self.metadata.series else "",
+        }
+
+        # テンプレートを適用してファイル名を生成
+        epub_filename = template.format(**template_vars)
+
+        # ファイル名として不正な文字を置換または削除
+        invalid_chars = r'[\\/:*?"<>|]'
+        safe_filename = re.sub(invalid_chars, "_", epub_filename)
+
+        output_dir_str = builder_conf.get("output_directory", ".")
         path = Path(output_dir_str)
         path.mkdir(parents=True, exist_ok=True)
-        return path / epub_filename
+        return path / safe_filename
 
     def _cleanup_failed_build(self, path: Path):
         """ビルド失敗時に、不完全な出力ファイルを削除します。"""
