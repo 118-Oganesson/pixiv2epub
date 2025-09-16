@@ -76,9 +76,11 @@ class PageInfo:
     def from_dict(cls, data: dict) -> "PageInfo":
         return cls(title=data.get("title"), body_path=data.get("body"))
 
+
 @dataclass
 class SeriesInfo:
     """小説のシリーズ情報を格納するデータクラス。"""
+
     id: int
     title: str
 
@@ -87,6 +89,7 @@ class SeriesInfo:
         if data and "id" in data and "title" in data:
             return cls(id=data["id"], title=data["title"])
         return None
+
 
 @dataclass
 class NovelMetadata:
@@ -296,4 +299,68 @@ class NovelApiResponse:
             replaceableItemIds=data.get("replaceableItemIds", []),
             seasonalEffectAnimationUrls=data.get("seasonalEffectAnimationUrls"),
             eventBanners=data.get("eventBanners"),
+        )
+
+
+# --- downloader.py (シリーズ) が利用するAPI応答のデータ構造 ---
+
+
+@dataclass
+class SeriesUser:
+    """シリーズ情報の作者を表すデータクラス。"""
+
+    id: int
+    name: str
+
+
+@dataclass
+class SeriesDetail:
+    """シリーズの詳細情報を格納するデータクラス。"""
+
+    id: int
+    title: str
+    user: SeriesUser
+
+
+@dataclass
+class NovelInSeries:
+    """シリーズ内の各小説の情報を格納するデータクラス。"""
+
+    id: int
+    title: str
+    order: int
+
+
+@dataclass
+class NovelSeriesApiResponse:
+    """Pixiv API (novel_series) からの応答全体を格納するデータクラス。"""
+
+    detail: SeriesDetail
+    novels: List[NovelInSeries]
+    next_url: Optional[str]
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "NovelSeriesApiResponse":
+        detail_data = data.get("novel_series_detail", {})
+        user_data = detail_data.get("user", {})
+
+        novels_data = []
+        # **novel_dict のようにアンパックするのではなく、必要なキーだけを明示的に指定する
+        for i, novel_dict in enumerate(data.get("novels", [])):
+            novels_data.append(
+                NovelInSeries(
+                    id=novel_dict.get("id"),
+                    title=novel_dict.get("title"),
+                    order=novel_dict.get("order", i + 1),
+                )
+            )
+
+        return cls(
+            detail=SeriesDetail(
+                id=detail_data.get("id"),
+                title=detail_data.get("title"),
+                user=SeriesUser(id=user_data.get("id"), name=user_data.get("name")),
+            ),
+            novels=novels_data,
+            next_url=data.get("next_url"),
         )

@@ -93,9 +93,13 @@ class EpubBuilder:
     def _determine_output_path(self) -> Path:
         """メタデータと設定から最終的な出力ファイルパスを決定します。"""
         builder_conf = self.config.get("builder", {})
-        template = builder_conf.get("filename_template", "{title}.epub")
 
-        # テンプレート用の変数を準備 (キーが存在しない場合もエラーにならないように)
+        # ★ シリーズ情報があり、専用テンプレートが設定されていればそれを優先
+        if self.metadata.series and "series_filename_template" in builder_conf:
+            template = builder_conf.get("series_filename_template")
+        else:
+            template = builder_conf.get("filename_template", "{title}.epub")
+
         template_vars = {
             "title": self.metadata.title or "untitled",
             "id": self.metadata.identifier.get("novel_id", "0"),
@@ -104,17 +108,26 @@ class EpubBuilder:
             "series_title": self.metadata.series.title if self.metadata.series else "",
         }
 
-        # テンプレートを適用してファイル名を生成
-        epub_filename = template.format(**template_vars)
+        # テンプレートを適用して相対パスを生成
+        relative_path_str = template.format(**template_vars)
 
-        # ファイル名として不正な文字を置換または削除
+        # ★ パス内の各要素（フォルダ名、ファイル名）をサニタイズする
         invalid_chars = r'[\\/:*?"<>|]'
-        safe_filename = re.sub(invalid_chars, "_", epub_filename)
 
-        output_dir_str = builder_conf.get("output_directory", ".")
-        path = Path(output_dir_str)
-        path.mkdir(parents=True, exist_ok=True)
-        return path / safe_filename
+        # パス区切り文字で分割し、各部分をサニタイズしてからPathオブジェクトを生成
+        safe_parts = [
+            re.sub(invalid_chars, "_", part) for part in relative_path_str.split("/")
+        ]
+        safe_relative_path = Path(*safe_parts)
+
+        # ベースとなる出力ディレクトリと結合
+        output_dir_base = Path(builder_conf.get("output_directory", "."))
+        final_path = output_dir_base / safe_relative_path
+
+        # ★ 出力先の親ディレクトリが存在しない場合は自動で作成
+        final_path.parent.mkdir(parents=True, exist_ok=True)
+
+        return final_path
 
     def _cleanup_failed_build(self, path: Path):
         """ビルド失敗時に、不完全な出力ファイルを削除します。"""

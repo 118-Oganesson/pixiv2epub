@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 
 from src.utils.config import load_config
-from src.core.downloader import PixivNovelDownloader
+from src.core.downloader import PixivNovelDownloader, PixivSeriesDownloader
 from src.core.builder import EpubBuilder
 from src.utils.log_setup import setup_logging
 
@@ -75,42 +75,43 @@ def interactive_edit_metadata(detail_path: Path) -> Optional[Dict[str, Any]]:
     return None
 
 
-def process_single_novel(novel_id: int, config: dict, args: argparse.Namespace):
-    """単一の小説を処理する関数"""
-    novel_path: Optional[Path] = None
+def build_from_path(novel_path: Path, config: dict, args: argparse.Namespace):
+    """指定されたパスからEPUBをビルドする関数"""
+    if not (novel_path / "detail.json").exists():
+        logger.error(
+            f"指定されたディレクトリに detail.json が見つかりません: {novel_path}"
+        )
+        return
 
-    # --- ダウンロード処理 ---
-    if not args.build_only:
-        console.print("\n[yellow]STEP 1: 小説データのダウンロード中...[/]")
-        downloader = PixivNovelDownloader(novel_id=novel_id, config=config)
-        novel_path = downloader.run()
-        console.print(f"✅ [bold]ダウンロード完了[/] -> [green]{novel_path}[/]")
-    else:
-        # ビルドのみモードの場合、パスを引数から取得
-        novel_path = Path(args.build_only).resolve()
-        if not (novel_path / "detail.json").exists():
-            logger.error(
-                f"指定されたディレクトリに detail.json が見つかりません: {novel_path}"
-            )
-            return
+    console.print(f"\n[yellow]EPUB生成中: {novel_path.name}[/]")
 
     custom_meta = None
-    if args.interactive and not args.download_only:
+    if args.interactive:
         custom_meta = interactive_edit_metadata(novel_path / "detail.json")
+
+    builder = EpubBuilder(str(novel_path), config, custom_metadata=custom_meta)
+    epub_path = builder.create_epub()
+
+    console.print(
+        Panel(
+            f"✅ [bold]EPUB successfully created![/]\n[green]{epub_path}[/]",
+            title="[bold green]Success[/]",
+            expand=False,
+        )
+    )
+
+
+def process_single_novel(novel_id: int, config: dict, args: argparse.Namespace):
+    """単一の小説をダウンロードし、ビルドする関数"""
+    # --- ダウンロード処理 ---
+    console.print("\n[yellow]STEP 1: 小説データのダウンロード中...[/]")
+    downloader = PixivNovelDownloader(novel_id=novel_id, config=config)
+    novel_path = downloader.run()
+    console.print(f"✅ [bold]ダウンロード完了[/] -> [green]{novel_path}[/]")
 
     # --- ビルド処理 ---
     if not args.download_only:
-        console.print("\n[yellow]STEP 2: EPUBファイルの生成中...[/]")
-        builder = EpubBuilder(str(novel_path), config, custom_metadata=custom_meta)
-        epub_path = builder.create_epub()
-
-        console.print(
-            Panel(
-                f"✅ [bold]EPUB successfully created![/]\n[green]{epub_path}[/]",
-                title="[bold green]Success[/]",
-                expand=False,
-            )
-        )
+        build_from_path(novel_path, config, args)
 
 
 def main():
@@ -134,6 +135,9 @@ def main():
         action="store_true",
         help="ビルド前にメタデータを対話的に編集します",
     )
+    parser.add_argument(
+        "-s", "--series", action="store_true", help="入力をシリーズIDとして扱います"
+    )
 
     mode_group = parser.add_mutually_exclusive_group()
     mode_group.add_argument(
@@ -155,11 +159,40 @@ def main():
     try:
         config = load_config(args.config)
 
-        # --- ビルドのみモード ---
+        if args.series:
+            # --- シリーズ処理モード ---
+            if not args.inputs:
+                parser.error("処理対象のシリーズIDを指定してください。")
+
+            series_id = int(args.inputs[0])
+            console.print(
+                f"シリーズモードで実行します。シリーズID: [cyan]{series_id}[/]"
+            )
+
+            series_downloader = PixivSeriesDownloader(series_id, config)
+            downloaded_paths = series_downloader.run(interactive=args.interactive)
+
+            # ダウンロードが完了し、--download-onlyでなければビルド処理に入る
+            if not args.download_only and downloaded_paths:
+                console.rule("[bold yellow]Starting Series Build Process[/]")
+                for i, path in enumerate(downloaded_paths, 1):
+                    console.print(f"\n[bold]Building {i}/{len(downloaded_paths)}[/]")
+                    try:
+                        build_from_path(path, config, args)
+                    except Exception:
+                        logger.exception(
+                            f"パス {path} のビルド中にエラーが発生しました。"
+                        )
+                        console.print(
+                            f"❌ [red]パス {path.name} のビルドに失敗しました。[/]"
+                        )
+            return
+
         if args.build_only:
+            # --- ビルドのみモード ---
             logger.info(f"ビルドのみモードで実行します: {args.build_only}")
-            # process_single_novel に novel_id=0 を渡すが、この値は使われない
-            process_single_novel(0, config, args)
+            build_path = Path(args.build_only).resolve()
+            build_from_path(build_path, config, args)
             return
 
         # --- IDリストの解決 ---

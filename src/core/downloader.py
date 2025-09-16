@@ -7,10 +7,14 @@ from pathlib import Path
 from typing import Callable, Any, Dict, Optional, Set, List, Tuple, Union
 
 from rich.progress import Progress
+from rich.console import Console
+from rich.prompt import Prompt
 from pixivpy3 import AppPixivAPI, PixivError
 
-from ..data.models import NovelApiResponse
+from ..data.models import NovelApiResponse, NovelSeriesApiResponse
 from ..utils.path_manager import PathManager
+
+console = Console()
 
 
 class PixivNovelDownloader:
@@ -19,7 +23,12 @@ class PixivNovelDownloader:
     インスタンスは単一の小説ダウンロードジョブを表します。
     """
 
-    def __init__(self, novel_id: int, config: Dict[str, Any]):
+    def __init__(
+        self,
+        novel_id: int,
+        config: Dict[str, Any],
+        override_base_dir: Optional[Path] = None,
+    ):
         """
         PixivNovelDownloaderを初期化し、ダウンロードの準備を行います。
         """
@@ -29,7 +38,10 @@ class PixivNovelDownloader:
 
         # --- 設定の読み込み ---
         downloader_conf = self.config.get("downloader", {})
-        self.base_dir = Path(downloader_conf.get("save_directory", "./pixiv_raw"))
+        # override_base_dirが指定されていればそれを使用し、なければ設定ファイルの値を使用
+        self.base_dir = override_base_dir or Path(
+            downloader_conf.get("save_directory", "./pixiv_raw")
+        )
         self.delay = float(downloader_conf.get("api_delay", 1.0))
         self.retry = int(downloader_conf.get("api_retries", 3))
         self.overwrite_images = bool(
@@ -53,14 +65,31 @@ class PixivNovelDownloader:
             self.api.novel_detail, self.novel_id, "詳細データ"
         )
 
-        # --- PathManagerを初期化して利用 ---
+        # ★ --- PathManagerの初期化ロジックを修正 ---
         template = downloader_conf.get("raw_dir_template", "{id}_{title}")
-        safe_title = "".join(c for c in self.novel_data.title if c.isalnum() or c in " _-").strip()
-        dir_name = template.format(id=self.novel_data.id, title=safe_title)
+
+        # テンプレートで使用する変数を準備
+        novel_detail = self.detail_data_dict.get("novel", {})
+        template_vars = {
+            "id": self.novel_data.id,
+            "title": self.novel_data.title,
+            "author_name": novel_detail.get("user", {}).get("name", "unknown_author"),
+        }
+
+        # テンプレートから相対パスを生成
+        relative_path_str = template.format(**template_vars)
+
+        # パスの各要素をサニタイズ
+        invalid_chars = r'[\\/:*?"<>|]'
+        safe_parts = [
+            re.sub(invalid_chars, "_", part).strip()
+            for part in relative_path_str.split("/")
+        ]
+        safe_dir_name = "/".join(safe_parts)
 
         self.paths = PathManager(
             base_dir=self.base_dir,
-            novel_dir_name=dir_name,
+            novel_dir_name=safe_dir_name,  # サニタイズ済みのパス文字列を渡す
         )
         self.paths.setup_directories()
         self.logger.info(f"保存先ディレクトリ: {self.paths.novel_dir}")
@@ -368,3 +397,132 @@ class PixivNovelDownloader:
             self.logger.debug("detail.json の保存が完了しました。")
         except IOError as e:
             self.logger.error(f"detail.json の保存に失敗しました: {e}")
+
+
+class PixivSeriesDownloader:
+    """
+    特定のPixiv小説シリーズをダウンロードし、整理して保存するクラス。
+    シリーズ用の親ディレクトリを作成し、その中に各小説のデータをダウンロードします。
+    """
+
+    def __init__(self, series_id: int, config: Dict[str, Any]):
+        """PixivSeriesDownloaderを初期化します。"""
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self.config = config
+        self.series_id = series_id
+
+        # --- 設定の読み込み ---
+        downloader_conf = self.config.get("downloader", {})
+        self.base_dir = Path(downloader_conf.get("save_directory", "./pixiv_raw"))
+
+        # --- APIクライアントの初期化 ---
+        self.api = AppPixivAPI()
+        refresh_token = self.config.get("auth", {}).get("refresh_token")
+        if not refresh_token or refresh_token == "your_refresh_token_here":
+            raise ValueError("設定に有効なPixivのrefresh_tokenが見つかりません。")
+        self.api.auth(refresh_token=refresh_token)
+
+        # --- シリーズ情報の取得 ---
+        self.logger.debug(f"シリーズID: {self.series_id} の情報取得を開始します。")
+        series_data_dict = self.api.novel_series(series_id=self.series_id)
+        self.series_data = NovelSeriesApiResponse.from_dict(series_data_dict)
+
+        # ★ --- 保存先ディレクトリの決定ロジックを修正 ---
+        template = downloader_conf.get("series_dir_template", "series_{id}_{title}")
+
+        # テンプレートで使用する変数を準備
+        template_vars = {
+            "id": self.series_data.detail.id,
+            "title": self.series_data.detail.title,
+            "author_name": self.series_data.detail.user.name,
+        }
+
+        # テンプレートから相対パスを生成
+        relative_path_str = template.format(**template_vars)
+
+        # パスの各要素をサニタイズ
+        invalid_chars = r'[\\/:*?"<>|]'
+        safe_parts = [
+            re.sub(invalid_chars, "_", part).strip()
+            for part in relative_path_str.split("/")
+        ]
+        safe_dir_name = Path(*safe_parts)  # Pathオブジェクトに変換
+
+        self.series_dir = self.base_dir / safe_dir_name
+        self.series_dir.mkdir(parents=True, exist_ok=True)
+        self.logger.info(f"シリーズ保存先ディレクトリ: {self.series_dir}")
+
+    def run(self, interactive: bool = False) -> List[Path]:
+        """シリーズのダウンロード処理を実行し、ダウンロード先のパスリストを返します。"""
+        downloaded_paths = []  # ダウンロードしたパスを保存するリスト
+        if interactive:
+            novel_ids_to_download = self._select_novels_interactive()
+            if not novel_ids_to_download:
+                self.logger.info(
+                    "ダウンロード対象が選択されなかったため、処理を終了します。"
+                )
+                return downloaded_paths
+        else:
+            novel_ids_to_download = [novel.id for novel in self.series_data.novels]
+
+        total = len(novel_ids_to_download)
+        self.logger.info(
+            f"計 {total} 件の小説をシリーズフォルダ内にダウンロードします。"
+        )
+
+        for i, novel_id in enumerate(novel_ids_to_download, 1):
+            console.rule(f"[bold]Processing Novel {i}/{total} (ID: {novel_id})[/]")
+            try:
+                # override_base_dir を使用して、保存先をシリーズディレクトリに指定
+                downloader = PixivNovelDownloader(
+                    novel_id=novel_id,
+                    config=self.config,
+                    override_base_dir=self.series_dir,
+                )
+                novel_path = downloader.run()
+                downloaded_paths.append(novel_path)  # 成功したパスを追加
+            except Exception as e:
+                self.logger.error(
+                    f"小説ID {novel_id} のダウンロードに失敗しました: {e}",
+                    exc_info=True,
+                )
+                console.print(f"❌ [red]小説ID {novel_id} の処理に失敗しました。[/]")
+
+        console.print(
+            f"\n✅ [bold green]シリーズ「{self.series_data.detail.title}」のダウンロードが完了しました。[/]"
+        )
+        return downloaded_paths
+
+    def _select_novels_interactive(self) -> List[int]:
+        """対話モードでダウンロードする小説を選択させます。"""
+        console.print("\n[cyan]-- ダウンロード対象の小説を選択 --[/]")
+        novels = sorted(self.series_data.novels, key=lambda n: n.order)
+
+        for i, novel in enumerate(novels):
+            console.print(f"[bold white]{i + 1: >2}[/]: {novel.title}")
+
+        console.print("\nダウンロードする小説の番号を入力してください。")
+        console.print("[dim]例: '1, 3, 5-8' or 'all'[/]")
+
+        while True:
+            try:
+                choice = Prompt.ask("[bold]番号[/]")
+                if choice.lower() == "all":
+                    return [novel.id for novel in novels]
+
+                selected_indices = set()
+                parts = choice.replace(" ", "").split(",")
+                for part in parts:
+                    if "-" in part:
+                        start, end = map(int, part.split("-"))
+                        selected_indices.update(range(start - 1, end))
+                    else:
+                        selected_indices.add(int(part) - 1)
+
+                return [
+                    novels[i].id
+                    for i in sorted(list(selected_indices))
+                    if 0 <= i < len(novels)
+                ]
+            except (ValueError, IndexError):
+                console.print("[red]無効な入力です。もう一度入力してください。[/]")
