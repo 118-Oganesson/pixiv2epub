@@ -1,4 +1,7 @@
-# Pixiv to EPUB Converter
+<div align="center">
+<img src="./pixiv2epub_icon.svg" alt="Pixiv to EPUB Converter Icon" width="250">
+<h1>Pixiv to EPUB Converter</h1>
+</div>
 
 Pixiv小説をID指定でダウンロードし、高品質なEPUB3形式に変換するコマンドラインツールです。
 
@@ -20,7 +23,7 @@ Pixiv小説をID指定でダウンロードし、高品質なEPUB3形式に変�
 
 ## ⚙️ 実行要件
 
-  * [cite\_start]**Python 3.13+** [cite: 56]
+  * **Python 3.13+**
   * **ライブラリ:**
       * `pixivpy3`
       * `rich`
