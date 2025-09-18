@@ -343,6 +343,16 @@ class PixivNovelDownloader:
                 re.compile(r"\[\[jumpuri:(.+?)\s*>\s*(https?://.+?)\]\]"),
                 r'<a href="\2" target="_blank" rel="noopener noreferrer">\1</a>',
             ),
+            # PixivカスタムURLスキーム (小説)
+            (
+                re.compile(r"pixiv://novels/(\d+)"),
+                r"https://www.pixiv.net/novel/show.php?id=\1",
+            ),
+            # PixivカスタムURLスキーム (イラスト)
+            (
+                re.compile(r"pixiv://illusts/(\d+)"),
+                r"https://www.pixiv.net/artworks/\1",
+            ),
         ]
 
     def _replace_image_tag(self, match: re.Match) -> str:
@@ -419,6 +429,9 @@ class PixivNovelDownloader:
             for i, content in enumerate(pages_content)
         ]
 
+        raw_caption = novel.get("caption", "") or ""
+        processed_caption = self._replace_tags(raw_caption)
+
         detail_summary = {
             "title": novel.get("title"),
             "authors": {
@@ -428,7 +441,7 @@ class PixivNovelDownloader:
             "language": "ja",
             "series": novel.get("series"),
             "publisher": "pixiv",
-            "description": novel.get("caption"),
+            "description": processed_caption,
             "identifier": {
                 "novel_id": novel.get("id"),
                 "uuid": f"urn:uuid:{uuid.uuid4()}",
