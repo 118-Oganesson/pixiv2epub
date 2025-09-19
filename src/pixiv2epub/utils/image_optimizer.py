@@ -7,7 +7,7 @@ from typing import Optional, List, Dict, Union
 import logging
 import concurrent.futures
 
-from ..data.models import CompressionResult
+from ..data_models import CompressionResult
 
 
 def _human_readable_size(size_bytes: Optional[int]) -> str:
