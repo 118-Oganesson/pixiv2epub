@@ -23,7 +23,7 @@ from ...constants import (
     KEY_CSS_FILE,
     DEFAULT_EPUB_FILENAME_TEMPLATE,
 )
-from ...utils.path_manager import sanitize_path_part
+from ...utils.path_manager import generate_sanitized_path
 
 
 class EpubBuilder(BaseBuilder):
@@ -136,12 +136,7 @@ class EpubBuilder(BaseBuilder):
             "series_id": self.metadata.series.id if self.metadata.series else "0",
         }
 
-        relative_path_str = template.format(**template_vars)
-
-        safe_parts = [
-            sanitize_path_part(part) for part in Path(relative_path_str).parts
-        ]
-        safe_relative_path = Path(*safe_parts)
+        safe_relative_path = generate_sanitized_path(template, template_vars)
 
         output_dir_base = Path(builder_conf.get(KEY_OUTPUT_DIRECTORY, "./epubs"))
         final_path = output_dir_base.resolve() / safe_relative_path

@@ -1,5 +1,14 @@
+#
+# -----------------------------------------------------------------------------
+# src/pixiv2epub/utils/path_manager.py
+#
+# ファイルシステムのパス操作を抽象化し、一元管理する機能を提供します。
+# ファイル名として不正な文字をサニタイズ（無害化）する機能や、
+# 特定の小説に関連するファイルパスを一貫したルールで生成する責務を持ちます。
+# -----------------------------------------------------------------------------
 import re
 from pathlib import Path
+from typing import Any, Dict
 
 from .. import constants as const
 
@@ -15,6 +24,26 @@ def sanitize_path_part(part: str) -> str:
         str: サニタイズ後の文字列。
     """
     return re.sub(const.INVALID_PATH_CHARS_REGEX, "_", part).strip()
+
+
+def generate_sanitized_path(template: str, variables: Dict[str, Any]) -> Path:
+    """
+    テンプレートと変数からパス文字列を生成し、各部分をサニタイズします。
+
+    Args:
+        template (str): "{author_name}/{title}" のようなフォーマット文字列。
+        variables (Dict[str, Any]): テンプレートに埋め込む変数。
+
+    Returns:
+        Path: サニタイズされた相対パス。
+    """
+    # 存在しないキーがあってもエラーにならないように、値がNoneの場合は空文字に置換
+    safe_vars = {k: v or "" for k, v in variables.items()}
+    relative_path_str = template.format_map(safe_vars)
+
+    # パスを分割し、各要素をサニタイズしてからPathオブジェクトとして再結合する
+    safe_parts = [sanitize_path_part(part) for part in Path(relative_path_str).parts]
+    return Path(*safe_parts)
 
 
 class PathManager:

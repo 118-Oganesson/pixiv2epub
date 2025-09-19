@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from ... import constants as const
 from ...data_models import NovelApiResponse, NovelSeriesApiResponse
-from ...utils.path_manager import PathManager, sanitize_path_part
+from ...utils.path_manager import PathManager, generate_sanitized_path
 from ..base_provider import BaseProvider
 from .api_client import PixivApiClient
 from .persister import PixivDataPersister
@@ -166,10 +166,8 @@ class PixivProvider(BaseProvider):
             "title": novel_data.title,
             "author_name": novel_detail.get("user", {}).get("name", "unknown_author"),
         }
-        relative_path_str = template.format(**template_vars)
 
-        safe_parts = [sanitize_path_part(part) for part in relative_path_str.split("/")]
-        safe_dir_name = "/".join(safe_parts)
+        safe_dir_name = str(generate_sanitized_path(template, template_vars))
 
         paths = PathManager(base_dir=base_dir, novel_dir_name=safe_dir_name)
         paths.setup_directories()
@@ -187,10 +185,8 @@ class PixivProvider(BaseProvider):
             "title": series_data.detail.title,
             "author_name": series_data.detail.user.name,
         }
-        relative_path_str = template.format(**template_vars)
 
-        safe_parts = [sanitize_path_part(part) for part in relative_path_str.split("/")]
-        safe_dir_name = Path(*safe_parts)
+        safe_dir_name = generate_sanitized_path(template, template_vars)
 
         series_dir = self.base_dir / safe_dir_name
         series_dir.mkdir(parents=True, exist_ok=True)
