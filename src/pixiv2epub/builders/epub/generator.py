@@ -22,6 +22,7 @@ from ...data_models import (
     PageInfo,
 )
 from ...utils.path_manager import PathManager
+from ... import constants as const
 
 
 class EpubGenerator:
@@ -105,18 +106,27 @@ class EpubGenerator:
         rendered_str = template.render(context)
         return rendered_str.encode("utf-8")
 
+    def _correct_html_image_paths(self, html_content: Optional[str]) -> str:
+        """HTMLコンテンツ内の画像パスをEPUBの構造に合わせて修正します。"""
+        if not html_content:
+            return ""
+        from_path = f'src="./{const.IMAGES_DIR_NAME}/'
+        to_path = f'src="../{const.IMAGES_DIR_NAME}/'
+        return html_content.replace(from_path, to_path)
+
     def _generate_main_pages(
         self, page_infos: List[PageInfo], css_path: Optional[str]
     ) -> List[PageAsset]:
         """本文の各ページをXHTMLに変換します。"""
         pages = []
         for i, page_info in enumerate(page_infos, 1):
-            raw_content_path = self.paths.novel_dir / page_info.body_path.lstrip("./")
+            raw_content_path = self.paths.novel_dir / page_info.body.lstrip("./")
             try:
                 content = raw_content_path.read_text(encoding="utf-8")
+                corrected_content = self._correct_html_image_paths(content)
                 context = {
                     "title": page_info.title,
-                    "content": content,
+                    "content": corrected_content,
                     "css_path": css_path,
                 }
                 page_content_bytes = self._render_template(
@@ -142,6 +152,9 @@ class EpubGenerator:
 
     def _generate_info_page(self, css_path: Optional[str]) -> PageAsset:
         """作品情報ページを生成します。"""
+        corrected_description = self._correct_html_image_paths(
+            self.metadata.description
+        )
         context = {
             "title": self.metadata.title,
             "css_path": css_path,
@@ -151,7 +164,7 @@ class EpubGenerator:
                 "series_title": self.metadata.series.title
                 if self.metadata.series
                 else None,
-                "description": self.metadata.description,
+                "description": corrected_description,
                 "tags": self.metadata.tags,
                 "source_url": self.metadata.original_source,
                 "meta_info": f"公開日: {self.metadata.date}, 文字数: {self.metadata.text_length or 'N/A'}",

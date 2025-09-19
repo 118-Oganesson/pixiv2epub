@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Optional, Type
 from ..builders.base_builder import BaseBuilder
 from ..builders.epub.builder import EpubBuilder
 from ..providers.base_provider import BaseProvider
-from ..providers.pixiv.downloader import PixivProvider
+from ..providers.pixiv.provider import PixivProvider
 
 
 class Coordinator:

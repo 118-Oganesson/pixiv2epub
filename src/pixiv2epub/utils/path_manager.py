@@ -1,4 +1,20 @@
+import re
 from pathlib import Path
+
+from .. import constants as const
+
+
+def sanitize_path_part(part: str) -> str:
+    """
+    ファイル/ディレクトリ名として安全でない文字を'_'に置換します。
+
+    Args:
+        part (str): サニタイズ対象の文字列（パスの一部）。
+
+    Returns:
+        str: サニタイズ後の文字列。
+    """
+    return re.sub(const.INVALID_PATH_CHARS_REGEX, "_", part).strip()
 
 
 class PathManager:

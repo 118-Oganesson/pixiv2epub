@@ -37,7 +37,9 @@ def get_media_type_from_filename(filename: str) -> str:
 class AssetManager:
     """EPUBアセットの収集・整理を担当するクラス。"""
 
-    def __init__(self, paths: PathManager, metadata: NovelMetadata, css_file_path: Optional[Path]):
+    def __init__(
+        self, paths: PathManager, metadata: NovelMetadata, css_file_path: Optional[Path]
+    ):
         """
         AssetManagerのインスタンスを初期化します。
 
@@ -74,7 +76,7 @@ class AssetManager:
         final_images = [
             img for img in all_images if img.filename in referenced_filenames
         ]
-        
+
         # カバー画像は本文中で参照されていなくても必ずEPUBに含める
         if cover_image_asset and cover_image_asset.filename not in referenced_filenames:
             final_images.append(cover_image_asset)
@@ -128,8 +130,11 @@ class AssetManager:
 
         # 全てのページファイルを解析
         for page_info in self.metadata.pages:
-            page_file = self.paths.novel_dir / page_info.body_path.lstrip("./")
+            page_file = self.paths.novel_dir / page_info.body.lstrip("./")
             if not page_file.is_file():
+                self.logger.warning(
+                    f"参照先のページファイルが見つかりません: {page_file}"
+                )
                 continue
             try:
                 content = page_file.read_text(encoding="utf-8")
@@ -146,9 +151,7 @@ class AssetManager:
             try:
                 css_text = self.css_file_path.read_text(encoding="utf-8")
                 # url(...) 形式の画像参照を検索
-                for match in re.finditer(
-                    r'url\((.*?)\)', css_text, re.IGNORECASE
-                ):
+                for match in re.finditer(r"url\((.*?)\)", css_text, re.IGNORECASE):
                     add_filename_from_path(match.group(1))
             except Exception as e:
                 self.logger.warning(f"CSSファイルの解析に失敗: {e}")

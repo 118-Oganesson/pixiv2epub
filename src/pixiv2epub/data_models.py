@@ -138,11 +138,11 @@ class PageInfo:
 
     Attributes:
         title (str): ページのタイトル（章題）。
-        body_path (str): 本文テキストが格納されたファイルへのパス。
+        body (str): 本文テキストが格納されたファイルへのパス。
     """
 
     title: str
-    body_path: str
+    body: str
 
     @classmethod
     def from_dict(cls, data: dict) -> "PageInfo":
@@ -154,7 +154,7 @@ class PageInfo:
         Returns:
             PageInfo: 生成されたPageInfoインスタンス。
         """
-        return cls(title=data.get("title"), body_path=data.get("body"))
+        return cls(title=data.get("title"), body=data.get("body"))
 
 
 @dataclass
@@ -192,27 +192,27 @@ class NovelMetadata:
     Attributes:
         title (str): 小説のタイトル。
         authors (Author): 作者情報。
+        series (Optional[SeriesInfo]): シリーズ情報。
         description (str): あらすじ。
-        tags (List[str]): タグのリスト。
-        pages (List[PageInfo]): 各ページの情報のリスト。
-        cover_path (Optional[str]): 表紙画像のファイルパス。
         identifier (Dict[str, Any]): 識別子情報（例: {"pixiv_id": 12345}）。
         date (str): 公開日。
+        cover_path (Optional[str]): 表紙画像のファイルパス。
+        tags (List[str]): タグのリスト。
         original_source (str): オリジナルのURL。
-        series (Optional[SeriesInfo]): シリーズ情報。
+        pages (List[PageInfo]): 各ページの情報のリスト。
         text_length (Optional[int]): 本文の文字数。
     """
 
     title: str
     authors: Author
+    series: Optional[SeriesInfo]
     description: str
-    tags: List[str]
-    pages: List[PageInfo]
-    cover_path: Optional[str]
     identifier: Dict[str, Any]
     date: str
+    cover_path: Optional[str]
+    tags: List[str]
     original_source: str
-    series: Optional[SeriesInfo]
+    pages: List[PageInfo]
     text_length: Optional[int]
 
     @classmethod
@@ -228,15 +228,15 @@ class NovelMetadata:
         return cls(
             title=data.get("title"),
             authors=Author(**data.get("authors", {})),
+            series=SeriesInfo.from_dict(data.get("series")),
             description=data.get("description"),
-            tags=data.get("tags", []),
-            pages=[PageInfo.from_dict(p) for p in data.get("pages", [])],
-            cover_path=data.get("cover"),
             identifier=data.get("identifier", {}),
             date=data.get("date"),
+            cover_path=data.get("cover_path"),
+            tags=data.get("tags", []),
             original_source=data.get("original_source"),
-            series=SeriesInfo.from_dict(data.get("series")),
-            text_length=data.get("x_meta", {}).get("text_length"),
+            pages=[PageInfo.from_dict(p) for p in data.get("pages", [])],
+            text_length=data.get("text_length"),
         )
 
 

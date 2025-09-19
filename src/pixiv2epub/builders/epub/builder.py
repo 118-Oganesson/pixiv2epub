@@ -8,7 +8,6 @@
 # 小説データから単一のEPUBファイルを生成する責務を持つ。
 # -----------------------------------------------------------------------------
 import os
-import re
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -22,9 +21,9 @@ from ...constants import (
     KEY_SERIES_FILENAME_TEMPLATE,
     KEY_FILENAME_TEMPLATE,
     KEY_CSS_FILE,
-    INVALID_PATH_CHARS_REGEX,
     DEFAULT_EPUB_FILENAME_TEMPLATE,
 )
+from ...utils.path_manager import sanitize_path_part
 
 
 class EpubBuilder(BaseBuilder):
@@ -140,8 +139,7 @@ class EpubBuilder(BaseBuilder):
         relative_path_str = template.format(**template_vars)
 
         safe_parts = [
-            re.sub(INVALID_PATH_CHARS_REGEX, "_", part)
-            for part in Path(relative_path_str).parts
+            sanitize_path_part(part) for part in Path(relative_path_str).parts
         ]
         safe_relative_path = Path(*safe_parts)
 
