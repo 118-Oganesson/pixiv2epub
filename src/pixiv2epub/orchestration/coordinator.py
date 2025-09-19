@@ -2,226 +2,127 @@
 # -----------------------------------------------------------------------------
 # pixiv2epub/src/pixiv2epub/orchestration/coordinator.py
 #
-# このモジュールは、アプリケーションの主要な処理フローを統括する
-# Coordinatorクラスを定義します。
-# Providerによるデータ取得からBuilderによるファイル生成までの一連の流れを管理します。
+# ProviderとBuilderを連携させ、ダウンロードからビルドまでの一連の処理フローを
+# 統括するオーケストレーター。
 # -----------------------------------------------------------------------------
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type
 
-from ..builders.base_builder import BaseBuilder
-from ..builders.epub.builder import EpubBuilder
 from ..providers.base_provider import BaseProvider
 from ..providers.pixiv.provider import PixivProvider
+from ..builders.base_builder import BaseBuilder
+from ..builders.epub.builder import EpubBuilder
+
+# 将来の拡張性を考慮し、利用可能なクラスを辞書で管理
+AVAILABLE_PROVIDERS: Dict[str, Type[BaseProvider]] = {"pixiv": PixivProvider}
+AVAILABLE_BUILDERS: Dict[str, Type[BaseBuilder]] = {"epub": EpubBuilder}
 
 
 class Coordinator:
-    """
-    データ取得(Provider)からファイル生成(Builder)までの一連の処理フローを統括するクラス。
-    """
+    """ダウンロードとビルドのプロセス全体を調整・実行するクラス。"""
 
     def __init__(self, config: Dict[str, Any]):
         """
-        Coordinatorのインスタンスを初期化します。
+        Coordinatorを初期化します。
 
         Args:
-            config (Dict[str, Any]): アプリケーション全体の設定情報。
+            config (Dict[str, Any]): アプリケーション全体の設定。
         """
         self.config = config
         self.logger = logging.getLogger(self.__class__.__name__)
-        self._providers: Dict[str, Type[BaseProvider]] = {}
-        self._builders: Dict[str, Type[BaseBuilder]] = {}
-        self._register_components()
 
-    def _register_components(self):
-        """
-        アプリケーションで利用可能なProviderとBuilderを登録します。
-        将来的にはプラグインシステムなどで動的に読み込むことも可能ですが、
-        現在は静的に登録しています。
-        """
-        # Providerの登録
-        self.register_provider(PixivProvider.get_provider_name(), PixivProvider)
-
-        # Builderの登録
-        self.register_builder(EpubBuilder.get_builder_name(), EpubBuilder)
-
-        self.logger.info(f"Registered providers: {list(self._providers.keys())}")
-        self.logger.info(f"Registered builders: {list(self._builders.keys())}")
-
-    def register_provider(self, name: str, provider_class: Type[BaseProvider]):
-        """
-        新しいProviderクラスをCoordinatorに登録します。
-
-        Args:
-            name (str): Providerを識別するための名前 (例: "pixiv")。
-            provider_class (Type[BaseProvider]): 登録するProviderクラス。
-        """
-        self._providers[name] = provider_class
-        self.logger.debug(f"Provider '{name}' registered.")
-
-    def register_builder(self, name: str, builder_class: Type[BaseBuilder]):
-        """
-        新しいBuilderクラスをCoordinatorに登録します。
-
-        Args:
-            name (str): Builderを識別するための名前 (例: "epub")。
-            builder_class (Type[BaseBuilder]): 登録するBuilderクラス。
-        """
-        self._builders[name] = builder_class
-        self.logger.debug(f"Builder '{name}' registered.")
-
-    def run(
-        self,
-        target_id: Any,
-        target_type: str = "novel",
-        provider_name: Optional[str] = None,
-        builder_name: Optional[str] = None,
-    ) -> List[Path]:
-        """
-        指定されたIDとタイプに基づいて、ダウンロードからビルドまでの一連の処理を実行します。
-
-        Args:
-            target_id (Any): 処理対象のID (小説ID, シリーズID, ユーザーIDなど)。
-            target_type (str): 処理の種類 ("novel", "series", "user")。
-            provider_name (Optional[str]): 使用するデータプロバイダの名前。Noneの場合、
-                登録されているプロバイダが1つであれば自動的に選択されます。
-            builder_name (Optional[str]): 使用するビルダーの名前。Noneの場合、
-                登録されているビルダーが1つであれば自動的に選択されます。
-
-        Returns:
-            List[Path]: 正常に生成されたファイルのパスのリスト。
-        """
-        # --- ProviderとBuilderの選択 ---
-        final_provider_name = self._determine_component_name(
-            provider_name, self._providers, "Provider"
-        )
-        if not final_provider_name:
-            return []
-
-        final_builder_name = self._determine_component_name(
-            builder_name, self._builders, "Builder"
-        )
-        if not final_builder_name:
-            return []
-
-        self.logger.info(
-            f"Starting process: type='{target_type}', id='{target_id}', "
-            f"provider='{final_provider_name}', builder='{final_builder_name}'"
-        )
-
-        # 1. Providerを選択し、データをダウンロードする
-        downloaded_paths = self._execute_download(
-            final_provider_name, target_type, target_id
-        )
-        if not downloaded_paths:
-            self.logger.warning("Download phase returned no paths. Halting process.")
-            return []
-        self.logger.info(f"Successfully downloaded {len(downloaded_paths)} item(s).")
-
-        # 2. Builderを選択し、ダウンロードされたデータからファイルを生成する
-        built_files = self._execute_build(final_builder_name, downloaded_paths)
-        if not built_files:
-            self.logger.warning("Build phase produced no files.")
-            return []
-
-        self.logger.info(
-            f"Process finished. Successfully built {len(built_files)} file(s)."
-        )
-        return built_files
-
-    def _determine_component_name(
-        self, name: Optional[str], components: Dict[str, Type], component_type: str
-    ) -> Optional[str]:
-        """
-        使用するコンポーネント（Provider/Builder）の名前を決定します。
-        名前が指定されていない場合、登録済みのコンポーネントが1つであればそれを自動選択します。
-        """
-        if name:
-            if name in components:
-                return name
-            else:
-                self.logger.error(
-                    f"{component_type} '{name}' not found. "
-                    f"Available: {list(components.keys())}"
-                )
-                return None
-
-        if len(components) == 1:
-            return list(components.keys())[0]
-        elif len(components) == 0:
-            self.logger.error(f"No {component_type}s are registered.")
-            return None
-        else:
-            self.logger.error(
-                f"{component_type} not specified and multiple are available: "
-                f"{list(components.keys())}. Please specify one."
-            )
-            return None
-
-    def _execute_download(
-        self, provider_name: str, target_type: str, target_id: Any
-    ) -> List[Path]:
-        """
-        指定されたProviderを使用してデータのダウンロード処理を実行します。
-
-        Returns:
-            List[Path]: ダウンロードされた生データが格納されているディレクトリパスのリスト。
-        """
-        provider_class = self._providers.get(provider_name)
+    def _get_provider(self, provider_name: str) -> BaseProvider:
+        """指定された名前のProviderインスタンスを生成して返します。"""
+        provider_class = AVAILABLE_PROVIDERS.get(provider_name)
         if not provider_class:
-            self.logger.error(f"Provider '{provider_name}' not found.")
-            return []
+            raise ValueError(f"不明なプロバイダです: {provider_name}")
+        return provider_class(self.config)
 
-        try:
-            provider = provider_class(self.config)
-            download_method = getattr(provider, f"get_{target_type}")
-            # get_novelは単一Path、その他はList[Path]を返すため、必ずリストに変換する
-            raw_paths = download_method(target_id)
-            return [raw_paths] if isinstance(raw_paths, Path) else raw_paths
+    def _get_builder(self, builder_name: str, novel_dir: Path) -> BaseBuilder:
+        """指定された名前のBuilderインスタンスを生成して返します。"""
+        builder_class = AVAILABLE_BUILDERS.get(builder_name)
+        if not builder_class:
+            raise ValueError(f"不明なビルダーです: {builder_name}")
+        return builder_class(novel_dir=novel_dir, config=self.config)
 
-        except AttributeError:
-            self.logger.error(
-                f"Invalid target_type '{target_type}' for provider '{provider_name}'. "
-                f"Method 'get_{target_type}' not found."
-            )
-            return []
-        except Exception as e:
-            self.logger.error(
-                f"Error during download phase with provider '{provider_name}': {e}",
-                exc_info=True,
-            )
-            return []
+    def download_and_build_novel(
+        self, provider_name: str, builder_name: str, novel_id: Any
+    ) -> Path:
+        """単一の小説をダウンロードし、指定されたフォーマットでビルドします。"""
+        self.logger.info(
+            f"小説ID: {novel_id} の処理を開始します... (Provider: {provider_name}, Builder: {builder_name})"
+        )
+        provider = self._get_provider(provider_name)
+        downloaded_path = provider.get_novel(novel_id)
 
-    def _execute_build(self, builder_name: str, source_dirs: List[Path]) -> List[Path]:
+        builder = self._get_builder(builder_name, downloaded_path)
+        output_path = builder.build()
+        self.logger.info(f"処理が正常に完了しました: {output_path}")
+        return output_path
+
+    def download_and_build_series(
+        self, provider_name: str, builder_name: str, series_id: Any
+    ) -> List[Path]:
+        """シリーズをダウンロードし、含まれる各小説を指定のフォーマットでビルドします。"""
+        self.logger.info(
+            f"シリーズID: {series_id} の処理を開始します... (Provider: {provider_name}, Builder: {builder_name})"
+        )
+        provider = self._get_provider(provider_name)
+        downloaded_paths = provider.get_series(series_id)
+
+        output_paths = []
+        for path in downloaded_paths:
+            try:
+                builder = self._get_builder(builder_name, path)
+                output_path = builder.build()
+                output_paths.append(output_path)
+            except Exception as e:
+                self.logger.error(
+                    f"{path.name} のビルドに失敗しました: {e}", exc_info=True
+                )
+
+        self.logger.info(
+            f"シリーズ処理が完了しました。 {len(output_paths)}/{len(downloaded_paths)} 件成功。"
+        )
+        return output_paths
+
+    def download_and_build_user_novels(
+        self, provider_name: str, builder_name: str, user_id: Any
+    ) -> List[Path]:
         """
-        指定されたBuilderを使用してファイルのビルド処理を実行します。
+        特定のユーザーの全小説をダウンロードし、それぞれを指定されたフォーマットでビルドします。
 
         Args:
-            builder_name (str): 使用するビルダーの名前。
-            source_dirs (List[Path]): ビルド対象のデータが格納されたディレクトリのリスト。
+            provider_name (str): 使用するプロバイダ名 (例: "pixiv")。
+            builder_name (str): 使用するビルダー名 (例: "epub")。
+            user_id (Any): 処理対象のユーザーID。
 
         Returns:
             List[Path]: 生成されたファイルのパスのリスト。
         """
-        builder_class = self._builders.get(builder_name)
-        if not builder_class:
-            self.logger.error(f"Builder '{builder_name}' not found.")
-            return []
+        self.logger.info(
+            f"ユーザーID: {user_id} の全作品の処理を開始します... (Provider: {provider_name}, Builder: {builder_name})"
+        )
+        provider = self._get_provider(provider_name)
+        downloaded_paths = provider.get_user_novels(user_id)
 
-        built_files: List[Path] = []
-        total = len(source_dirs)
-        for i, novel_dir in enumerate(source_dirs, 1):
-            self.logger.info(f"--- Building item {i}/{total}: {novel_dir.name} ---")
+        output_paths = []
+        total = len(downloaded_paths)
+        self.logger.info(f"合計 {total} 件の作品をビルドします。")
+
+        for i, path in enumerate(downloaded_paths, 1):
             try:
-                builder = builder_class(novel_dir, self.config)
+                self.logger.info(f"--- Processing {i}/{total}: {path.name} ---")
+                builder = self._get_builder(builder_name, path)
                 output_path = builder.build()
-                built_files.append(output_path)
+                output_paths.append(output_path)
             except Exception as e:
                 self.logger.error(
-                    f"Failed to build from source '{novel_dir}': {e}", exc_info=True
+                    f"{path.name} のビルドに失敗しました: {e}", exc_info=True
                 )
-                # 一つのビルドが失敗しても、次のアイテムの処理を続行する
-                continue
 
-        return built_files
+        self.logger.info(
+            f"ユーザー作品の処理が完了しました。 {len(output_paths)}/{total} 件成功。"
+        )
+        return output_paths
