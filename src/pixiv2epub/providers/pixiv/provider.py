@@ -9,8 +9,11 @@
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+from pixivpy3 import PixivError
+
 from ... import constants as const
 from ...data_models import NovelApiResponse, NovelSeriesApiResponse
+from ...exceptions import DownloadError
 from ...utils.path_manager import PathManager, generate_sanitized_path
 from ..base_provider import BaseProvider
 from .api_client import PixivApiClient
@@ -47,107 +50,138 @@ class PixivProvider(BaseProvider):
     ) -> Path:
         """単一の小説を取得し、ローカルに保存します。"""
         self.logger.info(f"小説ID: {novel_id} の処理を開始します。")
+        try:
+            novel_data_dict = self.api_client.webview_novel(novel_id)
+            novel_data = NovelApiResponse.from_dict(novel_data_dict)
+            detail_data_dict = self.api_client.novel_detail(novel_id)
 
-        # 1. APIからデータを取得
-        novel_data_dict = self.api_client.webview_novel(novel_id)
-        novel_data = NovelApiResponse.from_dict(novel_data_dict)
-        detail_data_dict = self.api_client.novel_detail(novel_id)
+            paths = self._setup_paths(
+                novel_data, detail_data_dict, override_base_dir or self.base_dir
+            )
 
-        # 2. パスを準備
-        paths = self._setup_paths(
-            novel_data, detail_data_dict, override_base_dir or self.base_dir
-        )
+            persister = PixivDataPersister(self.config, paths, self.api_client)
+            persister.persist(novel_data, detail_data_dict)
 
-        # 3. 保存処理をPersisterに委譲
-        persister = PixivDataPersister(self.config, paths, self.api_client)
-        persister.persist(novel_data, detail_data_dict)
-
-        self.logger.info(
-            f"小説「{novel_data.title}」の処理が完了しました。 -> {paths.novel_dir}"
-        )
-        return paths.novel_dir
+            self.logger.info(
+                f"小説「{novel_data.title}」の処理が完了しました。 -> {paths.novel_dir}"
+            )
+            return paths.novel_dir
+        except PixivError as e:
+            raise DownloadError(
+                f"小説ID {novel_id} のデータ取得に失敗しました: {e}"
+            ) from e
+        except Exception as e:
+            raise DownloadError(
+                f"小説ID {novel_id} の処理中に予期せぬエラーが発生: {e}"
+            ) from e
 
     def get_series(
         self, series_id: Any, novel_ids_to_download: Optional[List[int]] = None
     ) -> List[Path]:
         """シリーズ作品をダウンロードします。"""
         self.logger.info(f"シリーズID: {series_id} の処理を開始します。")
-        series_data = self.get_series_info(series_id)
+        try:
+            series_data = self.get_series_info(series_id)
+            series_dir = self._setup_series_dir(series_data)
 
-        series_dir = self._setup_series_dir(series_data)
+            if novel_ids_to_download is None:
+                novel_ids_to_download = [novel.id for novel in series_data.novels]
 
-        if novel_ids_to_download is None:
-            novel_ids_to_download = [novel.id for novel in series_data.novels]
-
-        if not novel_ids_to_download:
-            self.logger.info("ダウンロード対象が見つからないため、処理を終了します。")
-            return []
-
-        downloaded_paths = []
-        total = len(novel_ids_to_download)
-        self.logger.info(
-            f"計 {total} 件の小説をシリーズフォルダ内にダウンロードします。"
-        )
-
-        for i, novel_id in enumerate(novel_ids_to_download, 1):
-            self.logger.info(f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---")
-            try:
-                path = self.get_novel(novel_id, override_base_dir=series_dir)
-                downloaded_paths.append(path)
-            except Exception as e:
-                self.logger.error(
-                    f"小説ID {novel_id} のダウンロードに失敗: {e}", exc_info=True
+            if not novel_ids_to_download:
+                self.logger.info(
+                    "ダウンロード対象が見つからないため、処理を終了します。"
                 )
+                return []
 
-        self.logger.info(
-            f"シリーズ「{series_data.detail.title}」のダウンロードが完了しました。"
-        )
-        return downloaded_paths
+            downloaded_paths = []
+            total = len(novel_ids_to_download)
+            self.logger.info(
+                f"計 {total} 件の小説をシリーズフォルダ内にダウンロードします。"
+            )
+
+            for i, novel_id in enumerate(novel_ids_to_download, 1):
+                self.logger.info(
+                    f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---"
+                )
+                try:
+                    path = self.get_novel(novel_id, override_base_dir=series_dir)
+                    downloaded_paths.append(path)
+                except Exception as e:
+                    self.logger.error(
+                        f"小説ID {novel_id} のダウンロードに失敗: {e}", exc_info=True
+                    )
+
+            self.logger.info(
+                f"シリーズ「{series_data.detail.title}」のダウンロードが完了しました。"
+            )
+            return downloaded_paths
+        except PixivError as e:
+            raise DownloadError(
+                f"シリーズID {series_id} の情報取得に失敗しました: {e}"
+            ) from e
+        except Exception as e:
+            raise DownloadError(
+                f"シリーズID {series_id} の処理中に予期せぬエラーが発生: {e}"
+            ) from e
 
     def get_series_info(self, series_id: Any) -> NovelSeriesApiResponse:
         """シリーズの小説リストなどの情報を取得します。"""
         self.logger.debug(f"シリーズID: {series_id} の情報を取得します。")
-        series_data_dict = self.api_client.novel_series(series_id)
-        return NovelSeriesApiResponse.from_dict(series_data_dict)
+        try:
+            series_data_dict = self.api_client.novel_series(series_id)
+            return NovelSeriesApiResponse.from_dict(series_data_dict)
+        except PixivError as e:
+            raise DownloadError(
+                f"シリーズID {series_id} のメタデータ取得に失敗: {e}"
+            ) from e
 
     def get_user_novels(self, user_id: Any) -> List[Path]:
         """ユーザーの全作品をダウンロードします。"""
         self.logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します。")
+        try:
+            single_novel_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
+            self.logger.info(
+                f"取得結果: {len(series_ids)}件のシリーズ、{len(single_novel_ids)}件の単独作品が見つかりました。"
+            )
 
-        single_novel_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
-
-        self.logger.info(
-            f"取得結果: {len(series_ids)}件のシリーズ、{len(single_novel_ids)}件の単独作品が見つかりました。"
-        )
-
-        downloaded_paths = []
-        if series_ids:
-            self.logger.info("--- Processing Series ---")
-            for i, series_id in enumerate(series_ids, 1):
-                self.logger.info(f"\n--- Processing Series {i}/{len(series_ids)} ---")
-                try:
-                    paths = self.get_series(series_id)
-                    downloaded_paths.extend(paths)
-                except Exception as e:
-                    self.logger.error(
-                        f"シリーズID {series_id} の処理中にエラー: {e}", exc_info=True
+            downloaded_paths = []
+            if series_ids:
+                self.logger.info("--- Processing Series ---")
+                for i, series_id in enumerate(series_ids, 1):
+                    self.logger.info(
+                        f"\n--- Processing Series {i}/{len(series_ids)} ---"
                     )
+                    try:
+                        paths = self.get_series(series_id)
+                        downloaded_paths.extend(paths)
+                    except Exception as e:
+                        self.logger.error(
+                            f"シリーズID {series_id} の処理中にエラー: {e}",
+                            exc_info=True,
+                        )
 
-        if single_novel_ids:
-            self.logger.info("--- Processing Single Novels ---")
-            for i, novel_id in enumerate(single_novel_ids, 1):
-                self.logger.info(
-                    f"--- Processing Single Novel {i}/{len(single_novel_ids)} ---"
-                )
-                try:
-                    path = self.get_novel(novel_id)
-                    downloaded_paths.append(path)
-                except Exception as e:
-                    self.logger.error(
-                        f"小説ID {novel_id} の処理中にエラー: {e}", exc_info=True
+            if single_novel_ids:
+                self.logger.info("--- Processing Single Novels ---")
+                for i, novel_id in enumerate(single_novel_ids, 1):
+                    self.logger.info(
+                        f"--- Processing Single Novel {i}/{len(single_novel_ids)} ---"
                     )
-
-        return downloaded_paths
+                    try:
+                        path = self.get_novel(novel_id)
+                        downloaded_paths.append(path)
+                    except Exception as e:
+                        self.logger.error(
+                            f"小説ID {novel_id} の処理中にエラー: {e}", exc_info=True
+                        )
+            return downloaded_paths
+        except PixivError as e:
+            raise DownloadError(
+                f"ユーザーID {user_id} の作品リスト取得に失敗しました: {e}"
+            ) from e
+        except Exception as e:
+            raise DownloadError(
+                f"ユーザーID {user_id} の作品処理中に予期せぬエラーが発生: {e}"
+            ) from e
 
     # --- Private Helper Methods ---
 

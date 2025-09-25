@@ -23,6 +23,7 @@ from ...constants import (
     KEY_CSS_FILE,
     DEFAULT_EPUB_FILENAME_TEMPLATE,
 )
+from ...exceptions import BuildError
 from ...utils.path_manager import generate_sanitized_path
 
 
@@ -109,12 +110,12 @@ class EpubBuilder(BaseBuilder):
             self.logger.info(f"EPUBファイルの作成に成功しました: {output_path}")
             return output_path
 
-        except Exception:
+        except Exception as e:
             self.logger.exception(
                 "EPUBファイルの作成中に致命的なエラーが発生しました。"
             )
             self._cleanup_failed_build(output_path)
-            raise
+            raise BuildError(f"EPUBのビルドに失敗しました: {e}") from e
 
     def _determine_output_path(self) -> Path:
         """メタデータと設定に基づき、最終的な出力ファイルパスを決定します。"""

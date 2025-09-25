@@ -23,11 +23,12 @@ UNKNOWN_NOVEL_DIR = "novel_unknown"
 INVALID_PATH_CHARS_REGEX = r'[\\/:*?"<>|]'
 
 # --- Default Configuration Templates ---
-DEFAULT_NOVEL_DIR_TEMPLATE = "{id}_{title}"
-DEFAULT_SERIES_DIR_TEMPLATE = "series_{id}_{title}"
+DEFAULT_NOVEL_DIR_TEMPLATE = "{author_name}/{title}"
+DEFAULT_SERIES_DIR_TEMPLATE = "{author_name}/{title}"
+DEFAULT_SERIES_NOVEL_DIR_TEMPLATE = "{title}"
 DEFAULT_EPUB_FILENAME_TEMPLATE = "{author_name}/{title}.epub"
 DEFAULT_SERIES_EPUB_FILENAME_TEMPLATE = (
-    "{author_name}/[SERIES {series_title}]/{title}.epub"
+    "{author_name}/{series_title}/{title}.epub"
 )
 
 # --- Default API Settings ---
@@ -52,6 +53,7 @@ KEY_OUTPUT_DIRECTORY = "output_directory"
 KEY_FILENAME_TEMPLATE = "filename_template"
 KEY_SERIES_FILENAME_TEMPLATE = "series_filename_template"
 KEY_CSS_FILE = "css_file"
+KEY_CLEANUP_AFTER_BUILD = "cleanup_after_build"
 
 # [auth]
 KEY_AUTH = "auth"

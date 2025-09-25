@@ -172,13 +172,13 @@ class PixivDataPersister:
         pages_content = text.split("[newpage]")
         parsed_description = self.parser.parse(novel.get("caption", ""))
 
-        # 日付文字列をパースして YYYY-MM-DD 形式にフォーマット
+        # 日付文字列をパースして YYYY年MM月DD日 HH:MM 形式にフォーマット
         formatted_date = ""
         raw_date = novel.get("create_date")
         if raw_date:
             try:
                 dt_object = datetime.fromisoformat(raw_date)
-                formatted_date = dt_object.strftime("%Y-%m-%d")
+                formatted_date = dt_object.strftime("%Y年%m月%d日 %H:%M")
             except (ValueError, TypeError):
                 self.logger.warning(f"日付形式の解析に失敗しました: {raw_date}")
                 formatted_date = raw_date

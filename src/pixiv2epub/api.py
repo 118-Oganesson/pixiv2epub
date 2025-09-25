@@ -1,97 +1,66 @@
-#
-# -----------------------------------------------------------------------------
-# pixiv2epub/src/pixiv2epub/api.py
-#
-# このモジュールは、pixiv2epubをライブラリとして利用するための高レベルな公開APIを
-# 提供します（Facade パターン）。
-# 外部のPythonスクリプトから複雑な内部構造を意識することなく、主要な機能を
-# 簡単な関数呼び出しで利用できるように設計されています。
-# -----------------------------------------------------------------------------
+# src/pixiv2epub/api.py
 
-import logging
 from pathlib import Path
 from typing import Any, List, Optional
 
-from .orchestration.coordinator import Coordinator
-from .utils.config_loader import load_config
-from .utils.logging_setup import setup_logging
+from .main import Pixiv2Epub
 
-
-logger = logging.getLogger(__name__)
+# --- 通常実行 (Download & Build) ---
 
 
 def download_and_build_novel(
-    novel_id: Any,
-    config_path: Optional[str] = None,
-    log_level: str = "INFO",
+    novel_id: Any, config_path: Optional[str] = None, **kwargs
 ) -> Path:
-    """
-    単一のPixiv小説をダウンロードし、EPUBファイルとして生成します。
-
-    Args:
-        novel_id (Any): Pixivの小説ID。
-        config_path (Optional[str]): カスタム設定ファイルのパス。
-                                     Noneの場合はデフォルトパスが使用されます。
-        log_level (str): 出力するログのレベル ('INFO', 'DEBUG'など)。
-
-    Returns:
-        Path: 生成されたEPUBファイルのパス。
-    """
-    setup_logging(log_level)
-    config = load_config(config_path) if config_path else load_config()
-
-    coordinator = Coordinator(config)
-    # 現時点ではproviderとbuilderは固定だが、将来的には引数で指定可能に
-    return coordinator.download_and_build_novel(
-        provider_name="pixiv", builder_name="epub", novel_id=novel_id
-    )
+    """単一のPixiv小説をダウンロードし、EPUBを生成します。"""
+    cleanup_arg = kwargs.pop("cleanup", None)
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.run_novel(novel_id, cleanup=cleanup_arg)
 
 
 def download_and_build_series(
-    series_id: Any,
-    config_path: Optional[str] = None,
-    log_level: str = "INFO",
+    series_id: Any, config_path: Optional[str] = None, **kwargs
 ) -> List[Path]:
-    """
-    Pixivの小説シリーズをダウンロードし、各作品をEPUBファイルとして生成します。
-
-    Args:
-        series_id (Any): PixivのシリーズID。
-        config_path (Optional[str]): カスタム設定ファイルのパス。
-        log_level (str): 出力するログのレベル。
-
-    Returns:
-        List[Path]: 生成されたEPUBファイルのパスのリスト。
-    """
-    setup_logging(log_level)
-    config = load_config(config_path) if config_path else load_config()
-
-    coordinator = Coordinator(config)
-    return coordinator.download_and_build_series(
-        provider_name="pixiv", builder_name="epub", series_id=series_id
-    )
+    """Pixivのシリーズをダウンロードし、EPUBを生成します。"""
+    cleanup_arg = kwargs.pop("cleanup", None)
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.run_series(series_id, cleanup=cleanup_arg)
 
 
 def download_and_build_user_novels(
-    user_id: Any,
-    config_path: Optional[str] = None,
-    log_level: str = "INFO",
+    user_id: Any, config_path: Optional[str] = None, **kwargs
 ) -> List[Path]:
-    """
-    特定のPixivユーザーの全小説をダウンロードし、各作品をEPUBファイルとして生成します。
+    """Pixivユーザーの全作品をダウンロードし、EPUBを生成します。"""
+    cleanup_arg = kwargs.pop("cleanup", None)
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.run_user_novels(user_id, cleanup=cleanup_arg)
 
-    Args:
-        user_id (Any): PixivのユーザーID。
-        config_path (Optional[str]): カスタム設定ファイルのパス。
-        log_level (str): 出力するログのレベル。
 
-    Returns:
-        List[Path]: 生成されたEPUBファイルのパスのリスト。
-    """
-    setup_logging(log_level)
-    config = load_config(config_path) if config_path else load_config()
+# --- 分割実行 ---
 
-    coordinator = Coordinator(config)
-    return coordinator.download_and_build_user_novels(
-        provider_name="pixiv", builder_name="epub", user_id=user_id
-    )
+
+def download_novel(novel_id: Any, config_path: Optional[str] = None, **kwargs) -> Path:
+    """単一の小説をダウンロードします。"""
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.download_novel(novel_id)
+
+
+def download_series(
+    series_id: Any, config_path: Optional[str] = None, **kwargs
+) -> List[Path]:
+    """シリーズ作品をダウンロードします。"""
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.download_series(series_id)
+
+
+def download_user_novels(
+    user_id: Any, config_path: Optional[str] = None, **kwargs
+) -> List[Path]:
+    """ユーザーの全作品をダウンロードします。"""
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.download_user_novels(user_id)
+
+
+def build_novel(source_dir: Path, config_path: Optional[str] = None, **kwargs) -> Path:
+    """ローカルのデータからEPUBを生成します。"""
+    app = Pixiv2Epub(config_path=config_path, **kwargs)
+    return app.build_from_directory(source_dir)

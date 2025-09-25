@@ -43,6 +43,9 @@ series_filename_template = "{author_name}/{series_title}/[{author_name}] {series
 # EPUBに適用するCSSファイルへのパス (一時保存先ディレクトリからの相対パス)
 css_file = "styles/style.css"
 
+# trueに設定すると、EPUB生成後にダウンロードした生データ（中間ファイル）を自動的に削除します。
+# コマンドラインで --cleanup または --no-cleanup を指定すると、この設定は上書きされます。
+cleanup_after_build = false
 
 # ------------------------------------------------------------------------------
 # 認証設定

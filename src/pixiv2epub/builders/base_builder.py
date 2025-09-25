@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..data_models import NovelMetadata
+from ..exceptions import BuildError
 from ..utils.path_manager import PathManager
 
 
@@ -43,8 +44,8 @@ class BaseBuilder(ABC):
         else:
             detail_json_path = self.novel_dir / "detail.json"
             if not detail_json_path.is_file():
-                raise FileNotFoundError(
-                    f"detail.jsonが見つかりません: {detail_json_path}"
+                raise BuildError(
+                    f"ビルドに必要な 'detail.json' が見つかりません: {detail_json_path}"
                 )
             with open(detail_json_path, "r", encoding="utf-8") as f:
                 metadata_dict = json.load(f)

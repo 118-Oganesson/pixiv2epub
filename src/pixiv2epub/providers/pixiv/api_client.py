@@ -14,6 +14,8 @@ from typing import Any, Callable, Dict
 
 from pixivpy3 import AppPixivAPI, PixivError
 
+from ...exceptions import AuthenticationError
+
 
 class PixivApiClient:
     """Pixiv APIと通信するためのラッパークラス。"""
@@ -37,10 +39,16 @@ class PixivApiClient:
         self.retry = api_retries
 
         if not refresh_token or refresh_token == "your_refresh_token_here":
-            raise ValueError("設定に有効なPixivのrefresh_tokenが見つかりません。")
+            raise AuthenticationError(
+                "設定に有効なPixivのrefresh_tokenが見つかりません。"
+            )
 
         self.api = AppPixivAPI()
-        self.api.auth(refresh_token=refresh_token)
+        try:
+            self.api.auth(refresh_token=refresh_token)
+        except PixivError as e:
+            raise AuthenticationError(f"Pixiv APIの認証に失敗しました: {e}")
+
         self.logger.debug("Pixiv APIの認証が完了しました。")
 
     def _safe_api_call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:

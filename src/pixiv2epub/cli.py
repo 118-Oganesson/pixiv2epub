@@ -1,95 +1,111 @@
-#
-# -----------------------------------------------------------------------------
-# pixiv2epub/src/pixiv2epub/cli.py
-#
-# コマンドラインインターフェース（CLI）のエントリーポイント。
-# argparseを用いてコマンドライン引数を解析し、api.pyで定義された
-# 高レベル関数を呼び出す責務を持ちます。
-# -----------------------------------------------------------------------------
+# src/pixiv2epub/cli.py
+
 import argparse
-import sys
 import logging
+from pathlib import Path
 
 from . import api
-
-logger = logging.getLogger("pixiv2epub")
+from .exceptions import Pixiv2EpubError
+from .utils.url_parser import parse_input
+from .utils.logging import setup_logging
 
 
 def main():
-    """CLIのメイン処理"""
     parser = argparse.ArgumentParser(
-        description="Pixivの小説をダウンロードしてEPUBに変換します。",
-        formatter_class=argparse.RawTextHelpFormatter,
+        description="Pixivから小説をダウンロードしてEPUBに変換します。"
     )
     parser.add_argument(
-        "-c", "--config", type=str, help="設定ファイルのパスを指定します。"
+        "url_or_id",
+        nargs="?",
+        default=None,
+        help="小説/シリーズ/ユーザーのURLまたはID。--build-only使用時は不要。",
     )
-    parser.add_argument(
-        "-v",
-        "--verbose",
+
+    action_group = parser.add_mutually_exclusive_group()
+    action_group.add_argument(
+        "--download-only",
         action="store_true",
-        help="デバッグ用の詳細なログを出力します。",
+        help="ダウンロードのみ実行し、ビルドは行いません。",
+    )
+    action_group.add_argument(
+        "--build-only",
+        metavar="SOURCE_DIR",
+        type=Path,
+        help="指定したローカルディレクトリのデータからビルドのみ実行します。",
     )
 
-    # サブコマンドのパーサーを作成
-    subparsers = parser.add_subparsers(
-        dest="command", required=True, help="実行するコマンド"
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        default=None,
+        help="EPUB生成後に中間ファイルを削除します。設定ファイルの値より優先されます。",
     )
-
-    # 'novel' コマンド
-    parser_novel = subparsers.add_parser(
-        "novel", help="単一の小説を処理します。\n例: pixiv2epub novel 1234567"
+    parser.add_argument(
+        "--no-cleanup",
+        action="store_false",
+        dest="cleanup",
+        help="EPUB生成後に中間ファイルを削除しません。設定ファイルの値より優先されます。",
     )
-    parser_novel.add_argument("id", type=int, help="Pixivの小説ID")
-
-    # 'series' コマンド
-    parser_series = subparsers.add_parser(
-        "series", help="小説シリーズを処理します。\n例: pixiv2epub series 891011"
+    parser.add_argument("--config", help="設定ファイルのパス")
+    parser.add_argument(
+        "--verbose", "-v", action="store_true", help="デバッグログを有効にする"
     )
-    parser_series.add_argument("id", type=int, help="PixivのシリーズID")
-
-    # 'user' コマンド
-    parser_user = subparsers.add_parser(
-        "user", help="ユーザーの全作品を処理します。\n例: pixiv2epub user 12345"
-    )
-    parser_user.add_argument("id", type=int, help="PixivのユーザーID")
-
     args = parser.parse_args()
+
+    # CLIとしての引数チェック
+    if args.build_only and args.url_or_id:
+        parser.error("--build-only を使用する場合、IDやURLは不要です。")
+    if not args.build_only and not args.url_or_id:
+        parser.error("ID/URLを指定するか、--build-onlyオプションを使用してください。")
+
     log_level = "DEBUG" if args.verbose else "INFO"
+    setup_logging(log_level)
+
+    # API呼び出し時の共通引数
+    api_kwargs = {
+        "config_path": args.config,
+        "log_level": log_level,
+    }
+    if args.cleanup is not None:
+        api_kwargs["cleanup"] = args.cleanup
 
     try:
-        if args.command == "novel":
-            logger.info(f"小説ID: {args.id} の処理を開始します...")
-            output_path = api.download_and_build_novel(
-                novel_id=args.id, config_path=args.config, log_level=log_level
-            )
-            logger.info("✅ 処理完了")
-            print(f"作成されたファイル: {output_path}")
+        if args.build_only:
+            api.build_novel(args.build_only, **api_kwargs)
+            print(f"ビルドが完了しました: {args.build_only}")
+            return
 
-        elif args.command == "series":
-            logger.info(f"シリーズID: {args.id} の処理を開始します...")
-            output_paths = api.download_and_build_series(
-                series_id=args.id, config_path=args.config, log_level=log_level
-            )
-            logger.info("✅ シリーズ処理完了")
-            print("作成されたファイル:")
-            for path in output_paths:
-                print(f"  - {path}")
+        target_type, target_id = parse_input(args.url_or_id)
 
-        elif args.command == "user":
-            logger.info(f"ユーザーID: {args.id} の全作品の処理を開始します...")
-            output_paths = api.download_and_build_user_novels(
-                user_id=args.id, config_path=args.config, log_level=log_level
-            )
-            logger.info("✅ ユーザー作品処理完了")
-            print("作成されたファイル:")
-            for path in output_paths:
-                print(f"  - {path}")
+        if args.download_only:
+            print("ダウンロード処理を実行します...")
+            if target_type == "novel":
+                api.download_novel(target_id, **api_kwargs)
+            elif target_type == "series":
+                api.download_series(target_id, **api_kwargs)
+            elif target_type == "user":
+                api.download_user_novels(target_id, **api_kwargs)
+        else:  # 通常実行 (Download & Build)
+            print("ダウンロードとビルド処理を実行します...")
+            if target_type == "novel":
+                api.download_and_build_novel(target_id, **api_kwargs)
+            elif target_type == "series":
+                api.download_and_build_series(target_id, **api_kwargs)
+            elif target_type == "user":
+                api.download_and_build_user_novels(target_id, **api_kwargs)
 
+        print("処理が正常に完了しました。")
+
+    except Pixiv2EpubError as e:
+        # 制御されたエラー（設定ミス、認証失敗など）
+        logging.getLogger("cli").error(f"エラー: {e}")
+        exit(1)
     except Exception as e:
-        # api層で詳細なエラーログは出力済みのため、CLIではシンプルなメッセージを表示
-        logger.critical(f"❌ 致命的なエラーが発生しました: {e}")
-        sys.exit(1)
+        # 予期せぬエラー
+        logging.getLogger("cli").critical(
+            f"予期せぬ致命的なエラーが発生しました: {e}", exc_info=args.verbose
+        )
+        exit(1)
 
 
 if __name__ == "__main__":
