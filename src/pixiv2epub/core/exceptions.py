@@ -1,4 +1,4 @@
-# src/pixiv2epub/exceptions.py
+# src/pixiv2epub/core/exceptions.py
 
 
 class Pixiv2EpubError(Exception):
@@ -7,7 +7,7 @@ class Pixiv2EpubError(Exception):
     pass
 
 
-class ConfigError(Pixiv2EpubError):
+class SettingsError(Pixiv2EpubError):
     """設定関連のエラー。"""
 
     pass

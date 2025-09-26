@@ -5,9 +5,10 @@ import logging
 from pathlib import Path
 
 from . import api
-from .exceptions import Pixiv2EpubError
-from .utils.url_parser import parse_input
+from .core.exceptions import Pixiv2EpubError
+from .core.settings import SettingsError
 from .utils.logging import setup_logging
+from .utils.url_parser import parse_input
 
 
 def main():
@@ -36,19 +37,13 @@ def main():
 
     parser.add_argument(
         "--cleanup",
-        action="store_true",
+        action=argparse.BooleanOptionalAction,
         default=None,
-        help="EPUB生成後に中間ファイルを削除します。設定ファイルの値より優先されます。",
-    )
-    parser.add_argument(
-        "--no-cleanup",
-        action="store_false",
-        dest="cleanup",
-        help="EPUB生成後に中間ファイルを削除しません。設定ファイルの値より優先されます。",
+        help="EPUB生成後に中間ファイルを削除/保持します。設定ファイルの値より優先されます。",
     )
     parser.add_argument("--config", help="設定ファイルのパス")
     parser.add_argument(
-        "--verbose", "-v", action="store_true", help="デバッグログを有効にする"
+        "-v", "--verbose", action="store_true", help="デバッグログを有効にする"
     )
     args = parser.parse_args()
 
@@ -58,27 +53,31 @@ def main():
     if not args.build_only and not args.url_or_id:
         parser.error("ID/URLを指定するか、--build-onlyオプションを使用してください。")
 
+    # ログ先行設定
     log_level = "DEBUG" if args.verbose else "INFO"
     setup_logging(log_level)
 
-    # API呼び出し時の共通引数
-    api_kwargs = {
-        "config_path": args.config,
-        "log_level": log_level,
-    }
-    if args.cleanup is not None:
-        api_kwargs["cleanup"] = args.cleanup
-
     try:
+        # --- API呼び出し時の共通引数 ---
+        # api.pyの各関数はSettingsオブジェクトを内部で生成するため、
+        # 上書きしたい引数のみをキーワード引数として渡す
+        api_kwargs = {"config_path": args.config}
+        if args.verbose:
+            api_kwargs["log_level"] = "DEBUG"
+        if args.cleanup is not None:
+            # pydantic-settingsはネストした辞書で設定を上書きできる
+            api_kwargs["builder"] = {"cleanup_after_build": args.cleanup}
+
+        # --- 処理の実行 ---
         if args.build_only:
             api.build_novel(args.build_only, **api_kwargs)
-            print(f"ビルドが完了しました: {args.build_only}")
+            logging.info(f"ビルドが完了しました: {args.build_only}")
             return
 
         target_type, target_id = parse_input(args.url_or_id)
 
         if args.download_only:
-            print("ダウンロード処理を実行します...")
+            logging.info("ダウンロード処理を実行します...")
             if target_type == "novel":
                 api.download_novel(target_id, **api_kwargs)
             elif target_type == "series":
@@ -86,7 +85,7 @@ def main():
             elif target_type == "user":
                 api.download_user_novels(target_id, **api_kwargs)
         else:  # 通常実行 (Download & Build)
-            print("ダウンロードとビルド処理を実行します...")
+            logging.info("ダウンロードとビルド処理を実行します...")
             if target_type == "novel":
                 api.download_and_build_novel(target_id, **api_kwargs)
             elif target_type == "series":
@@ -94,14 +93,12 @@ def main():
             elif target_type == "user":
                 api.download_and_build_user_novels(target_id, **api_kwargs)
 
-        print("処理が正常に完了しました。")
+        logging.info("処理が正常に完了しました。")
 
-    except Pixiv2EpubError as e:
-        # 制御されたエラー（設定ミス、認証失敗など）
+    except (Pixiv2EpubError, SettingsError) as e:
         logging.getLogger("cli").error(f"エラー: {e}")
         exit(1)
     except Exception as e:
-        # 予期せぬエラー
         logging.getLogger("cli").critical(
             f"予期せぬ致命的なエラーが発生しました: {e}", exc_info=args.verbose
         )

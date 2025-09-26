@@ -1,20 +1,13 @@
-#
-# -----------------------------------------------------------------------------
 # src/pixiv2epub/builders/epub/asset_manager.py
-#
-# EPUBに含めるアセット（画像ファイルなど）の収集と整理を担当します。
-#
-# 本文やCSSから実際に参照されている画像ファイルのみを抽出し、
-# 不要なファイルがEPUBに含まれないようにする責務を持ちます。
-# -----------------------------------------------------------------------------
+
 import logging
 import re
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
-from ...data_models import ImageAsset, NovelMetadata, PageInfo
-from ...utils.path_manager import PathManager
 from ...constants import IMAGES_DIR_NAME
+from ...models.local import ImageAsset, NovelMetadata, PageInfo
+from ...utils.path_manager import PathManager
 
 MEDIA_TYPES = {
     "jpg": "image/jpeg",
@@ -40,14 +33,6 @@ class AssetManager:
     def __init__(
         self, paths: PathManager, metadata: NovelMetadata, css_file_path: Optional[Path]
     ):
-        """
-        AssetManagerのインスタンスを初期化します。
-
-        Args:
-            paths (PathManager): パス管理用のユーティリティインスタンス。
-            metadata (NovelMetadata): 小説のメタデータ。
-            css_file_path (Optional[Path]): CSSファイルの絶対パス。
-        """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.paths = paths
         self.metadata = metadata
@@ -56,39 +41,24 @@ class AssetManager:
     def gather_assets(
         self,
     ) -> Tuple[List[ImageAsset], List[PageInfo], Optional[ImageAsset]]:
-        """
-        アセットを収集、整理し、EPUBに含めるべき最終的なリストを返します。
-
-        Returns:
-            Tuple[List[ImageAsset], List[PageInfo], Optional[ImageAsset]]:
-                - 最終的にEPUBに含める画像アセットのリスト。
-                - ページ情報のリスト（メタデータから取得）。
-                - カバー画像として特定されたImageAsset（存在しない場合はNone）。
-        """
+        """アセットを収集、整理し、EPUBに含めるべき最終的なリストを返します。"""
         all_images = self._collect_image_files()
         cover_image_asset = self._find_cover_image(all_images)
-
         referenced_filenames = self._extract_referenced_image_filenames()
-        self.logger.debug(
-            f"本文・CSSで参照されている画像: {sorted(list(referenced_filenames))}"
-        )
-
         final_images = [
             img for img in all_images if img.filename in referenced_filenames
         ]
 
-        # カバー画像は本文中で参照されていなくても必ずEPUBに含める
         if cover_image_asset and cover_image_asset.filename not in referenced_filenames:
             final_images.append(cover_image_asset)
 
         return final_images, self.metadata.pages, cover_image_asset
 
     def _collect_image_files(self) -> List[ImageAsset]:
-        """`images`ディレクトリから画像ファイルを収集し、ImageAssetのリストを生成します。"""
+        """`images`ディレクトリから画像ファイルを収集します。"""
         image_assets = []
         if not self.paths.image_dir.is_dir():
             return image_assets
-
         image_paths = sorted([p for p in self.paths.image_dir.iterdir() if p.is_file()])
         for i, path in enumerate(image_paths, 1):
             image_assets.append(
@@ -125,20 +95,14 @@ class AssetManager:
             p = path.strip().strip("'\"")
             if not p or p.startswith(("http", "data:")):
                 return
-            # パスの '../' や './' を正規化してファイル名だけを抽出
             filenames.add(Path(p).name)
 
-        # 全てのページファイルを解析
         for page_info in self.metadata.pages:
             page_file = self.paths.novel_dir / page_info.body.lstrip("./")
             if not page_file.is_file():
-                self.logger.warning(
-                    f"参照先のページファイルが見つかりません: {page_file}"
-                )
                 continue
             try:
                 content = page_file.read_text(encoding="utf-8")
-                # src="..." or src='...' 形式の画像参照を検索
                 for match in re.finditer(r'src=(["\'])(.*?)\1', content, re.IGNORECASE):
                     add_filename_from_path(match.group(2))
             except Exception as e:
@@ -146,11 +110,9 @@ class AssetManager:
                     f"ページファイル '{page_file.name}' の解析に失敗: {e}"
                 )
 
-        # CSSファイルを解析
         if self.css_file_path and self.css_file_path.is_file():
             try:
                 css_text = self.css_file_path.read_text(encoding="utf-8")
-                # url(...) 形式の画像参照を検索
                 for match in re.finditer(r"url\((.*?)\)", css_text, re.IGNORECASE):
                     add_filename_from_path(match.group(1))
             except Exception as e:

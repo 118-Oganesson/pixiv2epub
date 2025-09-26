@@ -12,12 +12,9 @@ wheels/
 # Jupyter Notebook
 *.ipynb
 
-# config files
-configs/*.toml
+# local settings
+.env
 
 # novel files
 pixiv_raw
 epubs
-
-# list
-novels.txt

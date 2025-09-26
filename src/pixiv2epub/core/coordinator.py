@@ -1,49 +1,45 @@
-# src/pixiv2epub/orchestration/coordinator.py
+# src/pixiv2epub/core/coordinator.py
 
 import logging
 import os
 import shutil
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type
+from typing import Any, Dict, List, Type
 
-from .. import constants as const
-from ..builders.base_builder import BaseBuilder
+from ..builders.base import BaseBuilder
 from ..builders.epub.builder import EpubBuilder
-from ..providers.base_provider import BaseProvider
+from ..providers.base import BaseProvider
 from ..providers.pixiv.provider import PixivProvider
-
+from .settings import Settings
 
 AVAILABLE_PROVIDERS: Dict[str, Type[BaseProvider]] = {"pixiv": PixivProvider}
 AVAILABLE_BUILDERS: Dict[str, Type[BaseBuilder]] = {"epub": EpubBuilder}
 
 
 class Coordinator:
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
+    def __init__(self, settings: Settings):
+        self.settings = settings
         self.logger = logging.getLogger(self.__class__.__name__)
 
     def _get_provider(self, provider_name: str) -> BaseProvider:
         provider_class = AVAILABLE_PROVIDERS.get(provider_name)
         if not provider_class:
             raise ValueError(f"不明なプロバイダです: {provider_name}")
-        return provider_class(self.config)
+        return provider_class(self.settings)
 
     def _get_builder(self, builder_name: str, novel_dir: Path) -> BaseBuilder:
         builder_class = AVAILABLE_BUILDERS.get(builder_name)
         if not builder_class:
             raise ValueError(f"不明なビルダーです: {builder_name}")
-        return builder_class(novel_dir=novel_dir, config=self.config)
+        return builder_class(novel_dir=novel_dir, settings=self.settings)
 
-    def _is_cleanup_enabled(self, cleanup: Optional[bool]) -> bool:
+    def _is_cleanup_enabled(self) -> bool:
         """クリーンアップが有効かどうかを判定する。"""
-        if cleanup is not None:
-            return cleanup
-        return self.config.get(const.KEY_BUILDER, {}).get("cleanup_after_build", False)
+        return self.settings.builder.cleanup_after_build
 
     def _cleanup_empty_parents(self, directory: Path, stop_at: Path):
         """指定されたディレクトリの親を、空であれば再帰的に削除する。"""
         parent = directory.parent
-        # ルートダウンロードディレクトリに到達するまで、またはパスの階層関係が崩れたらループを停止
         while (
             parent.is_absolute()
             and parent != stop_at
@@ -55,7 +51,6 @@ class Coordinator:
                     os.rmdir(parent)
                     parent = parent.parent
                 else:
-                    # 親が空でなければ、それ以上遡る必要はない
                     break
             except OSError as e:
                 self.logger.warning(
@@ -63,13 +58,12 @@ class Coordinator:
                 )
                 break
 
-    def _handle_cleanup(self, directory: Path, base_dir: Path, cleanup: Optional[bool]):
+    def _handle_cleanup(self, directory: Path, base_dir: Path):
         """中間ファイルと、空になった親フォルダを削除する。"""
-        if self._is_cleanup_enabled(cleanup):
+        if self._is_cleanup_enabled():
             try:
                 self.logger.info(f"中間ファイルを削除します: {directory}")
                 shutil.rmtree(directory)
-                # 削除後、空になった親フォルダのクリーンアップを試みる
                 self._cleanup_empty_parents(directory, stop_at=base_dir)
             except OSError as e:
                 self.logger.error(f"中間ファイルの削除に失敗しました: {e}")
@@ -79,7 +73,6 @@ class Coordinator:
         provider_name: str,
         builder_name: str,
         novel_id: Any,
-        cleanup: Optional[bool] = None,
     ) -> Path:
         self.logger.info(f"小説ID: {novel_id} の処理を開始します...")
         provider = self._get_provider(provider_name)
@@ -88,7 +81,7 @@ class Coordinator:
         builder = self._get_builder(builder_name, downloaded_path)
         output_path = builder.build()
 
-        self._handle_cleanup(downloaded_path, provider.base_dir, cleanup)
+        self._handle_cleanup(downloaded_path, provider.base_dir)
 
         self.logger.info(f"処理が正常に完了しました: {output_path}")
         return output_path
@@ -98,7 +91,6 @@ class Coordinator:
         provider_name: str,
         builder_name: str,
         series_id: Any,
-        cleanup: Optional[bool] = None,
     ) -> List[Path]:
         self.logger.info(f"シリーズID: {series_id} の処理を開始します...")
         provider = self._get_provider(provider_name)
@@ -110,7 +102,7 @@ class Coordinator:
                 builder = self._get_builder(builder_name, path)
                 output_path = builder.build()
                 output_paths.append(output_path)
-                self._handle_cleanup(path, provider.base_dir, cleanup)
+                self._handle_cleanup(path, provider.base_dir)
             except Exception as e:
                 self.logger.error(
                     f"{path.name} のビルドに失敗しました: {e}", exc_info=True
@@ -126,7 +118,6 @@ class Coordinator:
         provider_name: str,
         builder_name: str,
         user_id: Any,
-        cleanup: Optional[bool] = None,
     ) -> List[Path]:
         self.logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します...")
         provider = self._get_provider(provider_name)
@@ -142,7 +133,7 @@ class Coordinator:
                 builder = self._get_builder(builder_name, path)
                 output_path = builder.build()
                 output_paths.append(output_path)
-                self._handle_cleanup(path, provider.base_dir, cleanup)
+                self._handle_cleanup(path, provider.base_dir)
             except Exception as e:
                 self.logger.error(
                     f"{path.name} のビルドに失敗しました: {e}", exc_info=True

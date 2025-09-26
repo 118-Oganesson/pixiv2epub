@@ -2,21 +2,17 @@
 
 ![Pixiv to EPUB Converter Icon](./pixiv2epub_icon.svg){ width=250 }
 
-Pixiv小説をID指定でダウンロードし、高品質なEPUB3形式に変換するコマンドラインツールです。
+Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。
 
 -----
 
 ## ✨ 主な機能
 
-* **高機能なEPUB3生成**: 小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含む標準規格のEPUB3を生成します。
-* **多彩な実行モード**:
-  * 単一の小説ID
-  * シリーズ作品の一括処理
-  * 特定ユーザーの全作品の一括処理
-  * ダウンロードのみ、またはローカルファイルからのビルドのみの実行
+* **高品質なEPUB3生成**: 小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
+* **スマートなURL/ID処理**: URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
 * **Pixiv独自タグ変換**: `[newpage]`, `[chapter:]`, `[[rb:...]]` などのタグを適切に解釈し、XHTMLに変換します。
 * **柔軟な画像処理**: カバー画像と本文中の挿絵を自動で取得・同梱します。`pngquant`などの外部ツールと連携し、ファイルサイズを最適化する画像圧縮も可能です。
-* **洗練されたCLI**: `rich`ライブラリによる進捗表示や、ビルド前の対話的なメタデータ編集機能を提供します。
+* **モダンなCLI**: `rich`ライブラリによる見やすいログ出力や、シンプルなコマンド体系を提供します。
 
 -----
 
@@ -24,12 +20,13 @@ Pixiv小説をID指定でダウンロードし、高品質なEPUB3形式に変�
 
 * **Python 3.13+**
 * **ライブラリ:**
+  * `pydantic-settings`
   * `pixivpy3`
   * `rich`
-  * `beautifulsoup4`
   * `Jinja2`
+  * その他、`pyproject.toml`を参照
 * **（任意）画像圧縮ツール:**
-    `config.toml`で画像圧縮を有効にする場合、以下のツールのインストールが必要です。
+    画像圧縮を有効にする場合、以下のツールのインストールが必要です。
   * `pngquant`
   * `jpegoptim`
   * `cwebp`
@@ -38,105 +35,94 @@ Pixiv小説をID指定でダウンロードし、高品質なEPUB3形式に変�
 
 ## 📦 セットアップ
 
-### 1\. 認証情報の設定
+本プロジェクトは [uv](https://github.com/astral-sh/uv) でのパッケージ管理を前提としています。
 
-`configs/config.toml.example` をコピーして `configs/config.toml` を作成し、Pixivの **Refresh Token** を設定してください。
+### 1\. 依存関係とパッケージのインストール
 
-```toml:configs/config.toml
-[auth]
-refresh_token = "your_refresh_token_here"
-```
-
-セキュリティのため、ファイルに直接書き込む代わりに**環境変数** `PIXIV_REFRESH_TOKEN` で指定することを強く推奨します。
+`uv`を使い、編集可能モードでプロジェクトをインストールします。
 
 ```bash
-export PIXIV_REFRESH_TOKEN="your_refresh_token_here"
+uv pip install -e .
 ```
 
-### 2\. 依存ライブラリのインストール
+### 2\. 認証情報の設定
 
-本ツールは [uv](https://github.com/astral-sh/uv) の利用を推奨しています。以下のコマンドで依存関係をインストールします。
+`.env.example` を `.env` にコピーし、ご自身のPixiv Refresh Tokenを設定してください。
 
 ```bash
-# uv.lock ファイルから依存関係を同期します
-uv sync
+cp .env.example .env
+```
+
+作成した`.env`ファイルを開き、トークンを貼り付けます。
+
+```bash
+# .env
+# アンダースコアが2つであることに注意してください
+PIXIV2EPUB_AUTH__REFRESH_TOKEN="your_refresh_token_here"
 ```
 
 -----
 
 ## 🚀 使い方
 
-`uv run` を使って `main.py` を実行します。
+インストールが完了すると、`pixiv2epub`コマンドが利用可能になります。
 
 ### 単一の小説を処理
 
-```bash
-uv run main.py 12345678
-```
-
-### 複数の小説を一度に処理
-
-IDをスペース区切りで渡すか、IDを一行ずつ記述したテキストファイルを指定します。
+小説のURLまたはIDを指定します。
 
 ```bash
-# IDを直接指定
-uv run main.py 12345678 87654321
+# URLで指定
+pixiv2epub "https://www.pixiv.net/novel/show.php?id=12345678"
 
-# ファイルから読み込み
-uv run main.py path/to/id_list.txt
+# IDで指定
+pixiv2epub 12345678
 ```
 
 ### シリーズ作品をまとめて処理
 
-`--series` フラグを付けてシリーズIDを指定します。
+シリーズページのURLを指定します。（自動でシリーズとして認識されます）
 
 ```bash
-uv run main.py --series 98765
+pixiv2epub "https://www.pixiv.net/novel/series/987654"
 ```
 
 ### ユーザーの全作品をまとめて処理
 
-`--user` フラグを付けてユーザーIDを指定します。シリーズ作品と単独作品が自動で分類され、すべて処理されます。
+ユーザーページのURLを指定します。（自動でユーザーとして認識されます）
 
 ```bash
-uv run main.py --user 58182393
+pixiv2epub "https://www.pixiv.net/users/58182393"
 ```
 
 ### ダウンロード済みデータからEPUBを生成
 
-`--build-only` を使うと、ダウンロード済みのローカルディレクトリからEPUBを生成できます。
+`--build-only` を使い、ダウンロード済みのローカルディレクトリからEPUBを生成します。
 
 ```bash
-uv run main.py --build-only ./pixiv_raw/作者名/12345678_小説タイトル
+pixiv2epub --build-only ./pixiv_raw/作者名/12345678_小説タイトル
 ```
 
-### メタデータを対話的に編集
+-----
 
-`--interactive` フラグを付けると、EPUB生成前にタイトルやあらすじをCLI上で編集できます。
-
-```bash
-uv run main.py --interactive 12345678
-```
-
-### コマンドラインオプション一覧
+## ⌨️ コマンドラインオプション一覧
 
 ```text
-usage: main.py [-h] [--user USER_ID | -s SERIES_ID | --build-only RAW_DIR | [inputs ...]] [-c CONFIG] [-v] [-i] [--download-only]
+usage: cli.py [-h] [--download-only | --build-only SOURCE_DIR] [--cleanup | --no-cleanup] [--config CONFIG] [-v]
+              [url_or_id]
 
-Pixiv小説をダウンロードしてEPUBに変換します。
+Pixivから小説をダウンロードしてEPUBに変換します。
+
+positional arguments:
+  url_or_id             小説/シリーズ/ユーザーのURLまたはID。--build-only使用時は不要。
 
 options:
   -h, --help            このヘルプメッセージを表示して終了します
-  -c CONFIG, --config CONFIG
-                        設定ファイルのパス (default: ./configs/config.toml)
-  -v, --verbose         詳細なログを出力します
-  -i, --interactive     ビルド前にメタデータを対話的に編集します (シリーズモードまたはユーザーモードで使用可能)
-  --download-only       ダウンロードのみ実行します
-
-入力モード:
-  inputs                小説ID(複数可)またはIDリストファイルへのパス
-  --user USER_ID        指定したユーザーIDのすべての小説をダウンロードします
-  -s SERIES_ID, --series SERIES_ID
-                        入力をシリーズIDとして扱います
-  --build-only RAW_DIR  指定ディレクトリからビルドのみ実行します
+  --download-only       ダウンロードのみ実行し、ビルドは行いません。
+  --build-only SOURCE_DIR
+                        指定したローカルディレクトリのデータからビルドのみ実行します。
+  --cleanup, --no-cleanup
+                        EPUB生成後に中間ファイルを削除/保持します。設定ファイルの値より優先されます。
+  --config CONFIG       設定ファイルのパス
+  -v, --verbose         デバッグログを有効にする
 ```

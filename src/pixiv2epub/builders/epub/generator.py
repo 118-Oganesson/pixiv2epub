@@ -1,20 +1,13 @@
-#
-# -----------------------------------------------------------------------------
 # src/pixiv2epub/builders/epub/generator.py
-#
-# EPUBを構成する各要素（XHTML, OPF, NCXなど）を生成する責務を持つクラス。
-#
-# Jinja2テンプレートエンジンを利用して、メタデータとアセット情報から
-# EPUBの仕様に準拠したファイルを動的に生成します。
-# -----------------------------------------------------------------------------
+
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader
 
-from ...data_models import (
+from ...models.local import (
     EpubComponents,
     ImageAsset,
     NovelMetadata,
@@ -22,30 +15,13 @@ from ...data_models import (
     PageInfo,
 )
 from ...utils.path_manager import PathManager
-from ... import constants as const
 
 
 class EpubGenerator:
     """EPUBの構成要素を生成するクラス。"""
 
-    def __init__(
-        self,
-        config: Dict[str, Any],
-        metadata: NovelMetadata,
-        paths: PathManager,
-        template_dir: Path,
-    ):
-        """
-        EpubGeneratorを初期化します。
-
-        Args:
-            config (dict): アプリケーション全体の設定情報。
-            metadata (NovelMetadata): 小説のメタデータ。
-            paths (PathManager): パス管理ユーティリティ。
-            template_dir (Path): Jinja2テンプレートが格納されているディレクトリのパス。
-        """
+    def __init__(self, metadata: NovelMetadata, paths: PathManager, template_dir: Path):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.config = config
         self.metadata = metadata
         self.paths = paths
         self.template_env = Environment(
@@ -59,35 +35,16 @@ class EpubGenerator:
         cover_asset: Optional[ImageAsset],
         css_path: Optional[Path],
     ) -> EpubComponents:
-        """
-        EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。
-
-        Args:
-            image_assets (List[ImageAsset]): EPUBに含める画像アセットのリスト。
-            page_infos (List[PageInfo]): 各ページのメタ情報リスト。
-            cover_asset (Optional[ImageAsset]): カバー画像のアセット。
-            css_path (Optional[Path]): スタイルシートのパス。
-
-        Returns:
-            EpubComponents: 生成された全コンポーネントを格納したデータクラス。
-        """
+        """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
         css_rel_path = (
             f"css/{css_path.name}" if css_path and css_path.is_file() else None
         )
-
-        # 1. 各本文ページ(XHTML)を生成
         final_pages = self._generate_main_pages(page_infos, css_rel_path)
-
-        # 2. 作品情報ページとカバーページを生成
         info_page = self._generate_info_page(css_rel_path)
         cover_page = self._generate_cover_page(cover_asset)
-
-        # 3. content.opf (パッケージドキュメント) を生成
         content_opf = self._generate_opf(
             final_pages, image_assets, info_page, cover_page, cover_asset, css_path
         )
-
-        # 4. nav.xhtml (目次) を生成
         nav_xhtml = self._generate_nav(final_pages, info_page, cover_page is not None)
 
         return EpubComponents(
@@ -101,18 +58,9 @@ class EpubGenerator:
         )
 
     def _render_template(self, template_name: str, context: Dict) -> bytes:
-        """Jinja2テンプレートをレンダリングしてバイト列として返します。"""
         template = self.template_env.get_template(template_name)
         rendered_str = template.render(context)
         return rendered_str.encode("utf-8")
-
-    def _correct_html_image_paths(self, html_content: Optional[str]) -> str:
-        """HTMLコンテンツ内の画像パスをEPUBの構造に合わせて修正します。"""
-        if not html_content:
-            return ""
-        from_path = f'src="./{const.IMAGES_DIR_NAME}/'
-        to_path = f'src="../{const.IMAGES_DIR_NAME}/'
-        return html_content.replace(from_path, to_path)
 
     def _generate_main_pages(
         self, page_infos: List[PageInfo], css_path: Optional[str]
@@ -123,10 +71,9 @@ class EpubGenerator:
             raw_content_path = self.paths.novel_dir / page_info.body.lstrip("./")
             try:
                 content = raw_content_path.read_text(encoding="utf-8")
-                corrected_content = self._correct_html_image_paths(content)
                 context = {
                     "title": page_info.title,
-                    "content": corrected_content,
+                    "content": content,
                     "css_path": css_path,
                 }
                 page_content_bytes = self._render_template(
@@ -140,21 +87,12 @@ class EpubGenerator:
                         title=page_info.title,
                     )
                 )
-            except FileNotFoundError:
-                self.logger.warning(
-                    f"ページファイルが見つかりません: {raw_content_path}"
-                )
             except Exception as e:
-                self.logger.error(
-                    f"ページの処理中にエラーが発生しました: {page_info.title}, {e}"
-                )
+                self.logger.error(f"ページの処理中にエラー: {page_info.title}, {e}")
         return pages
 
     def _generate_info_page(self, css_path: Optional[str]) -> PageAsset:
         """作品情報ページを生成します。"""
-        corrected_description = self._correct_html_image_paths(
-            self.metadata.description
-        )
         context = {
             "title": self.metadata.title,
             "css_path": css_path,
@@ -164,7 +102,7 @@ class EpubGenerator:
                 "series_title": self.metadata.series.title
                 if self.metadata.series
                 else None,
-                "description": corrected_description,
+                "description": self.metadata.description,
                 "tags": self.metadata.tags,
                 "source_url": self.metadata.original_source,
                 "meta_info": f"公開日: {self.metadata.date}, 文字数: {self.metadata.text_length or 'N/A'}",
@@ -203,10 +141,7 @@ class EpubGenerator:
         css_path: Optional[Path],
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
-        manifest_items = []
-        spine_itemrefs = []
-
-        # Nav
+        manifest_items, spine_itemrefs = [], []
         manifest_items.append(
             {
                 "id": "nav",
@@ -215,8 +150,6 @@ class EpubGenerator:
                 "properties": "nav",
             }
         )
-
-        # CSS
         if css_path and css_path.is_file():
             manifest_items.append(
                 {
@@ -225,8 +158,6 @@ class EpubGenerator:
                     "media_type": "text/css",
                 }
             )
-
-        # Pages (Info, Cover, Main)
         if cover_page:
             manifest_items.append(
                 {
@@ -236,7 +167,6 @@ class EpubGenerator:
                 }
             )
             spine_itemrefs.append({"idref": cover_page.id, "linear": False})
-
         manifest_items.append(
             {
                 "id": info_page.id,
@@ -245,7 +175,6 @@ class EpubGenerator:
             }
         )
         spine_itemrefs.append({"idref": info_page.id, "linear": True})
-
         for page in pages:
             manifest_items.append(
                 {
@@ -255,8 +184,6 @@ class EpubGenerator:
                 }
             )
             spine_itemrefs.append({"idref": page.id, "linear": True})
-
-        # Images
         for image in images:
             manifest_items.append(image._asdict())
 

@@ -1,0 +1,8 @@
+/* 作品情報ページのシリーズタイトル用 */
+.series-title {
+    font-weight: normal;
+    color: #777;
+    text-align: center;
+    margin-bottom: 2em;
+    text-indent: 0;
+}

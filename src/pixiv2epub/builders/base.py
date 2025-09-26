@@ -1,42 +1,35 @@
-#
-# -----------------------------------------------------------------------------
-# src/pixiv2epub/builders/base_builder.py
-#
-# すべてのBuilderクラスが継承すべき抽象基底クラスを定義します。
-# -----------------------------------------------------------------------------
+# src/pixiv2epub/builders/base.py
+
 import json
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from ..data_models import NovelMetadata
-from ..exceptions import BuildError
+from ..core.exceptions import BuildError
+from ..core.settings import Settings
+from ..models.local import NovelMetadata
 from ..utils.path_manager import PathManager
 
 
 class BaseBuilder(ABC):
-    """
-    Builderの抽象基底クラス。
-    """
+    """Builderの抽象基底クラス。"""
 
     def __init__(
         self,
         novel_dir: Path,
-        config: Dict[str, Any],
+        settings: Settings,
         custom_metadata: Optional[Dict[str, Any]] = None,
     ):
         """
-        BaseBuilderを初期化します。
-
         Args:
             novel_dir (Path): 小説データが格納されているディレクトリ。
-            config (Dict[str, Any]): アプリケーション設定。
+            settings (Settings): アプリケーション設定。
             custom_metadata (Optional[Dict[str, Any]]): detail.jsonの代わりのメタデータ。
         """
         self.logger = logging.getLogger(self.__class__.__name__)
         self.novel_dir = novel_dir.resolve()
-        self.config = config
+        self.settings = settings
 
         if custom_metadata:
             metadata_dict = custom_metadata
@@ -58,18 +51,10 @@ class BaseBuilder(ABC):
     @classmethod
     @abstractmethod
     def get_builder_name(cls) -> str:
-        """
-        このビルダーの一意な名前を返します。
-        Coordinatorがどのビルダーを使用するかを識別するために使われます。
-
-        Returns:
-            str: ビルダーの名前 (例: "epub")。
-        """
+        """このビルダーの一意な名前を返します。"""
         raise NotImplementedError
 
     @abstractmethod
     def build(self) -> Path:
-        """
-        ビルド処理を実行し、生成されたファイルのパスを返します。
-        """
+        """ビルド処理を実行し、生成されたファイルのパスを返します。"""
         raise NotImplementedError

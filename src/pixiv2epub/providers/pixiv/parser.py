@@ -1,13 +1,8 @@
-#
-# -----------------------------------------------------------------------------
-# pixiv2epub/src/pixiv2epub/providers/pixiv/parser.py
-#
-# Pixivの小説本文やキャプションに含まれる独自タグを解析し、
-# 標準的なHTMLに変換する責務を持ちます。
-# -----------------------------------------------------------------------------
+# src/pixiv2epub/providers/pixiv/parser.py
 
 import logging
 import re
+from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 
 from ... import constants as const
@@ -16,22 +11,22 @@ from ... import constants as const
 class PixivParser:
     """Pixiv独自タグをHTMLに変換するパーサー。"""
 
-    def __init__(self, image_paths: Dict[str, str]):
+    def __init__(self, image_paths: Dict[str, Path]):
         """
-        PixivParserを初期化します。
-
         Args:
-            image_paths (Dict[str, str]): 画像IDとローカルパスのマッピング。
-                                          `[pixivimage:id]` タグの置換に使用します。
+            image_paths (Dict[str, Path]): 画像IDとローカルファイルパスのマッピング。
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.image_paths = image_paths
+        # HTMLで使いやすいように、相対パスに変換しておく
+        self.image_relative_paths = {
+            k: f"../{const.IMAGES_DIR_NAME}/{v.name}" for k, v in image_paths.items()
+        }
 
     def _replace_image_tag(self, match: re.Match) -> str:
         """画像タグ `[pixivimage:id]` をHTMLの `<img>` タグに置換します。"""
         tag_type = match.group(1).replace("image", "")
         image_id = match.group(2)
-        path = self.image_paths.get(image_id)
+        path = self.image_relative_paths.get(image_id)
 
         if path:
             return f'<img alt="{tag_type}_{image_id}" src="{path}" />'
@@ -71,15 +66,7 @@ class PixivParser:
         ]
 
     def parse(self, text: str) -> str:
-        """
-        与えられたテキスト内のPixiv独自タグをHTMLタグに一括で変換します。
-
-        Args:
-            text (str): 変換対象のテキスト（小説本文やキャプション）。
-
-        Returns:
-            str: HTMLに変換されたテキスト。
-        """
+        """与えられたテキスト内のPixiv独自タグをHTMLタグに一括で変換します。"""
         if not text:
             return ""
 
@@ -93,4 +80,4 @@ class PixivParser:
     def extract_page_title(page_content: str, page_number: int) -> str:
         """ページ内容から章タイトル(h2)を抽出し、なければデフォルト名を返します。"""
         match = re.search(r"<h2>(.*?)</h2>", page_content)
-        return match.group(1) if match else f"ページ {page_number}"
+        return match.group(1).strip() if match else f"ページ {page_number}"
