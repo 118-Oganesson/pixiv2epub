@@ -16,11 +16,11 @@ dependencies = [
 pixiv2epub = "pixiv2epub.cli:main"
 
 # --- アプリケーションのデフォルト設定 ---
+[tool.pixiv2epub.workspace]
+root_directory = "./.pixiv2epub_work"
+
 [tool.pixiv2epub]
 [tool.pixiv2epub.downloader]
-save_directory = "./pixiv_raw"
-raw_dir_template = "{author_name}/{id}_{title}"
-series_dir_template = "{author_name}/series_{id}_{title}"
 api_delay = 1.0
 api_retries = 3
 overwrite_existing_images = false

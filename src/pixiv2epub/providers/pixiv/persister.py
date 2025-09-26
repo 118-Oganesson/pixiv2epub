@@ -2,49 +2,55 @@
 
 import json
 import logging
-import uuid
 from dataclasses import asdict
-from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
 
 from ... import constants as const
 from ...models.local import Author, NovelMetadata, PageInfo, SeriesInfo
 from ...models.pixiv import NovelApiResponse
-from ...utils.path_manager import PathManager
+from ...models.workspace import Workspace, WorkspaceManifest
 from .parser import PixivParser
 
 
 class PixivDataPersister:
-    """APIから取得したデータを解釈し、ローカルファイルに永続化するクラス。"""
+    """APIから取得したデータを解釈し、ワークスペース内に永続化するクラス。"""
 
     def __init__(
         self,
-        paths: PathManager,
+        workspace: Workspace,
         cover_path: Optional[Path],
         image_paths: Dict[str, Path],
     ):
         """
         Args:
-            paths (PathManager): ファイルパスを管理するインスタンス。
+            workspace (Workspace): データ保存先のワークスペース。
             cover_path (Optional[Path]): ダウンロード済みの表紙画像のパス。
             image_paths (Dict[str, Path]): ダウンロード済みの埋め込み画像のパス。
         """
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.paths = paths
+        self.workspace = workspace
         self.cover_path = cover_path
         self.image_paths = image_paths
         self.parser = PixivParser(self.image_paths)
 
-    def persist(self, novel_data: NovelApiResponse, detail_data_dict: dict):
+    def persist(
+        self,
+        novel_data: NovelApiResponse,
+        detail_data_dict: dict,
+        manifest_data: WorkspaceManifest,
+    ):
         """一連の保存処理を実行するメインメソッド。"""
-        self.logger.debug(f"永続化処理を開始します: {self.paths.novel_dir}")
+        self.logger.debug(f"永続化処理を開始します: {self.workspace.root_path}")
 
-        # 1. 本文をパース・保存
+        # 1. manifest.json を保存
+        self._save_manifest(manifest_data)
+
+        # 2. 本文をパース・保存
         parsed_text = self.parser.parse(novel_data.text)
         self._save_pages(parsed_text)
 
-        # 2. メタデータを構築・保存
+        # 3. メタデータ (detail.json) を構築・保存
         parsed_description = self.parser.parse(
             detail_data_dict.get("novel", {}).get("caption", "")
         )
@@ -54,11 +60,20 @@ class PixivDataPersister:
 
         self.logger.debug("永続化処理が完了しました。")
 
+    def _save_manifest(self, manifest_data: WorkspaceManifest):
+        """ワークスペースのマニフェストファイルを保存します。"""
+        try:
+            with open(self.workspace.manifest_path, "w", encoding="utf-8") as f:
+                json.dump(asdict(manifest_data), f, ensure_ascii=False, indent=2)
+            self.logger.debug("manifest.json の保存が完了しました。")
+        except IOError as e:
+            self.logger.error(f"manifest.json の保存に失敗しました: {e}")
+
     def _save_pages(self, parsed_text: str):
         """小説本文をページごとに分割し、XHTMLファイルとして保存します。"""
         pages = parsed_text.split("[newpage]")
         for i, page_content in enumerate(pages):
-            filename = self.paths.page_path(i + 1)
+            filename = self.workspace.source_path / f"page-{i + 1}.xhtml"
             try:
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(page_content)
@@ -77,20 +92,12 @@ class PixivDataPersister:
         novel = detail_data_dict.get("novel", {})
         pages_content = parsed_text.split("[newpage]")
 
-        formatted_date = ""
-        if raw_date := novel.get("create_date"):
-            try:
-                dt_object = datetime.fromisoformat(raw_date)
-                formatted_date = dt_object.strftime("%Y年%m月%d日 %H:%M")
-            except (ValueError, TypeError):
-                formatted_date = raw_date
-
         author_info = Author(
             name=novel.get("user", {}).get("name"), id=novel.get("user", {}).get("id")
         )
         pages_info = [
             PageInfo(
-                title=self.parser.extract_page_title(content, i + 1),
+                title=PixivParser.extract_page_title(content, i + 1),
                 body=f"./page-{i + 1}.xhtml",
             )
             for i, content in enumerate(pages_content)
@@ -99,7 +106,7 @@ class PixivDataPersister:
 
         # cover_pathは絶対パスなので、detail.jsonに保存する際は相対パスに変換
         relative_cover_path = (
-            f"./{const.IMAGES_DIR_NAME}/{self.cover_path.name}"
+            f"../{self.workspace.assets_path.name}/{const.IMAGES_DIR_NAME}/{self.cover_path.name}"
             if self.cover_path
             else None
         )
@@ -111,9 +118,8 @@ class PixivDataPersister:
             description=parsed_description,
             identifier={
                 "novel_id": novel.get("id"),
-                "uuid": f"urn:uuid:{uuid.uuid4()}",
             },
-            date=formatted_date,
+            date=novel.get("create_date"),
             cover_path=relative_cover_path,
             tags=[t.get("name") for t in novel.get("tags", [])],
             original_source=const.PIXIV_NOVEL_URL.format(novel_id=novel.get("id")),
@@ -123,7 +129,8 @@ class PixivDataPersister:
 
         try:
             metadata_dict = asdict(metadata)
-            with open(self.paths.detail_json_path, "w", encoding="utf-8") as f:
+            detail_path = self.workspace.source_path / const.DETAIL_FILE_NAME
+            with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
             self.logger.debug("detail.json の保存が完了しました。")
         except IOError as e:

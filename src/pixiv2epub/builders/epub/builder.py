@@ -6,6 +6,7 @@ from typing import Any, Dict, Optional
 
 from ...core.exceptions import BuildError
 from ...core.settings import Settings
+from ...models.workspace import Workspace
 from ...utils.path_manager import generate_sanitized_path
 from ..base import BaseBuilder
 from .archiver import Archiver
@@ -18,16 +19,18 @@ class EpubBuilder(BaseBuilder):
 
     def __init__(
         self,
-        novel_dir: Path,
+        workspace: Workspace,
         settings: Settings,
         custom_metadata: Optional[Dict[str, Any]] = None,
     ):
-        super().__init__(novel_dir, settings, custom_metadata)
+        super().__init__(workspace, settings, custom_metadata)
         css_rel_path = self.settings.builder.css_file
         self.css_abs_path: Optional[Path] = None
         if css_rel_path:
-            if (self.novel_dir / css_rel_path).is_file():
-                self.css_abs_path = self.novel_dir / css_rel_path
+            # CSSはワークスペース内ではなく、ユーザーが指定した外部パスの可能性がある
+            css_in_workspace_assets = self.workspace.assets_path / css_rel_path
+            if css_in_workspace_assets.is_file():
+                self.css_abs_path = css_in_workspace_assets
             elif Path(css_rel_path).is_file():
                 self.css_abs_path = Path(css_rel_path).resolve()
             else:
@@ -35,11 +38,13 @@ class EpubBuilder(BaseBuilder):
                     f"指定されたCSSファイルが見つかりません: {css_rel_path}"
                 )
 
-        # assetsディレクトリのパスを解決
+        # assetsテンプレートディレクトリのパスを解決
         asset_dir = Path(__file__).parent.parent.parent / "assets"
 
-        self.asset_manager = AssetManager(self.paths, self.metadata, self.css_abs_path)
-        self.generator = EpubGenerator(self.metadata, self.paths, asset_dir)
+        self.asset_manager = AssetManager(
+            self.workspace, self.metadata, self.css_abs_path
+        )
+        self.generator = EpubGenerator(self.metadata, self.workspace, asset_dir)
         self.archiver = Archiver(self.settings)
 
     @classmethod
@@ -49,7 +54,7 @@ class EpubBuilder(BaseBuilder):
     def build(self) -> Path:
         """EPUBファイルを生成するメインの実行メソッド。"""
         output_path = self._determine_output_path()
-        self.logger.info(f"EPUB作成処理を開始します: {self.novel_dir.name}")
+        self.logger.info(f"EPUB作成処理を開始します (Workspace: {self.workspace.id})")
         if output_path.exists():
             self.logger.warning(
                 f"出力ファイル {output_path} は既に存在するため、上書きします。"

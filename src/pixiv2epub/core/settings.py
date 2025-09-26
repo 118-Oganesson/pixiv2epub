@@ -53,12 +53,11 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
 
 # --- 設定モデル定義 ---
 class AuthSettings(BaseModel):
-    # env指定を削除し、自動命名規則に従わせる
     refresh_token: Optional[str] = Field(None)
 
 
 class DownloaderSettings(BaseModel):
-    save_directory: Path = Path("./pixiv_raw")
+    # save_directory は workspace に移行
     raw_dir_template: str = "{author_name}/{id}_{title}"
     series_dir_template: str = "{author_name}/series_{id}_{title}"
     api_delay: float = 1.0
@@ -73,7 +72,7 @@ class BuilderSettings(BaseModel):
         "{author_name}/{series_title}/[{author_name}] {series_title} - {title}.epub"
     )
     css_file: Optional[str] = None
-    cleanup_after_build: bool = False
+    cleanup_after_build: bool = True
 
 
 class PngquantSettings(BaseModel):
@@ -105,6 +104,10 @@ class CompressionSettings(BaseModel):
     cwebp: CwebpSettings = CwebpSettings()
 
 
+class WorkspaceSettings(BaseModel):
+    root_directory: Path = Path("./.pixiv2epub_work")
+
+
 class Settings(BaseSettings):
     """
     アプリケーションの階層的設定管理クラス。
@@ -114,6 +117,7 @@ class Settings(BaseSettings):
     downloader: DownloaderSettings = DownloaderSettings()
     builder: BuilderSettings = BuilderSettings()
     compression: CompressionSettings = CompressionSettings()
+    workspace: WorkspaceSettings = WorkspaceSettings()
     log_level: str = "INFO"
 
     _config_file: Optional[Path] = None

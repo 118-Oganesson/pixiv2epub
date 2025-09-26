@@ -2,10 +2,10 @@
 
 import logging
 from abc import ABC, abstractmethod
-from pathlib import Path
 from typing import Any, List
 
 from ..core.settings import Settings
+from ..models.workspace import Workspace
 
 
 class BaseProvider(ABC):
@@ -29,16 +29,16 @@ class BaseProvider(ABC):
         pass
 
     @abstractmethod
-    def get_novel(self, novel_id: Any) -> Path:
-        """単一の小説を取得し、ローカルに保存します。"""
+    def get_novel(self, novel_id: Any) -> Workspace:
+        """単一の小説を取得し、Workspaceを生成して返します。"""
         pass
 
     @abstractmethod
-    def get_series(self, series_id: Any) -> List[Path]:
-        """シリーズに含まれるすべての小説を取得し、ローカルに保存します。"""
+    def get_series(self, series_id: Any) -> List[Workspace]:
+        """シリーズに含まれるすべての小説を取得し、Workspaceのリストを返します。"""
         pass
 
     @abstractmethod
-    def get_user_novels(self, user_id: Any) -> List[Path]:
-        """特定のユーザーが投稿したすべての小説を取得し、ローカルに保存します。"""
+    def get_user_novels(self, user_id: Any) -> List[Workspace]:
+        """特定のユーザーが投稿したすべての小説を取得し、Workspaceのリストを返します。"""
         pass

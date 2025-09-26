@@ -1,6 +1,8 @@
 # src/pixiv2epub/builders/epub/generator.py
 
 import logging
+import uuid
+from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -14,16 +16,18 @@ from ...models.local import (
     PageAsset,
     PageInfo,
 )
-from ...utils.path_manager import PathManager
+from ...models.workspace import Workspace
 
 
 class EpubGenerator:
     """EPUBの構成要素を生成するクラス。"""
 
-    def __init__(self, metadata: NovelMetadata, paths: PathManager, template_dir: Path):
+    def __init__(
+        self, metadata: NovelMetadata, workspace: Workspace, template_dir: Path
+    ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.metadata = metadata
-        self.paths = paths
+        self.workspace = workspace
         self.template_env = Environment(
             loader=FileSystemLoader(str(template_dir)), autoescape=True
         )
@@ -68,7 +72,7 @@ class EpubGenerator:
         """本文の各ページをXHTMLに変換します。"""
         pages = []
         for i, page_info in enumerate(page_infos, 1):
-            raw_content_path = self.paths.novel_dir / page_info.body.lstrip("./")
+            raw_content_path = self.workspace.source_path / page_info.body.lstrip("./")
             try:
                 content = raw_content_path.read_text(encoding="utf-8")
                 context = {
@@ -93,6 +97,15 @@ class EpubGenerator:
 
     def _generate_info_page(self, css_path: Optional[str]) -> PageAsset:
         """作品情報ページを生成します。"""
+        # 日付フォーマット処理を追加
+        formatted_date = self.metadata.date
+        try:
+            if self.metadata.date:
+                dt_object = datetime.fromisoformat(self.metadata.date)
+                formatted_date = dt_object.strftime("%Y年%m月%d日 %H:%M")
+        except (ValueError, TypeError):
+            pass  # フォーマットできない場合は元の文字列を使用
+
         context = {
             "title": self.metadata.title,
             "css_path": css_path,
@@ -105,7 +118,7 @@ class EpubGenerator:
                 "description": self.metadata.description,
                 "tags": self.metadata.tags,
                 "source_url": self.metadata.original_source,
-                "meta_info": f"公開日: {self.metadata.date}, 文字数: {self.metadata.text_length or 'N/A'}",
+                "meta_info": f"公開日: {formatted_date}, 文字数: {self.metadata.text_length or 'N/A'}",
             },
         }
         content_bytes = self._render_template("epub/pixiv/info_page.xhtml.j2", context)
@@ -187,8 +200,11 @@ class EpubGenerator:
         for image in images:
             manifest_items.append(image._asdict())
 
+        metadata_as_dict = asdict(self.metadata)
+        metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{uuid.uuid4()}"
+
         context = {
-            "metadata": self.metadata,
+            "metadata": metadata_as_dict,
             "formatted_date": self.metadata.date,
             "modified_time": datetime.now(timezone.utc).isoformat(),
             "manifest_items": manifest_items,

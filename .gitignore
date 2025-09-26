@@ -16,5 +16,5 @@ wheels/
 .env
 
 # novel files
-pixiv_raw
+.pixiv2epub_work
 epubs

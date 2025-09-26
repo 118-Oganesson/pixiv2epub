@@ -7,7 +7,7 @@ from typing import List, Optional, Set, Tuple
 
 from ...constants import IMAGES_DIR_NAME
 from ...models.local import ImageAsset, NovelMetadata, PageInfo
-from ...utils.path_manager import PathManager
+from ...models.workspace import Workspace
 
 MEDIA_TYPES = {
     "jpg": "image/jpeg",
@@ -31,12 +31,17 @@ class AssetManager:
     """EPUBアセットの収集・整理を担当するクラス。"""
 
     def __init__(
-        self, paths: PathManager, metadata: NovelMetadata, css_file_path: Optional[Path]
+        self,
+        workspace: Workspace,
+        metadata: NovelMetadata,
+        css_file_path: Optional[Path],
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.paths = paths
+        self.workspace = workspace
         self.metadata = metadata
         self.css_file_path = css_file_path
+        self.source_dir = workspace.source_path
+        self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
 
     def gather_assets(
         self,
@@ -55,11 +60,11 @@ class AssetManager:
         return final_images, self.metadata.pages, cover_image_asset
 
     def _collect_image_files(self) -> List[ImageAsset]:
-        """`images`ディレクトリから画像ファイルを収集します。"""
+        """`assets/images`ディレクトリから画像ファイルを収集します。"""
         image_assets = []
-        if not self.paths.image_dir.is_dir():
+        if not self.image_dir.is_dir():
             return image_assets
-        image_paths = sorted([p for p in self.paths.image_dir.iterdir() if p.is_file()])
+        image_paths = sorted([p for p in self.image_dir.iterdir() if p.is_file()])
         for i, path in enumerate(image_paths, 1):
             image_assets.append(
                 ImageAsset(
@@ -95,10 +100,13 @@ class AssetManager:
             p = path.strip().strip("'\"")
             if not p or p.startswith(("http", "data:")):
                 return
+            # パスからファイル名のみを抽出
+            # 例: ../assets/images/foo.jpg -> foo.jpg
             filenames.add(Path(p).name)
 
         for page_info in self.metadata.pages:
-            page_file = self.paths.novel_dir / page_info.body.lstrip("./")
+            # page_info.body は "./page-1.xhtml" のような相対パス
+            page_file = self.source_dir / page_info.body.lstrip("./")
             if not page_file.is_file():
                 continue
             try:
