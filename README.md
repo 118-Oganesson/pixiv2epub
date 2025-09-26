@@ -1,6 +1,8 @@
 # Pixiv to EPUB Converter
-
-![Pixiv to EPUB Converter Icon](./pixiv2epub_icon.svg){ width=250 }
+<!-- markdownlint-disable MD033 -->
+<p align="center">
+  <img src="./pixiv2epub_icon.svg" alt="Pixiv to EPUB Converter Icon" width="250">
+</p>
 
 Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。
 
