@@ -16,6 +16,9 @@
         {% if metadata.series -%}
         <meta property="belongs-to-collection" id="series-title">{{ metadata.series.title }}</meta>
         <meta refines="#series-title" property="collection-type">series</meta>
+        {% if metadata.series.order -%}
+        <meta refines="#series-title" property="group-position">{{ metadata.series.order }}</meta>
+        {% endif -%}
         <meta property="meta" scheme="urn:pixiv:series:id">{{ metadata.series.id }}</meta>
         {% endif -%}
 

@@ -70,6 +70,41 @@ class UploadedImage:
 
 
 @dataclass
+class SeriesNavigationNovel:
+    """
+    【修正点】
+    APIレスポンスに含まれる他のキーもフィールドとして定義します。
+    これにより "unexpected keyword argument" エラーが解消されます。
+    """
+
+    id: int
+    contentOrder: str
+    viewable: bool
+    title: str
+    coverUrl: str
+    viewableMessage: Optional[str]
+
+
+@dataclass
+class SeriesNavigation:
+    nextNovel: Optional[SeriesNavigationNovel] = None
+    prevNovel: Optional[SeriesNavigationNovel] = None
+
+    @classmethod
+    def from_dict(cls, data: Optional[Dict[str, Any]]) -> Optional["SeriesNavigation"]:
+        if not data:
+            return None
+        return cls(
+            nextNovel=SeriesNavigationNovel(**data["nextNovel"])
+            if data.get("nextNovel")
+            else None,
+            prevNovel=SeriesNavigationNovel(**data["prevNovel"])
+            if data.get("prevNovel")
+            else None,
+        )
+
+
+@dataclass
 class NovelApiResponse:
     """Pixiv API (webview_novel) からの応答データ全体を格納します。"""
 
@@ -89,6 +124,7 @@ class NovelApiResponse:
     seriesId: Optional[int] = None
     seriesTitle: Optional[str] = None
     seriesIsWatched: Optional[bool] = None
+    seriesNavigation: Optional[SeriesNavigation] = None
     # ... (その他の未使用フィールドは省略しても良い)
 
     @classmethod
@@ -150,6 +186,7 @@ class NovelApiResponse:
             seriesId=data.get("seriesId"),
             seriesTitle=data.get("seriesTitle"),
             seriesIsWatched=data.get("seriesIsWatched"),
+            seriesNavigation=SeriesNavigation.from_dict(data.get("seriesNavigation")),
         )
 
 

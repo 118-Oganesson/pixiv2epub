@@ -102,7 +102,22 @@ class PixivDataPersister:
             )
             for i, content in enumerate(pages_content)
         ]
-        series_info = SeriesInfo.from_dict(novel.get("series"))
+
+        series_order: Optional[int] = None
+        if novel_data.seriesId and novel_data.seriesNavigation:
+            nav = novel_data.seriesNavigation
+            if nav.prevNovel and nav.prevNovel.contentOrder:
+                series_order = int(nav.prevNovel.contentOrder) + 1
+            elif nav.nextNovel:  # prevNovelがなくnextNovelがある場合 -> 1番目
+                series_order = 1
+            else:  # prevNovelもnextNovelもない場合 -> シリーズに1作品のみ
+                series_order = 1
+
+        series_info_dict = novel.get("series")
+        if series_info_dict and series_order:
+            series_info_dict["order"] = series_order
+
+        series_info = SeriesInfo.from_dict(series_info_dict)
 
         # cover_pathは絶対パスなので、detail.jsonに保存する際は相対パスに変換
         relative_cover_path = (

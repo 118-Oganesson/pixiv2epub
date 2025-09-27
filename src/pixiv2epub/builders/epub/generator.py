@@ -128,6 +128,9 @@ class EpubGenerator:
                 "series_title": self.metadata.series.title
                 if self.metadata.series
                 else None,
+                "series_order": self.metadata.series.order
+                if self.metadata.series
+                else None,
                 "description": self.metadata.description,
                 "tags": self.metadata.tags,
                 "source_url": self.metadata.original_source,

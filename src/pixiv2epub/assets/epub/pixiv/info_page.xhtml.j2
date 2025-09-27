@@ -11,7 +11,9 @@
 
 <body>
     {% if novel.series_title %}
-    <p class="series-title">{{ novel.series_title }}</p>
+    <p class="series-title">
+        {{ novel.series_title }}{% if novel.series_order %} #{{ novel.series_order }}{% endif %}
+    </p>
     {% endif %}
 
     <h2 epub:type="title">{{ novel.title }}</h2>

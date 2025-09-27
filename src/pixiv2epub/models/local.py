@@ -90,11 +90,16 @@ class SeriesInfo:
 
     id: int
     title: str
+    order: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: Optional[dict]) -> Optional["SeriesInfo"]:
         if data and "id" in data and "title" in data:
-            return cls(id=data["id"], title=data["title"])
+            return cls(
+                id=data["id"],
+                title=data["title"],
+                order=data.get("order"),
+            )
         return None
 
 
