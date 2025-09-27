@@ -57,9 +57,6 @@ class AuthSettings(BaseModel):
 
 
 class DownloaderSettings(BaseModel):
-    # save_directory は workspace に移行
-    raw_dir_template: str = "{author_name}/{id}_{title}"
-    series_dir_template: str = "{author_name}/series_{id}_{title}"
     api_delay: float = 1.0
     api_retries: int = 3
     overwrite_existing_images: bool = False

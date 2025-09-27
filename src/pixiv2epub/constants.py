@@ -10,7 +10,6 @@ PIXIV_ARTWORK_URL = "https://www.pixiv.net/artworks/{illust_id}"
 # --- File and Directory Names ---
 IMAGES_DIR_NAME = "images"
 DETAIL_FILE_NAME = "detail.json"
-UNKNOWN_NOVEL_DIR = "novel_unknown"
 
 # --- Regular Expressions ---
 # OSのファイル/ディレクトリ名として使用できない文字を検出するための正規表現

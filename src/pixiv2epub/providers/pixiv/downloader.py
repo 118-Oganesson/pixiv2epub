@@ -54,14 +54,12 @@ class ImageDownloader:
             self.logger.info("この小説にはカバー画像がありません。")
             return None
 
-        def convert_url(url: str) -> str:
-            return re.sub(r"/c/\d+x\d+(?:_\d+)?/", "/c/600x600/", url)
-
         ext = cover_url.split(".")[-1].split("?")[0]
         cover_filename = f"cover.{ext}"
 
         # 高解像度版、オリジナル版の順で試行
-        for url in (convert_url(cover_url), cover_url):
+        high_res_url = re.sub(r"/c/\d+x\d+(?:_\d+)?/", "/c/600x600/", cover_url)
+        for url in (high_res_url, cover_url):
             if path := self._download_single_image(url, cover_filename):
                 return path
 
