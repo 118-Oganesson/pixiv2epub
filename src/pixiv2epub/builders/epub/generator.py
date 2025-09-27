@@ -40,7 +40,7 @@ class EpubGenerator:
     ) -> EpubComponents:
         """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
         css_asset = self._generate_css()
-        css_rel_path = f"../{css_asset.href}" if css_asset else None
+        css_rel_path = css_asset.href if css_asset else None
 
         final_pages = self._generate_main_pages(page_infos, css_rel_path)
         info_page = self._generate_info_page(css_rel_path)

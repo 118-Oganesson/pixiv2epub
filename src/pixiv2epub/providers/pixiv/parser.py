@@ -19,7 +19,8 @@ class PixivParser:
         self.logger = logging.getLogger(self.__class__.__name__)
         # HTMLで使いやすいように、相対パスに変換しておく
         self.image_relative_paths = {
-            k: f"../{const.IMAGES_DIR_NAME}/{v.name}" for k, v in image_paths.items()
+            k: f"../assets/{const.IMAGES_DIR_NAME}/{v.name}"
+            for k, v in image_paths.items()
         }
 
     def _replace_image_tag(self, match: re.Match) -> str:
