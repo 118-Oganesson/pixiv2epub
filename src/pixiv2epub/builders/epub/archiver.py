@@ -52,13 +52,10 @@ class Archiver:
                 )
             for page in components.final_pages:
                 zf.writestr(f"OEBPS/{page.href}", page.content)
-
-            if components.css_file_path and components.css_file_path.is_file():
-                zf.write(
-                    components.css_file_path,
-                    f"OEBPS/css/{components.css_file_path.name}",
+            if components.css_asset:
+                zf.writestr(
+                    f"OEBPS/{components.css_asset.href}", components.css_asset.content
                 )
-
             if not components.final_images:
                 self.logger.debug("画像ファイルはありません。")
                 return

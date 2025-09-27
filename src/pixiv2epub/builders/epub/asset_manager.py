@@ -34,12 +34,10 @@ class AssetManager:
         self,
         workspace: Workspace,
         metadata: NovelMetadata,
-        css_file_path: Optional[Path],
     ):
         self.logger = logging.getLogger(self.__class__.__name__)
         self.workspace = workspace
         self.metadata = metadata
-        self.css_file_path = css_file_path
         self.source_dir = workspace.source_path
         self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
 
@@ -117,13 +115,5 @@ class AssetManager:
                 self.logger.warning(
                     f"ページファイル '{page_file.name}' の解析に失敗: {e}"
                 )
-
-        if self.css_file_path and self.css_file_path.is_file():
-            try:
-                css_text = self.css_file_path.read_text(encoding="utf-8")
-                for match in re.finditer(r"url\((.*?)\)", css_text, re.IGNORECASE):
-                    add_filename_from_path(match.group(1))
-            except Exception as e:
-                self.logger.warning(f"CSSファイルの解析に失敗: {e}")
 
         return filenames

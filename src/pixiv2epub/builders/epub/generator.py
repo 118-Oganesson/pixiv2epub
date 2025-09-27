@@ -37,17 +37,16 @@ class EpubGenerator:
         image_assets: List[ImageAsset],
         page_infos: List[PageInfo],
         cover_asset: Optional[ImageAsset],
-        css_path: Optional[Path],
     ) -> EpubComponents:
         """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
-        css_rel_path = (
-            f"css/{css_path.name}" if css_path and css_path.is_file() else None
-        )
+        css_asset = self._generate_css()
+        css_rel_path = f"../{css_asset.href}" if css_asset else None
+
         final_pages = self._generate_main_pages(page_infos, css_rel_path)
         info_page = self._generate_info_page(css_rel_path)
         cover_page = self._generate_cover_page(cover_asset)
         content_opf = self._generate_opf(
-            final_pages, image_assets, info_page, cover_page, cover_asset, css_path
+            final_pages, image_assets, info_page, cover_page, cover_asset, css_asset
         )
         nav_xhtml = self._generate_nav(final_pages, info_page, cover_page is not None)
 
@@ -56,10 +55,24 @@ class EpubGenerator:
             final_images=image_assets,
             info_page=info_page,
             cover_page=cover_page,
-            css_file_path=css_path,
+            css_asset=css_asset,
             content_opf=content_opf,
             nav_xhtml=nav_xhtml,
         )
+
+    def _generate_css(self) -> Optional[PageAsset]:
+        """style.css.j2 テンプレートをレンダリングします。"""
+        try:
+            content_bytes = self._render_template("epub/pixiv/style.css.j2", {})
+            return PageAsset(
+                id="css_style",
+                href="css/style.css",
+                content=content_bytes,
+                title="stylesheet",
+            )
+        except Exception as e:
+            self.logger.warning(f"CSSテンプレートのレンダリングに失敗: {e}")
+            return None
 
     def _render_template(self, template_name: str, context: Dict) -> bytes:
         template = self.template_env.get_template(template_name)
@@ -151,7 +164,7 @@ class EpubGenerator:
         info_page: PageAsset,
         cover_page: Optional[PageAsset],
         cover_asset: Optional[ImageAsset],
-        css_path: Optional[Path],
+        css_asset: Optional[PageAsset],  # 引数を変更
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
         manifest_items, spine_itemrefs = [], []
@@ -163,11 +176,11 @@ class EpubGenerator:
                 "properties": "nav",
             }
         )
-        if css_path and css_path.is_file():
+        if css_asset:
             manifest_items.append(
                 {
-                    "id": "css_style",
-                    "href": f"css/{css_path.name}",
+                    "id": css_asset.id,
+                    "href": css_asset.href,
                     "media_type": "text/css",
                 }
             )

@@ -68,7 +68,6 @@ class BuilderSettings(BaseModel):
     series_filename_template: str = (
         "{author_name}/{series_title}/[{author_name}] {series_title} - {title}.epub"
     )
-    css_file: Optional[str] = None
     cleanup_after_build: bool = True
 
 

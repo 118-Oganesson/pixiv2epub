@@ -58,7 +58,7 @@ class EpubComponents(NamedTuple):
     final_images: List[ImageAsset]
     info_page: PageAsset
     cover_page: Optional[PageAsset]
-    css_file_path: Optional[Path]
+    css_asset: Optional[PageAsset]
     content_opf: bytes
     nav_xhtml: bytes
 

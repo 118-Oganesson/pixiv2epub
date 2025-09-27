@@ -24,25 +24,15 @@ class EpubBuilder(BaseBuilder):
         custom_metadata: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(workspace, settings, custom_metadata)
-        css_rel_path = self.settings.builder.css_file
-        self.css_abs_path: Optional[Path] = None
-        if css_rel_path:
-            # CSSはワークスペース内ではなく、ユーザーが指定した外部パスの可能性がある
-            css_in_workspace_assets = self.workspace.assets_path / css_rel_path
-            if css_in_workspace_assets.is_file():
-                self.css_abs_path = css_in_workspace_assets
-            elif Path(css_rel_path).is_file():
-                self.css_abs_path = Path(css_rel_path).resolve()
-            else:
-                self.logger.warning(
-                    f"指定されたCSSファイルが見つかりません: {css_rel_path}"
-                )
+
+        # css_file を解決するロジック全体が不要になったため削除されています。
 
         # assetsテンプレートディレクトリのパスを解決
         asset_dir = Path(__file__).parent.parent.parent / "assets"
 
         self.asset_manager = AssetManager(
-            self.workspace, self.metadata, self.css_abs_path
+            self.workspace,
+            self.metadata,  # 修正点: self.css_abs_path 引数を削除
         )
         self.generator = EpubGenerator(self.metadata, self.workspace, asset_dir)
         self.archiver = Archiver(self.settings)
@@ -65,7 +55,9 @@ class EpubBuilder(BaseBuilder):
                 self.asset_manager.gather_assets()
             )
             components = self.generator.generate_components(
-                final_images, raw_pages_info, cover_asset, self.css_abs_path
+                final_images,
+                raw_pages_info,
+                cover_asset,  # 修正点: self.css_abs_path 引数を削除
             )
             self.archiver.archive(components, output_path)
             self.logger.info(f"EPUBファイルの作成に成功しました: {output_path}")
