@@ -40,14 +40,24 @@ class PixivApiClient:
                 time.sleep(self.delay)
                 return result
             except PixivError as e:
+                # レスポンスにHTTPステータスコードが含まれているかチェック
+                status_code = getattr(getattr(e, "response", None), "status_code", None)
+
+                # 4xx系のクライアントエラーは永続的なエラーとみなし、リトライしない
+                if status_code and 400 <= status_code < 500:
+                    self.logger.error(
+                        f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code}) が発生しました。処理を中断します。"
+                    )
+                    raise e
+
                 self.logger.warning(
-                    f"API '{func.__name__}' 呼び出し中にエラー (試行 {attempt}/{self.retry}): {e}"
+                    f"API '{func.__name__}' 呼び出し中にエラー (試行 {attempt}/{self.retry}): {e} (HTTP: {status_code or 'N/A'})"
                 )
                 if attempt == self.retry:
                     self.logger.error(
                         f"API呼び出しが最終的に失敗しました: {func.__name__}"
                     )
-                    raise
+                    raise e
                 time.sleep(self.delay * attempt)
         raise RuntimeError("API呼び出しがリトライ回数を超えました。")
 

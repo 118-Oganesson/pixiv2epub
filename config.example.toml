@@ -1,0 +1,68 @@
+# pixiv2epub カスタム設定ファイル
+# このファイルを 'config.toml' などの名前でコピーし、
+# 'pixiv2epub run <URL> -c config.toml' のように指定して使用します。
+
+# --- ダウンローダー設定 ---
+[downloader]
+# API呼び出し間の待機時間（秒）。値を大きくするとサーバーへの負荷が減ります。
+api_delay = 1.0
+# API呼び出しが失敗した際のリトライ回数。
+api_retries = 3
+# 既に存在する画像を上書きしてダウンロードするかどうか。
+overwrite_existing_images = false
+
+# --- ビルダー設定 ---
+[builder]
+# EPUBファイルの出力先ディレクトリ。
+output_directory = "./Epubs"
+# 中間ファイル（ワークスペース）をビルド後に削除するかどうか。
+cleanup_after_build = true
+
+# --- ファイル名テンプレート ---
+# 利用可能な変数:
+#   {title}:        小説のタイトル
+#   {id}:           小説のID
+#   {author_name}:  作者名
+#   {author_id}:    作者のID
+#   {series_title}: シリーズのタイトル (シリーズ作品の場合)
+#   {series_id}:    シリーズのID (シリーズ作品の場合)
+# 単発作品のファイル名テンプレート。
+filename_template = "{author_name}/[{id}] {title}.epub"
+# シリーズ作品のファイル名テンプレート。
+series_filename_template = "{author_name}/{series_title}/[{series_id}] {title}.epub"
+
+# --- 画像圧縮設定 ---
+[compression]
+# 画像圧縮を有効にするか。 (true / false)
+# pngquant, jpegoptim, cwebp コマンドがシステムにインストールされている必要があります。
+enabled = true
+# 圧縮後のファイルが元より大きい場合に圧縮をスキップするか。
+skip_if_larger = true
+# 並列で圧縮処理を行うワーカーの最大数。
+max_workers = 4
+
+[compression.pngquant] # PNG
+colors = 256
+quality = "65-90"
+speed = 3
+strip = true
+
+[compression.jpegoptim] # JPEG
+max_quality = 85
+strip_all = true
+progressive = true
+preserve_timestamp = true
+
+[compression.cwebp] # WEBP
+quality = 75
+lossless = false
+metadata = "none"
+
+# --- ワークスペース設定 ---
+[workspace]
+# 中間ファイルを保存するルートディレクトリ。
+root_directory = "./.Workspace"
+
+# --- 認証設定 (通常は .env ファイルで管理) ---
+# [auth]
+# refresh_token = "your_token_here_if_not_using_env"

@@ -44,13 +44,6 @@ overwrite_existing_images = false
 
 [tool.pixiv2epub.builder]
 output_directory = "./Epubs"
-# 利用可能な変数:
-#   {title}:        小説のタイトル
-#   {id}:           小説のID
-#   {author_name}:  作者名
-#   {author_id}:    作者のID
-#   {series_title}: シリーズのタイトル (シリーズ作品の場合)
-#   {series_id}:    シリーズのID (シリーズ作品の場合)
 filename_template = "{author_name}/{title}.epub"
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
 cleanup_after_build = false
