@@ -19,7 +19,7 @@ pixiv2epub = "pixiv2epub.cli:main"
 
 # --- アプリケーションのデフォルト設定 ---
 [tool.pixiv2epub.workspace]
-root_directory = "./.pixiv2epub_work"
+root_directory = "./.Workspace"
 
 [tool.pixiv2epub]
 [tool.pixiv2epub.downloader]
@@ -28,7 +28,7 @@ api_retries = 3
 overwrite_existing_images = false
 
 [tool.pixiv2epub.builder]
-output_directory = "./epubs"
+output_directory = "./Epubs"
 # 利用可能な変数:
 #   {title}:        小説のタイトル
 #   {id}:           小説のID
