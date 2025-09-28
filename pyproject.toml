@@ -10,12 +10,27 @@ dependencies = [
     "rich>=14.1.0",
     "pydantic-settings>=2.11.0",
     "canonicaljson>=2.0.0",
+    "playwright>=1.55.0",
+    "requests>=2.32.5",
 ]
 [dependency-groups]
-dev = ["ipykernel>=6.30.1"]
+dev = ["ipykernel>=6.30.1", "poethepoet>=0.37.0"]
 
 [project.scripts]
 pixiv2epub = "pixiv2epub.cli:main"
+
+# --- ビルドシステムの定義 ---
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+# --- poethepoetのタスク定義 ---
+[tool.poe.tasks]
+setup = [
+    { cmd = "playwright install-deps" },
+    { cmd = "playwright install" },
+    { cmd = "uv pip install -e ." },
+]
 
 # --- アプリケーションのデフォルト設定 ---
 [tool.pixiv2epub.workspace]
