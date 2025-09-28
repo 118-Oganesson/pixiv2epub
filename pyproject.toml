@@ -9,6 +9,7 @@ dependencies = [
     "pixivpy3>=3.7.5",
     "rich>=14.1.0",
     "pydantic-settings>=2.11.0",
+    "canonicaljson>=2.0.0",
 ]
 [dependency-groups]
 dev = ["ipykernel>=6.30.1"]

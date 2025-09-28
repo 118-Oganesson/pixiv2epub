@@ -18,6 +18,9 @@ from ...models.local import (
 )
 from ...models.workspace import Workspace
 
+# 決定論的なブックIDを生成するための固定の名前空間UUID
+PIXIV_NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
+
 
 class EpubGenerator:
     """EPUBの構成要素を生成するクラス。"""
@@ -88,6 +91,12 @@ class EpubGenerator:
             raw_content_path = self.workspace.source_path / page_info.body.lstrip("./")
             try:
                 content = raw_content_path.read_text(encoding="utf-8")
+
+                # --- ▼▼▼ 修正点 ▼▼▼ ---
+                # 中間ファイル用の画像パスを、最終的なEPUB内のパスに置換する
+                content = content.replace("../assets/images/", "../images/")
+                # --- ▲▲▲ 修正点 ▲▲▲ ---
+
                 context = {
                     "title": page_info.title,
                     "content": content,
@@ -217,7 +226,10 @@ class EpubGenerator:
             manifest_items.append(image._asdict())
 
         metadata_as_dict = asdict(self.metadata)
-        metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{uuid.uuid4()}"
+
+        novel_id = self.metadata.identifier.get("novel_id")
+        deterministic_uuid = uuid.uuid5(PIXIV_NAMESPACE_UUID, str(novel_id))
+        metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{deterministic_uuid}"
 
         context = {
             "metadata": metadata_as_dict,

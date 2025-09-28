@@ -1,7 +1,8 @@
 # src/pixiv2epub/providers/pixiv/provider.py
 
+import json
+import os
 import shutil
-import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Set, Tuple
 
@@ -14,6 +15,7 @@ from ...models.workspace import Workspace, WorkspaceManifest
 from ..base import BaseProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
+from .fingerprint import generate_content_hash
 from .persister import PixivDataPersister
 
 
@@ -33,27 +35,60 @@ class PixivProvider(BaseProvider):
     def get_provider_name(cls) -> str:
         return "pixiv"
 
-    def _create_workspace(self) -> Workspace:
-        """一意のIDを持つ新しいワークスペースを初期化します。"""
+    def _setup_workspace(self, novel_id: Any) -> Workspace:
+        """novel_idに基づいた永続的なワークスペースを準備します。"""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
-        workspace_id = str(uuid.uuid4())
-        workspace_path = self.workspace_dir / workspace_id
-        workspace = Workspace(id=workspace_id, root_path=workspace_path)
+        workspace_path = self.workspace_dir / f"pixiv_{novel_id}"
+        workspace = Workspace(id=f"pixiv_{novel_id}", root_path=workspace_path)
 
         # 必須ディレクトリを作成
-        workspace.source_path.mkdir(parents=True)
-        (workspace.assets_path / "images").mkdir(parents=True)
+        workspace.source_path.mkdir(parents=True, exist_ok=True)
+        (workspace.assets_path / "images").mkdir(parents=True, exist_ok=True)
 
-        self.logger.debug(f"ワークスペースを作成しました: {workspace.root_path}")
+        self.logger.debug(f"ワークスペースを準備しました: {workspace.root_path}")
         return workspace
 
     def get_novel(self, novel_id: Any) -> Workspace:
         """単一の小説を取得し、ローカルに保存します。"""
         self.logger.info(f"小説ID: {novel_id} の処理を開始します。")
-        workspace = self._create_workspace()
+        workspace = self._setup_workspace(novel_id)
+
+        # 既存のハッシュを読み込む
+        old_hash = None
+        if workspace.manifest_path.exists():
+            try:
+                with open(workspace.manifest_path, "r", encoding="utf-8") as f:
+                    manifest_data = json.load(f)
+                    old_hash = manifest_data.get("content_hash")
+            except (json.JSONDecodeError, IOError) as e:
+                self.logger.warning(f"既存のマニフェストが読み込めません: {e}")
+
+        # APIから最新データを取得し、新しいハッシュを計算
+        novel_data_dict = self.api_client.webview_novel(novel_id)
+        new_hash = generate_content_hash(novel_data_dict)
+
+        # ハッシュを比較
+        if old_hash and old_hash == new_hash:
+            self.logger.info(
+                f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
+            )
+            return workspace
+
+        self.logger.info(
+            "コンテンツの更新を検出しました（または新規ダウンロードです）。"
+        )
+
         try:
+            # 更新があるので、テキスト関連の古いファイルのみをクリーンにする
+            if workspace.source_path.exists():
+                shutil.rmtree(workspace.source_path)
+            if workspace.manifest_path.exists():
+                os.remove(workspace.manifest_path)
+            
+            # ワークスペースのディレクトリ構造を再作成（assetsは維持される）
+            workspace.source_path.mkdir(parents=True, exist_ok=True)
+
             # 1. APIから基本データを取得
-            novel_data_dict = self.api_client.webview_novel(novel_id)
             novel_data = NovelApiResponse.from_dict(novel_data_dict)
             detail_data_dict = self.api_client.novel_detail(novel_id)
 
@@ -72,6 +107,7 @@ class PixivProvider(BaseProvider):
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
                 source_metadata={"novel_id": novel_id},
+                content_hash=new_hash,
             )
 
             # 4. テキストとメタデータを永続化

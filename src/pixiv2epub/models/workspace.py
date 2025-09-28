@@ -1,7 +1,7 @@
 # src/pixiv2epub/models/workspace.py
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)
@@ -34,4 +34,5 @@ class WorkspaceManifest:
     provider_name: str
     created_at_utc: str
     source_metadata: Dict[str, Any]
+    content_hash: Optional[str] = None
     workspace_schema_version: str = "1.0"
