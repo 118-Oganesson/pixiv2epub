@@ -1,140 +1,223 @@
 # Pixiv to EPUB Converter
+
 <!-- markdownlint-disable MD033 -->
 <p align="center">
   <img src="./pixiv2epub_icon.svg" alt="Pixiv to EPUB Converter Icon" width="250">
 </p>
 
+<p align="center">
+  <!-- Badges -->
+  <a href="https://github.com/astral-sh/uv">
+    <img src="https://img.shields.io/badge/managed%20by-uv-black.svg?style=flat&labelColor=black" alt="Managed by uv">
+  </a>
+  <img src="https://img.shields.io/badge/python-3.13%2B-blue.svg?style=flat" alt="Python 3.13+">
+</p>
+
 Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。
 
------
+---
 
 ## ✨ 主な機能
 
-* **永続的ライブラリと差分更新**: 一度取得した小説はローカルに永続化されます。二回目以降はコンテンツの変更を自動で検知し、**更新があった作品のみをダウンロード**するため、高速かつ効率的にライブラリを最新の状態に保てます。
+- **永続的ライブラリと差分更新**  
+  一度取得した小説はローカルに永続化されます。二回目以降はコンテンツの変更を自動で検知し、更新があった作品のみをダウンロードするため、高速かつ効率的にライブラリを最新の状態に保てます。
 
-* **安定した書籍管理**: 小説ごとに決定論的なIDをEPUBに付与するため、ファイルを更新しても電子書籍リーダー上で**別の本として重複することなく、読書進捗やメモが維持されます**。
+- **安定した書籍管理**  
+  小説ごとに決定論的なIDをEPUBに付与するため、ファイルを更新しても電子書籍リーダー上で別の本として重複することなく、読書進捗やメモが維持されます。
 
-* **高品質なEPUB3生成**: 小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
+- **高品質なEPUB3生成**  
+  小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
 
-* **スマートなURL/ID処理**: URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
+- **スマートなURL/ID処理**  
+  URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
 
-* **Pixiv独自タグ変換**: `[newpage]`, `[chapter:]`, `[[rb:...]]` などのタグを適切に解釈し、XHTMLに変換します。
+- **Pixiv独自タグ変換**  
+  `[newpage]`, `[chapter:]`, `[[rb:...]]` などのタグを適切に解釈し、XHTMLに変換します。
 
-* **柔軟な画像処理**: カバー画像と本文中の挿絵を自動で取得・同梱します。`pngquant`などの外部ツールと連携し、ファイルサイズを最適化する画像圧縮も可能です。
+- **柔軟な画像処理**  
+  カバー画像と本文中の挿絵を自動で取得・同梱します。pngquantなどの外部ツールと連携し、ファイルサイズを最適化する画像圧縮も可能です。
 
-* **モダンなCLI**: `rich`ライブラリによる見やすいログ出力や、シンプルなコマンド体系を提供します。
+- **モダンなCLI**  
+  `rich` ライブラリによる見やすいログ出力や、直感的なサブコマンド体系を提供します。
 
------
-
-## ⚙️ 実行要件
-
-* **Python 3.13+**
-* **ライブラリ:**
-
-  * `pydantic-settings`
-  * `pixivpy3`
-  * `rich`
-  * `Jinja2`
-  * `canonicaljson`
-* **（任意）画像圧縮ツール:**
-  画像圧縮を有効にする場合、以下のコマンドラインツールが`PATH`上に必要です。
-
-  * `pngquant`
-  * `jpegoptim`
-  * `cwebp` （WebP Toolsに含まれます）
-
------
+---
 
 ## 📦 セットアップ
 
 本プロジェクトは [uv](https://github.com/astral-sh/uv) でのパッケージ管理を前提としています。
 
-### 1\. 依存関係とパッケージのインストール
-
-`uv`を使い、編集可能モードでプロジェクトをインストールします。
+### 1. リポジトリのクローンと環境構築
 
 ```bash
-uv pip install -e .
+# 1. リポジトリをクローン
+git clone https://github.com/118-Oganesson/pixiv2epub.git
+cd pixiv2epub
+
+# 2. uvで仮想環境を作成し、有効化
+uv venv
+source .venv/bin/activate  # macOS / Linux
+# .venv\Scripts\activate   # Windows
+
+# 3. 開発ツールをインストール
+uv sync
+
+# 4. プロジェクトのセットアップタスクを実行
+poe setup
 ```
 
-### 2\. 認証情報の設定
+`poe setup` コマンドは、`pyproject.toml` に定義されたタスクを実行し、依存関係のインストールと Playwright のセットアップを自動で行います。
 
-`.env.example` を `.env` にコピーし、ご自身のPixiv Refresh Tokenを設定してください。
+---
+
+### 2. Pixiv認証
+
+以下のコマンドを実行するとブラウザが起動します。表示されたウィンドウでPixivにログインしてください。
+ログインが成功すると、認証情報がプロジェクトルートの `.env` ファイルに自動で保存されます。
 
 ```bash
-cp .env.example .env
+pixiv2epub auth
 ```
 
-作成した`.env`ファイルを開き、トークンを貼り付けます。
+> **Note**
+> この認証ステップは初回のみ必要です。一度 `.env` ファイルが作成されれば、以降のコマンド実行時に自動で読み込まれます。
 
-```bash
-# .env
-# アンダースコアが2つであることに注意してください
-PIXIV2EPUB_AUTH__REFRESH_TOKEN="your_refresh_token_here"
-```
-
------
+---
 
 ## 🚀 使い方
 
-インストールが完了すると、`pixiv2epub`コマンドが利用可能になります。
+### 基本的な使い方 (ダウンロード & EPUB生成)
 
-### 単一の小説を処理
-
-小説のURLまたはIDを指定します。
+`run` コマンドに小説のURLまたはIDを渡すだけで、ダウンロードからEPUB生成までを一度に行います。
 
 ```bash
-# URLで指定
-pixiv2epub "https://www.pixiv.net/novel/show.php?id=12345678"
+# 小説のURLを指定
+pixiv2epub run "https://www.pixiv.net/novel/show.php?id=12345678"
 
-# IDで指定
-pixiv2epub 12345678
+# シリーズページのURLを指定
+pixiv2epub run "https://www.pixiv.net/novel/series/987654"
+
+# ユーザーページのURLを指定 (全作品が対象)
+pixiv2epub run "https://www.pixiv.net/users/58182393"
 ```
 
-### シリーズ作品をまとめて処理
+---
 
-シリーズページのURLを指定します。（自動でシリーズとして認識されます）
+### 発展的な使い方
+
+#### ステップ1: ダウンロードのみ実行
 
 ```bash
-pixiv2epub "https://www.pixiv.net/novel/series/987654"
+pixiv2epub download "https://www.pixiv.net/novel/show.php?id=12345678"
+# > ℹ️ ダウンロードが完了しました: ./.Workspace/pixiv_12345678
 ```
 
-### ユーザーの全作品をまとめて処理
-
-ユーザーページのURLを指定します。（自動でユーザーとして認識されます）
+#### ステップ2: ローカルデータからEPUBを生成
 
 ```bash
-pixiv2epub "https://www.pixiv.net/users/58182393"
+pixiv2epub build ./.Workspace/pixiv_12345678
+# > ℹ️ ビルドが完了しました: ./Epubs/作者名/[12345678] 小説タイトル.epub
 ```
 
-### ダウンロード済みデータからEPUBを生成
+---
 
-`--build-only` を使い、ダウンロード済みのローカルディレクトリからEPUBを生成します。
+## ⚙️ 設定のカスタマイズ
+
+EPUBの出力先やファイル名の形式などを変更したい場合は、設定ファイルを使用します。
+
+1. `config.example.toml` を `config.toml` などの名前でコピー。
+2. コピーしたファイルを編集して設定を変更。
+3. `-c` または `--config` オプションで指定。
 
 ```bash
-pixiv2epub --build-only ./pixiv_raw/作者名/12345678_小説タイトル
+pixiv2epub run 12345678 -c config.toml
 ```
 
------
+設定可能な項目の詳細は `config.example.toml` を参照してください。
 
-## ⌨️ コマンドラインオプション一覧
+---
+
+## ⌨️ コマンドリファレンス
+
+### グローバルオプション
 
 ```text
-usage: cli.py [-h] [--download-only | --build-only SOURCE_DIR] [--cleanup | --no-cleanup] [--config CONFIG] [-v]
-              [url_or_id]
-
-Pixivから小説をダウンロードしてEPUBに変換します。
-
-positional arguments:
-  url_or_id             小説/シリーズ/ユーザーのURLまたはID。--build-only使用時は不要。
+usage: pixiv2epub [-h] [-v] {auth,run,download,build} ...
 
 options:
-  -h, --help            このヘルプメッセージを表示して終了します
-  --download-only       ダウンロードのみ実行し、ビルドは行いません。
-  --build-only SOURCE_DIR
-                        指定したローカルディレクトリのデータからビルドのみ実行します。
-  --cleanup, --no-cleanup
-                        EPUB生成後に中間ファイルを削除/保持します。設定ファイルの値より優先されます。
-  --config CONFIG       設定ファイルのパス
-  -v, --verbose         デバッグログを有効にする
+  -h, --help            Show this help message and exit
+  -v, --verbose         Enable detailed debug logging.
 ```
+
+---
+
+### `auth`
+
+ブラウザでPixivにログインし、認証トークンを `.env` ファイルに保存します。
+
+```text
+usage: pixiv2epub auth [-h]
+
+options:
+  -h, --help  Show this help message and exit
+```
+
+---
+
+### `run`
+
+指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。
+
+```text
+usage: pixiv2epub run [-h] [-c CONFIG] input
+
+positional arguments:
+  input                 URL or ID of the Pixiv novel, series, or user.
+
+options:
+  -h, --help            Show this help message and exit
+  -c CONFIG, --config CONFIG
+                        Path to a custom TOML configuration file.
+```
+
+---
+
+### `download`
+
+小説データをワークスペースにダウンロードするだけで終了します。
+
+```text
+usage: pixiv2epub download [-h] [-c CONFIG] input
+
+positional arguments:
+  input                 URL or ID of the Pixiv novel, series, or user.
+
+options:
+  -h, --help            Show this help message and exit
+  -c CONFIG, --config CONFIG
+                        Path to a custom TOML configuration file.
+```
+
+---
+
+### `build`
+
+既存のワークスペースディレクトリからEPUBをビルドします。
+
+```text
+usage: pixiv2epub build [-h] [-c CONFIG] WORKSPACE_PATH
+
+positional arguments:
+  WORKSPACE_PATH        Path to the workspace directory to be built.
+
+options:
+  -h, --help            Show this help message and exit
+  -c CONFIG, --config CONFIG
+                        Path to a custom TOML configuration file.
+```
+
+---
+
+## ⚙️ 実行要件
+
+- Python 3.13+
+- （任意）画像圧縮ツール: `pngquant`, `jpegoptim`, `cwebp` が PATH 上に必要です。
