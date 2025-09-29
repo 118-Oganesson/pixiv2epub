@@ -15,6 +15,9 @@ wheels/
 # local settings
 .env
 
+# gui session files
+.gui_session
+
 # novel files
 .Workspace
 Epubs

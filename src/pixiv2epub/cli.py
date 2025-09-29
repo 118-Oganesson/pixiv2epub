@@ -2,12 +2,16 @@
 
 import argparse
 import logging
+import shutil
 from pathlib import Path
+
+from playwright.sync_api import sync_playwright
 
 from .app import Application
 from .core.auth import get_pixiv_refresh_token
 from .core.exceptions import AuthenticationError, SettingsError
 from .core.settings import Settings
+from .gui import GuiManager
 from .utils.logging import setup_logging
 from .utils.url_parser import parse_input
 
@@ -15,10 +19,22 @@ logger = logging.getLogger(__name__)
 
 
 def handle_auth(args: argparse.Namespace):
-    """'auth' サブコマンドを処理し、.envファイルを作成します。"""
+    """'auth' サブコマンドを処理し、.envファイルとGUIセッションを作成します。"""
+    session_path = Path("./.gui_session")
+    logger.info(
+        f"GUI用のブラウザセッションを '{session_path.resolve()}' に作成します。"
+    )
+
+    if session_path.exists():
+        logger.warning(
+            f"既存のGUIセッションを削除して上書きします: {session_path.resolve()}"
+        )
+        shutil.rmtree(session_path)
+
     logger.info("Pixiv認証を開始します...")
     try:
-        refresh_token = get_pixiv_refresh_token()
+        refresh_token = get_pixiv_refresh_token(save_session_path=session_path)
+
         env_path = Path(".env")
         env_content = f'PIXIV2EPUB_AUTH__REFRESH_TOKEN="{refresh_token}"'
 
@@ -34,6 +50,7 @@ def handle_auth(args: argparse.Namespace):
         logger.info(
             f"✅ 認証に成功しました！ リフレッシュトークンを '{env_path.resolve()}' に保存しました。"
         )
+        logger.info("✅ GUI用のログインセッションも保存されました。")
 
     except AuthenticationError as e:
         logger.error(f"❌ 認証に失敗しました: {e}")
@@ -84,6 +101,55 @@ def handle_build(args: argparse.Namespace, app: Application):
     logger.info(f"✅ ビルドが完了しました: {output_path}")
 
 
+def handle_gui(args: argparse.Namespace, app: Application):
+    """'gui' サブコマンドを処理し、永続的なブラウザセッションを開始します。"""
+    session_path = Path("./.gui_session")
+    logger.info(
+        f"GUIセッションのデータを '{session_path.resolve()}' に保存/読込します。"
+    )
+    if not session_path.exists():
+        logger.info(
+            "初回起動時、またはセッションが切れた場合はPixivへのログインが必要です。"
+        )
+
+    try:
+        with sync_playwright() as p:
+            context = p.chromium.launch_persistent_context(
+                session_path,
+                headless=False,
+            )
+
+            if context.pages:
+                page = context.pages[0]
+            else:
+                page = context.new_page()
+
+            gui_manager = GuiManager(page, app)
+            gui_manager.setup_bridge()
+
+            if page.url == "about:blank":
+                logger.info("Pixivトップページに移動します。")
+                page.goto("https://www.pixiv.net/")
+            else:
+                logger.info("既存のセッションを再利用します。")
+
+            logger.info(
+                "ブラウザセッション待機中... ウィンドウを閉じるとプログラムは終了します。"
+            )
+            while not page.is_closed():
+                try:
+                    page.wait_for_timeout(1000)
+                except Exception:
+                    break
+
+    except Exception as e:
+        logger.error(
+            f"💥 GUIセッション中に致命的なエラーが発生しました: {e}", exc_info=True
+        )
+    finally:
+        logger.info("GUIモードを終了します。")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Pixivから小説をダウンロードし、EPUB形式に変換します。",
@@ -102,14 +168,12 @@ def main():
     subparsers = parser.add_subparsers(dest="command", help="実行するコマンド")
     subparsers.required = True
 
-    # 'auth' コマンド
     parser_auth = subparsers.add_parser(
         "auth",
-        help="ブラウザでPixivにログインし、認証トークンを.envファイルに保存します。",
+        help="ブラウザでPixivにログインし、認証トークンとGUIセッションを保存します。",
     )
     parser_auth.set_defaults(func=handle_auth)
 
-    # 'run' コマンド
     parser_run = subparsers.add_parser(
         "run",
         help="指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。",
@@ -122,7 +186,6 @@ def main():
     )
     parser_run.set_defaults(func=handle_run)
 
-    # 'download' コマンド
     parser_download = subparsers.add_parser(
         "download",
         help="小説データをワークスペースにダウンロードするだけで終了します。",
@@ -135,7 +198,6 @@ def main():
     )
     parser_download.set_defaults(func=handle_download)
 
-    # 'build' コマンド
     parser_build = subparsers.add_parser(
         "build",
         help="既存のワークスペースディレクトリからEPUBをビルドします。",
@@ -151,17 +213,21 @@ def main():
     )
     parser_build.set_defaults(func=handle_build)
 
+    parser_gui = subparsers.add_parser(
+        "gui",
+        help="ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。",
+    )
+    parser_gui.set_defaults(func=handle_gui)
+
     args = parser.parse_args()
 
     setup_logging(args.log_level)
 
-    # `auth`コマンドはSettingsを必要としないため、先に処理
     if args.command == "auth":
         args.func(args)
         return
 
     try:
-        # 他のコマンドはSettingsの初期化が必要
         config_path = getattr(args, "config", None)
         settings = Settings(_config_file=config_path, log_level=args.log_level)
         app = Application(settings)

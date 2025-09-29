@@ -32,6 +32,7 @@ setup = [
     { cmd = "playwright install" },
     { cmd = "uv pip install -e ." },
 ]
+build = [{ cmd = "uv pip install -e ." }]
 
 # --- アプリケーションのデフォルト設定 ---
 [tool.pixiv2epub.workspace]

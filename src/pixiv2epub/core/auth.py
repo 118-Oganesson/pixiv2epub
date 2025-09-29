@@ -3,14 +3,15 @@
 import logging
 import re
 import time
-from hashlib import sha256
 from base64 import urlsafe_b64encode
+from hashlib import sha256
+from pathlib import Path
 from secrets import token_urlsafe
 from typing import Tuple
 from urllib.parse import urlencode
 
 import requests
-from playwright.sync_api import sync_playwright, Request, TimeoutError
+from playwright.sync_api import Request, TimeoutError, sync_playwright
 
 from .exceptions import AuthenticationError
 
@@ -37,7 +38,7 @@ def _oauth_pkce() -> Tuple[str, str]:
     return code_verifier, code_challenge
 
 
-def _login_and_get_code() -> Tuple[str, str]:
+def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
     """Playwright を使用してブラウザでログインし、認可コードを取得する"""
     code_verifier, code_challenge = _oauth_pkce()
     login_params = {
@@ -57,8 +58,8 @@ def _login_and_get_code() -> Tuple[str, str]:
                 auth_code_holder.append(match.groups()[0])
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=False)
-        page = browser.new_page()
+        context = p.chromium.launch_persistent_context(save_session_path, headless=False)
+        page = context.new_page()
         logger.info(
             "ブラウザを起動しました。表示されたウィンドウでPixivにログインしてください..."
         )
@@ -83,7 +84,7 @@ def _login_and_get_code() -> Tuple[str, str]:
                 f"ログインプロセスがタイムアウトしたか、失敗しました: {e}"
             )
         finally:
-            browser.close()
+            context.close()
             logger.info("ブラウザを終了しました。")
 
     if not auth_code_holder:
@@ -121,12 +122,12 @@ def _get_refresh_token(code: str, code_verifier: str) -> str:
     return refresh_token
 
 
-def get_pixiv_refresh_token() -> str:
+def get_pixiv_refresh_token(save_session_path: Path) -> str:
     """
     一連の認証フローを実行し、Pixivのリフレッシュトークンを取得する。
     """
     try:
-        auth_code, verifier = _login_and_get_code()
+        auth_code, verifier = _login_and_get_code(save_session_path)
         refresh_token = _get_refresh_token(auth_code, verifier)
         return refresh_token
     except Exception as e:
