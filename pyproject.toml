@@ -36,7 +36,7 @@ build = [{ cmd = "uv pip install -e ." }]
 
 # --- アプリケーションのデフォルト設定 ---
 [tool.pixiv2epub.workspace]
-root_directory = "./.Workspace"
+root_directory = "./.workspace"
 
 [tool.pixiv2epub]
 [tool.pixiv2epub.downloader]
@@ -45,7 +45,7 @@ api_retries = 3
 overwrite_existing_images = false
 
 [tool.pixiv2epub.builder]
-output_directory = "./Epubs"
+output_directory = "./epubs"
 filename_template = "{author_name}/{title}.epub"
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
 cleanup_after_build = false

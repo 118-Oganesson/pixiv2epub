@@ -19,5 +19,5 @@ wheels/
 .gui_session
 
 # novel files
-.Workspace
-Epubs
+.workspace
+epubs
