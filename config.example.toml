@@ -14,7 +14,7 @@ overwrite_existing_images = false
 # --- ビルダー設定 ---
 [builder]
 # EPUBファイルの出力先ディレクトリ。
-output_directory = "./Epubs"
+output_directory = "./epubs"
 # 中間ファイル（ワークスペース）をビルド後に削除するかどうか。
 cleanup_after_build = true
 
@@ -27,9 +27,9 @@ cleanup_after_build = true
 #   {series_title}: シリーズのタイトル (シリーズ作品の場合)
 #   {series_id}:    シリーズのID (シリーズ作品の場合)
 # 単発作品のファイル名テンプレート。
-filename_template = "{author_name}/[{id}] {title}.epub"
+filename_template = "{author_name}/{title}.epub"
 # シリーズ作品のファイル名テンプレート。
-series_filename_template = "{author_name}/{series_title}/[{series_id}] {title}.epub"
+series_filename_template = "{author_name}/{series_title}/{title}.epub"
 
 # --- 画像圧縮設定 ---
 [compression]
@@ -61,7 +61,7 @@ metadata = "none"
 # --- ワークスペース設定 ---
 [workspace]
 # 中間ファイルを保存するルートディレクトリ。
-root_directory = "./.Workspace"
+root_directory = "./.workspace"
 
 # --- 認証設定 (通常は .env ファイルで管理) ---
 # [auth]

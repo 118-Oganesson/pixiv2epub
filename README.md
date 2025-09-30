@@ -28,6 +28,8 @@ Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコ
 - **高品質なEPUB3生成**  
   小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
 
+- **GUIモード** ブラウザを起動し、表示しているPixivの小説ページから直接EPUB化を実行できます。URLをコピー＆ペーストする必要はありません。
+
 - **スマートなURL/ID処理**  
   URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
 
@@ -72,7 +74,7 @@ poe setup
 ### 2. Pixiv認証
 
 以下のコマンドを実行するとブラウザが起動します。表示されたウィンドウでPixivにログインしてください。
-ログインが成功すると、認証情報がプロジェクトルートの `.env` ファイルに自動で保存されます。
+ログインが成功すると、認証情報がプロジェクトルートの `.env` ファイルと、GUIモード用のセッションファイル (`.gui_session`) に自動で保存されます。
 
 ```bash
 pixiv2epub auth
@@ -99,6 +101,19 @@ pixiv2epub run "https://www.pixiv.net/novel/series/987654"
 # ユーザーページのURLを指定 (全作品が対象)
 pixiv2epub run "https://www.pixiv.net/users/58182393"
 ```
+
+---
+
+### GUIモードの使い方
+
+ブラウザ上で直接操作したい場合は `gui` コマンドを使用します。
+
+```bash
+pixiv2epub gui
+```
+
+このコマンドを実行すると、ログインセッションが保存されたブラウザが起動します。
+Pixivの小説・シリーズ・ユーザーのページを開くと、画面上にEPUB化を実行するためのボタンが自動的に追加されます。そのボタンをクリックするだけで、表示中のページの作品をダウンロードし、EPUBを生成できます。
 
 ---
 
@@ -213,6 +228,19 @@ options:
   -h, --help            Show this help message and exit
   -c CONFIG, --config CONFIG
                         Path to a custom TOML configuration file.
+```
+
+---
+
+### `gui`
+
+ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。
+
+```text
+usage: pixiv2epub gui [-h]
+
+options:
+  -h, --help  Show this help message and exit
 ```
 
 ---
