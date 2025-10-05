@@ -1,8 +1,99 @@
-/* 作品情報ページのシリーズタイトル用 */
-.series-title {
-    font-weight: normal;
+/* 全体の基本設定 */
+body {
+    line-height: 1.7;
+    padding: 1em;
+}
+
+.main-content {
+    max-width: 100%;
+}
+
+/* 小説タイトル（シリーズ名を含むブロック全体） */
+h3[epub|type="title"] {
+    text-align: left;
+    margin-top: 0;
+    font-weight: bold;
+    line-height: 1.2; 
+}
+
+/* h3内のシリーズタイトル部分のスタイル */
+.series-title-inline {
     color: #777;
-    text-align: center;
-    margin-bottom: 2em;
-    text-indent: 0;
+    font-size: 0.8em; 
+    font-weight: normal; 
+}
+
+/* 著者名 */
+.author {
+    text-align: left;
+}
+
+/* 3列テーブルレイアウト用のスタイル */
+.cover-meta-table {
+    width: 100%;
+    border-spacing: 0;
+    margin-bottom: 1.5em;
+    border-collapse: collapse;
+}
+
+/* 中央の画像が入るセル */
+.cover-cell {
+    width: 33.3%; /* 画像の幅を指定 */
+    padding: 0;
+}
+
+.cover-cell img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 10px;
+}
+
+/* 右側の文字数が入るセル */
+.char-count-cell {
+    width: 33.35%; /* 残りの空間の半分 */
+    vertical-align: top;
+    text-align: right;
+    padding: 0;
+}
+
+/* 左側のスペーサー用セル */
+.spacer-cell {
+    width: 33.35%; /* 残りの空間の半分 */
+    padding: 0;
+}
+
+/* 文字数（装飾） */
+.char-count {
+    display: inline-block;
+    background-color: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 0.8em;
+    padding: 2px 10px;
+    border-radius: 20px;
+}
+
+/* 小説の説明 */
+.description {
+    text-align: left;
+}
+
+/* タグ */
+.tags {
+    color: #0073bb;
+    font-size: 0.8em;
+    line-height: 1.8;
+}
+
+/* 日付 */
+.date {
+    color: #888;
+    font-size: 0.8em;
+    text-align: left;
+}
+
+/* ソースURL */
+.source-link {
+    font-size: 0.8em;
+    word-wrap: break-word;
 }

@@ -10,20 +10,40 @@
 </head>
 
 <body>
-    {% if novel.series_title %}
-    <p class="series-title">
-        {{ novel.series_title }}{% if novel.series_order %} #{{ novel.series_order }}{% endif %}
-    </p>
-    {% endif %}
+    <div class="main-content">
+        <h3 epub:type="title">
+            {% if novel.series_title %}
+            <span class="series-title-inline">
+                {{ novel.series_title }}{% if novel.series_order %} #{{ novel.series_order }}{% endif %}
+            </span><br /> {% endif %}
+            {{ novel.title }}
+        </h3>
+        <p class="author">作者：{{ novel.author }}</p>
+        <table class="cover-meta-table">
+            <tr>
+                <td class="spacer-cell"></td>
 
-    <h2 epub:type="title">{{ novel.title }}</h2>
-    <h3>{{ novel.author }}</h3>
-    <p>{{ novel.meta_info }}</p>
-    <hr />
-    <div>{{ novel.description | safe }}</div>
-    <hr />
-    <p>タグ: {{ novel.tags | join(', ') }}</p>
-    <p><a href="{{ novel.source_url }}">{{ novel.source_url }}</a></p>
+                <td class="cover-cell">
+                    {% if novel.cover_href %}
+                    <img src="{{ novel.cover_href }}" alt="カバー画像" />
+                    {% endif %}
+                </td>
+
+                <td class="char-count-cell">
+                    <span class="char-count">{% if novel.text_length is number %}{{ "{:,}".format(novel.text_length)
+                        }}{% else %}{{ novel.text_length }}{% endif %}文字</span>
+                </td>
+            </tr>
+        </table>
+
+        <div class="description">{{ novel.description | safe }}</div>
+
+        <p class="tags">{% for tag in novel.tags %}#{{ tag }}{% if not loop.last %} {% endif %}{% endfor %}</p>
+
+        <p class="date">{{ novel.formatted_date }}</p>
+
+        <p class="source-link"><a href="{{ novel.source_url }}">{{ novel.source_url }}</a></p>
+    </div>
 </body>
 
 </html>

@@ -46,7 +46,7 @@ class EpubGenerator:
         css_rel_path = css_asset.href if css_asset else None
 
         final_pages = self._generate_main_pages(page_infos, css_rel_path)
-        info_page = self._generate_info_page(css_rel_path)
+        info_page = self._generate_info_page(css_rel_path, cover_asset)
         cover_page = self._generate_cover_page(cover_asset)
         content_opf = self._generate_opf(
             final_pages, image_assets, info_page, cover_page, cover_asset, css_asset
@@ -92,10 +92,8 @@ class EpubGenerator:
             try:
                 content = raw_content_path.read_text(encoding="utf-8")
 
-                # --- ▼▼▼ 修正点 ▼▼▼ ---
                 # 中間ファイル用の画像パスを、最終的なEPUB内のパスに置換する
                 content = content.replace("../assets/images/", "../images/")
-                # --- ▲▲▲ 修正点 ▲▲▲ ---
 
                 context = {
                     "title": page_info.title,
@@ -117,9 +115,11 @@ class EpubGenerator:
                 self.logger.error(f"ページの処理中にエラー: {page_info.title}, {e}")
         return pages
 
-    def _generate_info_page(self, css_path: Optional[str]) -> PageAsset:
+    def _generate_info_page(
+        self, css_path: Optional[str], cover_asset: Optional[ImageAsset]
+    ) -> PageAsset:
         """作品情報ページを生成します。"""
-        # 日付フォーマット処理を追加
+        # 日付フォーマット処理
         formatted_date = self.metadata.date
         try:
             if self.metadata.date:
@@ -143,7 +143,9 @@ class EpubGenerator:
                 "description": self.metadata.description,
                 "tags": self.metadata.tags,
                 "source_url": self.metadata.original_source,
-                "meta_info": f"公開日: {formatted_date}, 文字数: {self.metadata.text_length or 'N/A'}",
+                "formatted_date": formatted_date,
+                "text_length": self.metadata.text_length or "N/A",
+                "cover_href": f"../{cover_asset.href}" if cover_asset else None,
             },
         }
         content_bytes = self._render_template("epub/pixiv/info_page.xhtml.j2", context)
