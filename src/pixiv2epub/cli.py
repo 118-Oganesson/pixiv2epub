@@ -94,11 +94,52 @@ def handle_download(args: argparse.Namespace, app: Application):
 
 
 def handle_build(args: argparse.Namespace, app: Application):
-    """'build' サブコマンドを処理します。"""
-    workspace_path = Path(args.workspace_path)
-    logger.info(f"ビルド処理を実行します: {workspace_path}")
-    output_path = app.build_from_workspace(workspace_path)
-    logger.info(f"✅ ビルドが完了しました: {output_path}")
+    """
+    'build' サブコマンドを処理します。
+    指定されたパスがディレクトリの場合、再帰的にビルド可能なワークスペースを探して処理します。
+    """
+    base_path = Path(args.workspace_path).resolve()
+    workspaces_to_build = []
+
+    if not base_path.exists():
+        logger.error(f"❌ 指定されたパスが見つかりません: {base_path}")
+        return
+
+    # 指定されたパス自体がビルド可能なワークスペースかチェック
+    if base_path.is_dir() and (base_path / "manifest.json").is_file():
+        workspaces_to_build.append(base_path)
+    # ディレクトリの場合、再帰的に探索
+    elif base_path.is_dir():
+        logger.info(
+            f"'{base_path}' 内のビルド可能なワークスペースを再帰的に検索します..."
+        )
+        for manifest_path in base_path.rglob("manifest.json"):
+            workspaces_to_build.append(manifest_path.parent)
+
+    if not workspaces_to_build:
+        logger.warning(
+            f"指定されたパスにビルド可能なワークスペースが見つかりませんでした: {base_path}"
+        )
+        return
+
+    total = len(workspaces_to_build)
+    success_count = 0
+    logger.info(f"✅ {total}件のビルド対象ワークスペースが見つかりました。")
+
+    for i, workspace_path in enumerate(workspaces_to_build, 1):
+        logger.info(f"--- ビルド処理 ({i}/{total}): {workspace_path.name} ---")
+        try:
+            output_path = app.build_from_workspace(workspace_path)
+            logger.info(f"✅ ビルド成功: {output_path}")
+            success_count += 1
+        except Exception as e:
+            logger.error(
+                f"❌ '{workspace_path.name}' のビルドに失敗しました: {e}",
+                exc_info=False,
+            )
+
+    logger.info("---")
+    logger.info(f"✨ 全てのビルド処理が完了しました。成功: {success_count}/{total}")
 
 
 def handle_gui(args: argparse.Namespace, app: Application):
