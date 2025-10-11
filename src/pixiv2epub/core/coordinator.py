@@ -1,9 +1,9 @@
-# src/pixiv2epub/core/coordinator.py
-
-import logging
+# FILE: src/pixiv2epub/core/coordinator.py
 import shutil
 from pathlib import Path
 from typing import Any, Dict, List, Type
+
+from loguru import logger
 
 from ..builders.base import BaseBuilder
 from ..builders.epub.builder import EpubBuilder
@@ -19,7 +19,6 @@ AVAILABLE_BUILDERS: Dict[str, Type[BaseBuilder]] = {"epub": EpubBuilder}
 class Coordinator:
     def __init__(self, settings: Settings):
         self.settings = settings
-        self.logger = logging.getLogger(self.__class__.__name__)
 
     def _get_provider(self, provider_name: str) -> BaseProvider:
         provider_class = AVAILABLE_PROVIDERS.get(provider_name)
@@ -41,12 +40,12 @@ class Coordinator:
         """中間ファイル（ワークスペース）を削除する。"""
         if self._is_cleanup_enabled():
             try:
-                self.logger.info(
+                logger.info(
                     f"ワークスペースをクリーンアップします: {workspace.root_path}"
                 )
                 shutil.rmtree(workspace.root_path)
             except OSError as e:
-                self.logger.error(f"ワークスペースのクリーンアップに失敗しました: {e}")
+                logger.error(f"ワークスペースのクリーンアップに失敗しました: {e}")
 
     def download_and_build_novel(
         self,
@@ -54,7 +53,7 @@ class Coordinator:
         builder_name: str,
         novel_id: Any,
     ) -> Path:
-        self.logger.info(f"小説ID: {novel_id} の処理を開始します...")
+        logger.info(f"小説ID: {novel_id} の処理を開始します...")
         provider = self._get_provider(provider_name)
         workspace = provider.get_novel(novel_id)
 
@@ -63,7 +62,7 @@ class Coordinator:
 
         self._handle_cleanup(workspace)
 
-        self.logger.info(f"処理が正常に完了しました: {output_path}")
+        logger.info(f"処理が正常に完了しました: {output_path}")
         return output_path
 
     def download_and_build_series(
@@ -72,7 +71,7 @@ class Coordinator:
         builder_name: str,
         series_id: Any,
     ) -> List[Path]:
-        self.logger.info(f"シリーズID: {series_id} の処理を開始します...")
+        logger.info(f"シリーズID: {series_id} の処理を開始します...")
         provider = self._get_provider(provider_name)
         workspaces = provider.get_series(series_id)
 
@@ -84,16 +83,13 @@ class Coordinator:
                 output_paths.append(output_path)
                 self._handle_cleanup(workspace)
             except Exception as e:
-                self.logger.error(
+                logger.error(
                     f"ワークスペース {workspace.id} のビルドに失敗しました: {e}",
                     exc_info=True,
                 )
-                # ビルド失敗時もワークスペースはクリーンアップする
                 self._handle_cleanup(workspace)
 
-        self.logger.info(
-            f"シリーズ処理完了。{len(output_paths)}/{len(workspaces)}件成功。"
-        )
+        logger.info(f"シリーズ処理完了。{len(output_paths)}/{len(workspaces)}件成功。")
         return output_paths
 
     def download_and_build_user_novels(
@@ -102,29 +98,27 @@ class Coordinator:
         builder_name: str,
         user_id: Any,
     ) -> List[Path]:
-        self.logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します...")
+        logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します...")
         provider = self._get_provider(provider_name)
         workspaces = provider.get_user_novels(user_id)
 
         output_paths = []
         total = len(workspaces)
-        self.logger.info(f"合計 {total} 件の作品をビルドします。")
+        logger.info(f"合計 {total} 件の作品をビルドします。")
 
         for i, workspace in enumerate(workspaces, 1):
             try:
-                self.logger.info(
-                    f"--- Processing {i}/{total}: Workspace {workspace.id} ---"
-                )
+                logger.info(f"--- Processing {i}/{total}: Workspace {workspace.id} ---")
                 builder = self._get_builder(builder_name, workspace)
                 output_path = builder.build()
                 output_paths.append(output_path)
                 self._handle_cleanup(workspace)
             except Exception as e:
-                self.logger.error(
+                logger.error(
                     f"ワークスペース {workspace.id} のビルドに失敗しました: {e}",
                     exc_info=True,
                 )
                 self._handle_cleanup(workspace)
 
-        self.logger.info(f"ユーザー作品処理完了。{len(output_paths)}/{total}件成功。")
+        logger.info(f"ユーザー作品処理完了。{len(output_paths)}/{total}件成功。")
         return output_paths

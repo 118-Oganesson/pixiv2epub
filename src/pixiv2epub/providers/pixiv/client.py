@@ -1,10 +1,9 @@
-# src/pixiv2epub/providers/pixiv/client.py
-
-import logging
+# FILE: src/pixiv2epub/providers/pixiv/client.py
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict
 
+from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
 
 from ...core.exceptions import AuthenticationError
@@ -16,7 +15,6 @@ class PixivApiClient:
     def __init__(
         self, refresh_token: str, api_delay: float = 1.0, api_retries: int = 3
     ):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.delay = api_delay
         self.retry = api_retries
 
@@ -28,7 +26,7 @@ class PixivApiClient:
         self.api = AppPixivAPI()
         try:
             self.api.auth(refresh_token=refresh_token)
-            self.logger.debug("Pixiv APIの認証が完了しました。")
+            logger.debug("Pixiv APIの認証が完了しました。")
         except PixivError as e:
             raise AuthenticationError(f"Pixiv APIの認証に失敗しました: {e}")
 
@@ -40,23 +38,20 @@ class PixivApiClient:
                 time.sleep(self.delay)
                 return result
             except PixivError as e:
-                # レスポンスにHTTPステータスコードが含まれているかチェック
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
 
                 # 4xx系のクライアントエラーは永続的なエラーとみなし、リトライしない
                 if status_code and 400 <= status_code < 500:
-                    self.logger.error(
+                    logger.error(
                         f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code}) が発生しました。処理を中断します。"
                     )
                     raise e
 
-                self.logger.warning(
+                logger.warning(
                     f"API '{func.__name__}' 呼び出し中にエラー (試行 {attempt}/{self.retry}): {e} (HTTP: {status_code or 'N/A'})"
                 )
                 if attempt == self.retry:
-                    self.logger.error(
-                        f"API呼び出しが最終的に失敗しました: {func.__name__}"
-                    )
+                    logger.error(f"API呼び出しが最終的に失敗しました: {func.__name__}")
                     raise e
                 time.sleep(self.delay * attempt)
         raise RuntimeError("API呼び出しがリトライ回数を超えました。")

@@ -1,7 +1,7 @@
-# src/pixiv2epub/gui_bridge.py
-import logging
+# FILE: src/pixiv2epub/gui.py
 from pathlib import Path
 
+from loguru import logger
 from playwright.sync_api import Page
 
 from .app import Application
@@ -15,17 +15,16 @@ class GuiManager:
     def __init__(self, page: Page, app: Application):
         self.page = page
         self.app = app
-        self.logger = logging.getLogger(self.__class__.__name__)
 
     async def _run_task_from_browser(self, url: str) -> dict:
         """ブラウザから呼び出される非同期ラッパー関数。"""
-        self.logger.info(f"ブラウザからタスク実行リクエスト: {url}")
+        logger.info(f"ブラウザからタスク実行リクエスト: {url}")
         try:
             # 既存のURLパーサーを再利用して、IDとタイプを特定
             target_type, target_id = parse_input(url)
 
             message = f"処理を開始します: タイプ={target_type}, ID={target_id}"
-            self.logger.info(message)
+            logger.info(message)
 
             # Applicationクラスの同期メソッドを呼び出す
             if target_type == "novel":
@@ -43,13 +42,11 @@ class GuiManager:
                 # このケースは通常発生しないはず
                 raise InvalidInputError(f"未対応のターゲットタイプです: {target_type}")
 
-            self.logger.info(f"タスク完了: {message}")
+            logger.info(f"タスク完了: {message}")
             return {"status": "success", "message": message}
 
         except Exception as e:
-            self.logger.error(
-                f"GUIタスクの処理中にエラーが発生しました: {e}", exc_info=True
-            )
+            logger.error(f"GUIタスクの処理中にエラーが発生しました: {e}", exc_info=True)
             return {"status": "error", "message": str(e)}
 
     def setup_bridge(self):
@@ -68,9 +65,9 @@ class GuiManager:
             # このスクリプトは、ページが遷移するたびに実行されます
             self.page.add_init_script(path=str(injector_path))
 
-            self.logger.info(
+            logger.info(
                 "GUIブリッジとインジェクタースクリプトのセットアップが完了しました。"
             )
         except Exception as e:
-            self.logger.error(f"GUIブリッジのセットアップに失敗しました: {e}")
+            logger.error(f"GUIブリッジのセットアップに失敗しました: {e}")
             raise

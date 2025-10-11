@@ -1,4 +1,4 @@
-# src/pixiv2epub/models/pixiv.py
+# FILE: src/pixiv2epub/models/pixiv.py
 """
 Pixiv APIのJSONレスポンスをマッピングするためのデータモデル。
 このモジュールは外部APIの仕様に依存します。

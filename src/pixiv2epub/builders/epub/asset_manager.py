@@ -1,9 +1,9 @@
-# src/pixiv2epub/builders/epub/asset_manager.py
-
-import logging
+# FILE: src/pixiv2epub/builders/epub/asset_manager.py
 import re
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
+
+from loguru import logger
 
 from ...constants import IMAGES_DIR_NAME
 from ...models.local import ImageAsset, NovelMetadata, PageInfo
@@ -35,7 +35,6 @@ class AssetManager:
         workspace: Workspace,
         metadata: NovelMetadata,
     ):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.workspace = workspace
         self.metadata = metadata
         self.source_dir = workspace.source_path
@@ -85,7 +84,7 @@ class AssetManager:
             if asset.filename == cover_filename:
                 image_assets[i] = asset._replace(properties="cover-image")
                 return image_assets[i]
-        self.logger.warning(
+        logger.warning(
             f"指定されたカバー画像 '{cover_filename}' が見つかりませんでした。"
         )
         return None
@@ -112,8 +111,6 @@ class AssetManager:
                 for match in re.finditer(r'src=(["\'])(.*?)\1', content, re.IGNORECASE):
                     add_filename_from_path(match.group(2))
             except Exception as e:
-                self.logger.warning(
-                    f"ページファイル '{page_file.name}' の解析に失敗: {e}"
-                )
+                logger.warning(f"ページファイル '{page_file.name}' の解析に失敗: {e}")
 
         return filenames

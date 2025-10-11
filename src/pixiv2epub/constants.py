@@ -1,4 +1,4 @@
-# src/pixiv2epub/constants.py
+# FILE: src/pixiv2epub/constants.py
 #
 # このモジュールは、アプリケーション全体で使用される不変の定数を定義します。
 # URL、固定のファイル名、正規表現などを一元管理します。

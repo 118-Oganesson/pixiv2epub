@@ -1,4 +1,4 @@
-# src/pixiv2epub/utils/path_manager.py
+# FILE: src/pixiv2epub/utils/path_manager.py
 
 import re
 from pathlib import Path

@@ -1,10 +1,10 @@
-# src/pixiv2epub/providers/pixiv/persister.py
-
+# FILE: src/pixiv2epub/providers/pixiv/persister.py
 import json
-import logging
 from dataclasses import asdict
 from pathlib import Path
 from typing import Dict, Optional
+
+from loguru import logger
 
 from ... import constants as const
 from ...models.local import Author, NovelMetadata, PageInfo, SeriesInfo
@@ -28,7 +28,6 @@ class PixivDataPersister:
             cover_path (Optional[Path]): ダウンロード済みの表紙画像のパス。
             image_paths (Dict[str, Path]): ダウンロード済みの埋め込み画像のパス。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.workspace = workspace
         self.cover_path = cover_path
         self.image_paths = image_paths
@@ -41,16 +40,13 @@ class PixivDataPersister:
         manifest_data: WorkspaceManifest,
     ):
         """一連の保存処理を実行するメインメソッド。"""
-        self.logger.debug(f"永続化処理を開始します: {self.workspace.root_path}")
+        logger.debug(f"永続化処理を開始します: {self.workspace.root_path}")
 
-        # 1. manifest.json を保存
         self._save_manifest(manifest_data)
 
-        # 2. 本文をパース・保存
         parsed_text = self.parser.parse(novel_data.text)
         self._save_pages(parsed_text)
 
-        # 3. メタデータ (detail.json) を構築・保存
         parsed_description = self.parser.parse(
             detail_data_dict.get("novel", {}).get("caption", "")
         )
@@ -58,16 +54,16 @@ class PixivDataPersister:
             novel_data, detail_data_dict, parsed_text, parsed_description
         )
 
-        self.logger.debug("永続化処理が完了しました。")
+        logger.debug("永続化処理が完了しました。")
 
     def _save_manifest(self, manifest_data: WorkspaceManifest):
         """ワークスペースのマニフェストファイルを保存します。"""
         try:
             with open(self.workspace.manifest_path, "w", encoding="utf-8") as f:
                 json.dump(asdict(manifest_data), f, ensure_ascii=False, indent=2)
-            self.logger.debug("manifest.json の保存が完了しました。")
+            logger.debug("manifest.json の保存が完了しました。")
         except IOError as e:
-            self.logger.error(f"manifest.json の保存に失敗しました: {e}")
+            logger.error(f"manifest.json の保存に失敗しました: {e}")
 
     def _save_pages(self, parsed_text: str):
         """小説本文をページごとに分割し、XHTMLファイルとして保存します。"""
@@ -78,8 +74,8 @@ class PixivDataPersister:
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(page_content)
             except IOError as e:
-                self.logger.error(f"ページ {i + 1} の保存に失敗しました: {e}")
-        self.logger.debug(f"{len(pages)}ページの保存が完了しました。")
+                logger.error(f"ページ {i + 1} の保存に失敗しました: {e}")
+        logger.debug(f"{len(pages)}ページの保存が完了しました。")
 
     def _save_detail_json(
         self,
@@ -147,6 +143,6 @@ class PixivDataPersister:
             detail_path = self.workspace.source_path / const.DETAIL_FILE_NAME
             with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
-            self.logger.debug("detail.json の保存が完了しました。")
+            logger.debug("detail.json の保存が完了しました。")
         except IOError as e:
-            self.logger.error(f"detail.json の保存に失敗しました: {e}")
+            logger.error(f"detail.json の保存に失敗しました: {e}")

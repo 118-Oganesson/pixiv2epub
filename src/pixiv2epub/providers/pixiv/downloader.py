@@ -1,9 +1,9 @@
-# src/pixiv2epub/providers/pixiv/downloader.py
-
-import logging
+# FILE: src/pixiv2epub/providers/pixiv/downloader.py
 import re
 from pathlib import Path
 from typing import Dict, Optional
+
+from loguru import logger
 
 from ...models.pixiv import NovelApiResponse
 from .client import PixivApiClient
@@ -27,7 +27,6 @@ class ImageDownloader:
             image_dir (Path): 画像の保存先ディレクトリ。
             overwrite (bool): 既存の画像を上書きするかどうか。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.api_client = api_client
         self.image_dir = image_dir
         self.overwrite = overwrite
@@ -36,22 +35,22 @@ class ImageDownloader:
         """単一の画像をダウンロードし、ローカルパスを返します。"""
         target_path = self.image_dir / filename
         if target_path.exists() and not self.overwrite:
-            self.logger.debug(f"画像は既に存在するためスキップ: {filename}")
+            logger.debug(f"画像は既に存在するためスキップ: {filename}")
             return target_path
 
         try:
             self.api_client.download(url, path=self.image_dir, name=filename)
-            self.logger.debug(f"画像をダウンロードしました: {filename}")
+            logger.debug(f"画像をダウンロードしました: {filename}")
             return target_path
         except Exception as e:
-            self.logger.warning(f"画像 ({url}) のダウンロードに失敗しました: {e}")
+            logger.warning(f"画像 ({url}) のダウンロードに失敗しました: {e}")
             return None
 
     def download_cover(self, novel_detail: dict) -> Optional[Path]:
         """小説の表紙画像をダウンロードします。"""
         cover_url = novel_detail.get("image_urls", {}).get("large")
         if not cover_url:
-            self.logger.info("この小説にはカバー画像がありません。")
+            logger.info("この小説にはカバー画像がありません。")
             return None
 
         ext = cover_url.split(".")[-1].split("?")[0]
@@ -63,18 +62,18 @@ class ImageDownloader:
             if path := self._download_single_image(url, cover_filename):
                 return path
 
-        self.logger.error("カバー画像のダウンロードに最終的に失敗しました。")
+        logger.error("カバー画像のダウンロードに最終的に失敗しました。")
         return None
 
     def download_embedded_images(self, novel_data: NovelApiResponse) -> Dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
-        self.logger.info("埋め込み画像のダウンロードを開始します...")
+        logger.info("埋め込み画像のダウンロードを開始します...")
         text = novel_data.text
         uploaded_ids = set(re.findall(r"\[uploadedimage:(\d+)\]", text))
         pixiv_ids = set(re.findall(r"\[pixivimage:(\d+)\]", text))
 
         total_images = len(uploaded_ids) + len(pixiv_ids)
-        self.logger.info(f"対象画像: {total_images}件")
+        logger.info(f"対象画像: {total_images}件")
 
         image_paths: Dict[str, Path] = {}
 
@@ -106,7 +105,7 @@ class ImageDownloader:
                     if path := self._download_single_image(url, filename):
                         image_paths[illust_id] = path
             except Exception as e:
-                self.logger.warning(f"イラスト {illust_id} の取得に失敗: {e}")
+                logger.warning(f"イラスト {illust_id} の取得に失敗: {e}")
 
-        self.logger.info("埋め込み画像ダウンロード処理が完了しました。")
+        logger.info("埋め込み画像ダウンロード処理が完了しました。")
         return image_paths

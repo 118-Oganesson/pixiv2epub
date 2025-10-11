@@ -1,8 +1,8 @@
-# src/pixiv2epub/app.py
-
-import logging
+# FILE: src/pixiv2epub/app.py
 from pathlib import Path
 from typing import Any, List
+
+from loguru import logger
 
 from .core.coordinator import Coordinator
 from .core.settings import Settings
@@ -27,8 +27,7 @@ class Application:
         self.settings = settings
         setup_logging(self.settings.log_level)
         self.coordinator = Coordinator(self.settings)
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.debug("Pixiv2Epubアプリケーションが初期化されました。")
+        logger.debug("Pixiv2Epubアプリケーションが初期化されました。")
 
     # --- 通常実行 (Download & Build) ---
 
@@ -78,7 +77,6 @@ class Application:
                 f"指定されたパスに manifest.json が見つかりません: {workspace_path}"
             )
 
-        # パスからWorkspaceオブジェクトを復元
         workspace = Workspace(
             id=workspace_path.name, root_path=workspace_path.resolve()
         )

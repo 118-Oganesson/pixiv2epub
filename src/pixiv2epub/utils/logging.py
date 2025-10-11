@@ -1,26 +1,24 @@
-# src/pixiv2epub/utils/logging.py
-
-import logging
+# FILE: src/pixiv2epub/utils/logging.py
+from loguru import logger
 from rich.logging import RichHandler
 
 
-def setup_logging(level="INFO"):
+def setup_logging(level: str = "INFO"):
     """
-    richライブラリを用いて、見やすく色付けされたログ出力を設定します。
-
-    Args:
-        level (str, optional): 出力するログの最低レベル。 Defaults to "INFO".
+    LoguruをRichHandlerを使用するように設定します。
+    Loguruのフォーマットを無効にし、RichHandlerに全てのフォーマットを委任します。
     """
-    logging.basicConfig(
+    logger.remove()  # デフォルトハンドラの削除
+    logger.add(
+        RichHandler(
+            rich_tracebacks=True,
+            show_path=False,
+            markup=True,
+            log_time_format="[%X]",  # RichHandlerに時刻フォーマットを指定
+        ),
         level=level.upper(),
-        format="%(message)s",
-        datefmt="[%X]",
-        force=True,
-        handlers=[
-            RichHandler(
-                rich_tracebacks=True,
-                markup=True,
-                show_path=False,
-            )
-        ],
+        format="{message}",  # RichHandlerにフォーマットを完全に委任
+        backtrace=False,
+        diagnose=False,
     )
+    logger.info(f"ログレベルを {level.upper()} に設定しました。")

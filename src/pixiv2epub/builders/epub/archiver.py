@@ -1,8 +1,8 @@
-# src/pixiv2epub/builders/epub/archiver.py
-
-import logging
+# FILE: src/pixiv2epub/builders/epub/archiver.py
 import zipfile
 from pathlib import Path
+
+from loguru import logger
 
 from ...core.settings import Settings
 from ...models.local import EpubComponents, ImageAsset
@@ -17,7 +17,6 @@ class Archiver:
         Args:
             settings (Settings): アプリケーション全体の設定情報。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.settings = settings
         self.img_optimizer = (
             ImageCompressor(self.settings)
@@ -57,14 +56,14 @@ class Archiver:
                     f"OEBPS/{components.css_asset.href}", components.css_asset.content
                 )
             if not components.final_images:
-                self.logger.debug("画像ファイルはありません。")
+                logger.debug("画像ファイルはありません。")
                 return
 
-            self.logger.info(f"{len(components.final_images)}件の画像を処理します。")
+            logger.info(f"{len(components.final_images)}件の画像を処理します。")
             for image in components.final_images:
                 self._write_image(zf, image)
 
-        self.logger.debug(f"EPUB を生成しました: {output_path}")
+        logger.debug(f"EPUB を生成しました: {output_path}")
 
     def _write_image(self, zf: zipfile.ZipFile, image: ImageAsset):
         """単一の画像ファイルを読み込み、必要に応じて圧縮してZIPファイルに書き込みます。"""
@@ -78,4 +77,4 @@ class Archiver:
                     file_bytes = result.output_bytes
             zf.writestr(f"OEBPS/{image.href}", file_bytes)
         except IOError as e:
-            self.logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")
+            logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")

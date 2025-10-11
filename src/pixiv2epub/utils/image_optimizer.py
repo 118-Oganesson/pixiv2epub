@@ -1,14 +1,13 @@
-# src/pixiv2epub/utils/image_optimizer.py
-
-
+# FILE: src/pixiv2epub/utils/image_optimizer.py
 import concurrent.futures
-import logging
 import shutil
 import subprocess
 import tempfile
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Union
+
+from loguru import logger
 
 from ..core.settings import Settings
 from ..models.local import CompressionResult
@@ -39,8 +38,7 @@ class ImageCompressor:
         Args:
             settings (Settings): アプリケーション全体の設定オブジェクト。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.settings = settings.compression  # 圧縮関連の設定のみを保持
+        self.settings = settings.compression
 
         self.tools_available: Dict[str, bool] = {}
         for tool in self.REQUIRED_TOOLS:
@@ -48,7 +46,7 @@ class ImageCompressor:
                 self.tools_available[tool] = True
             else:
                 self.tools_available[tool] = False
-                self.logger.warning(
+                logger.warning(
                     f"コマンド '{tool}' が見つかりません。この形式の画像は圧縮されません。"
                 )
 
@@ -85,7 +83,7 @@ class ImageCompressor:
         start_time = time.time()
 
         if not input_path.is_file():
-            self.logger.error(f"ファイルが見つかりません: {input_path}")
+            logger.error(f"ファイルが見つかりません: {input_path}")
             return CompressionResult(
                 input_path,
                 None,
@@ -102,7 +100,7 @@ class ImageCompressor:
 
         fmt = self.detect_format(input_path)
         if fmt is None:
-            self.logger.warning(f"対応していない画像形式です: {input_path}")
+            logger.warning(f"対応していない画像形式です: {input_path}")
             return CompressionResult(
                 input_path,
                 None,
@@ -140,7 +138,7 @@ class ImageCompressor:
             duration = time.time() - start_time
 
             if not res.success:
-                self.logger.error(f"{tool} による圧縮に失敗しました: {input_path}")
+                logger.error(f"{tool} による圧縮に失敗しました: {input_path}")
                 return CompressionResult(
                     input_path,
                     None,
@@ -157,7 +155,7 @@ class ImageCompressor:
                 )
 
             if not tmp_out_path.is_file() or tmp_out_path.stat().st_size == 0:
-                self.logger.error(
+                logger.error(
                     f"予期せぬエラー: 一時出力ファイルが見つかりません: {tmp_out_path}"
                 )
                 return CompressionResult(
@@ -178,7 +176,7 @@ class ImageCompressor:
             compressed_size = tmp_out_path.stat().st_size
             if compressed_size >= original_size and self.settings.skip_if_larger:
                 data = tmp_out_path.read_bytes() if return_bytes else None
-                self.logger.info(
+                logger.info(
                     f"圧縮結果が元より大きいためスキップ: {input_path.name} "
                     f"({_human_readable_size(original_size)} -> {_human_readable_size(compressed_size)})"
                 )
@@ -215,7 +213,7 @@ class ImageCompressor:
             )
 
             if write_output:
-                self.logger.info(
+                logger.info(
                     f"圧縮完了: {input_path.name} -> {final_out_path.name if final_out_path else 'N/A'} | "
                     f"元: {_human_readable_size(original_size)}, 圧縮後: {_human_readable_size(compressed_size)}, "
                     f"削減: {_human_readable_size(saved_bytes)} ({saved_percent:.2f}%)"
@@ -277,7 +275,7 @@ class ImageCompressor:
                 try:
                     results.append(future.result())
                 except Exception as e:
-                    self.logger.error(f"画像圧縮中にエラーが発生しました: {e}")
+                    logger.error(f"画像圧縮中にエラーが発生しました: {e}")
         return results
 
     def _run_command(
@@ -285,7 +283,7 @@ class ImageCompressor:
     ) -> Dict[str, Union[bytes, int]]:
         """外部コマンドを実行し、結果をキャプチャします。"""
         try:
-            self.logger.debug(f"コマンド実行: {' '.join(cmd)}")
+            logger.debug(f"コマンド実行: {' '.join(cmd)}")
             proc = subprocess.run(
                 cmd, capture_output=True, timeout=timeout, check=False
             )
@@ -315,7 +313,7 @@ class ImageCompressor:
         stderr = result["stderr"].decode("utf-8", "replace") if result["stderr"] else ""
 
         if not success:
-            self.logger.error(f"{tool_name}による圧縮に失敗しました: {stderr}")
+            logger.error(f"{tool_name}による圧縮に失敗しました: {stderr}")
 
         return CompressionResult(
             input_path,
@@ -426,7 +424,6 @@ class ImageCompressor:
         else:
             cmd.extend(["-q", str(opts.quality)])
         cmd.extend(["-metadata", opts.metadata])
-        # 将来的な拡張性のために他のオプションも追加可能
         cmd.extend([str(input_path), "-o", str(tmp_out_path)])
 
         result = self._run_command(cmd)

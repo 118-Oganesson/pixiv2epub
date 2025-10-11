@@ -1,4 +1,4 @@
-# src/pixiv2epub/models/local.py
+# FILE: src/pixiv2epub/models/local.py
 """
 アプリケーションの内部処理（ビルド、画像圧縮など）で利用されるデータモデル。
 外部APIの仕様とは独立しています。

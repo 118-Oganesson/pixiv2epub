@@ -1,4 +1,4 @@
-# src/pixiv2epub/providers/pixiv/fingerprint.py
+# FILE: src/pixiv2epub/providers/pixiv/fingerprint.py
 import hashlib
 from typing import Any, Dict
 

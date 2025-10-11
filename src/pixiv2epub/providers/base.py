@@ -1,8 +1,8 @@
-# src/pixiv2epub/providers/base.py
-
-import logging
+# FILE: src/pixiv2epub/providers/base.py
 from abc import ABC, abstractmethod
 from typing import Any, List
+
+from loguru import logger
 
 from ..core.settings import Settings
 from ..models.workspace import Workspace
@@ -19,8 +19,7 @@ class BaseProvider(ABC):
             settings (Settings): アプリケーション全体の設定情報。
         """
         self.settings = settings
-        self.logger = logging.getLogger(self.__class__.__name__)
-        self.logger.info(f"{self.__class__.__name__} を初期化しました。")
+        logger.info(f"{self.__class__.__name__} を初期化しました。")
 
     @classmethod
     @abstractmethod

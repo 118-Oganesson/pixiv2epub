@@ -1,10 +1,10 @@
-# src/pixiv2epub/builders/base.py
-
+# FILE: src/pixiv2epub/builders/base.py
 import json
-import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from loguru import logger
 
 from ..core.exceptions import BuildError
 from ..core.settings import Settings
@@ -27,13 +27,12 @@ class BaseBuilder(ABC):
             settings (Settings): アプリケーション設定。
             custom_metadata (Optional[Dict[str, Any]]): detail.jsonの代わりのメタデータ。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.workspace = workspace
         self.settings = settings
 
         if custom_metadata:
             metadata_dict = custom_metadata
-            self.logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
+            logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
         else:
             detail_json_path = self.workspace.source_path / "detail.json"
             if not detail_json_path.is_file():

@@ -1,6 +1,4 @@
-# src/pixiv2epub/builders/epub/generator.py
-
-import logging
+# FILE: src/pixiv2epub/builders/epub/generator.py
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -8,6 +6,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from jinja2 import Environment, FileSystemLoader
+from loguru import logger
 
 from ...models.local import (
     EpubComponents,
@@ -28,7 +27,6 @@ class EpubGenerator:
     def __init__(
         self, metadata: NovelMetadata, workspace: Workspace, template_dir: Path
     ):
-        self.logger = logging.getLogger(self.__class__.__name__)
         self.metadata = metadata
         self.workspace = workspace
         self.template_env = Environment(
@@ -74,7 +72,7 @@ class EpubGenerator:
                 title="stylesheet",
             )
         except Exception as e:
-            self.logger.warning(f"CSSテンプレートのレンダリングに失敗: {e}")
+            logger.warning(f"CSSテンプレートのレンダリングに失敗: {e}")
             return None
 
     def _render_template(self, template_name: str, context: Dict) -> bytes:
@@ -112,7 +110,7 @@ class EpubGenerator:
                     )
                 )
             except Exception as e:
-                self.logger.error(f"ページの処理中にエラー: {page_info.title}, {e}")
+                logger.error(f"ページの処理中にエラー: {page_info.title}, {e}")
         return pages
 
     def _generate_info_page(
@@ -178,7 +176,7 @@ class EpubGenerator:
         info_page: PageAsset,
         cover_page: Optional[PageAsset],
         cover_asset: Optional[ImageAsset],
-        css_asset: Optional[PageAsset],  # 引数を変更
+        css_asset: Optional[PageAsset],
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
         manifest_items, spine_itemrefs = [], []

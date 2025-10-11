@@ -1,4 +1,4 @@
-// src/pixiv2epub/assets/gui/injector.js
+// FILE: src/pixiv2epub/assets/gui/injector.js
 
 (() => {
     // UIの状態を管理し、必要な時だけDOM操作を行う関数

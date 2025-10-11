@@ -1,9 +1,9 @@
-# src/pixiv2epub/providers/pixiv/parser.py
-
-import logging
+# FILE: src/pixiv2epub/providers/pixiv/parser.py
 import re
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
+
+from loguru import logger
 
 from ... import constants as const
 
@@ -16,8 +16,6 @@ class PixivParser:
         Args:
             image_paths (Dict[str, Path]): 画像IDとローカルファイルパスのマッピング。
         """
-        self.logger = logging.getLogger(self.__class__.__name__)
-        # HTMLで使いやすいように、相対パスに変換しておく
         self.image_relative_paths = {
             k: f"../assets/{const.IMAGES_DIR_NAME}/{v.name}"
             for k, v in image_paths.items()
@@ -32,9 +30,7 @@ class PixivParser:
         if path:
             return f'<img alt="{tag_type}_{image_id}" src="{path}" />'
 
-        self.logger.warning(
-            f"置換対象の画像ID '{image_id}' のパスが見つかりませんでした。"
-        )
+        logger.warning(f"置換対象の画像ID '{image_id}' のパスが見つかりませんでした。")
         return match.group(0)
 
     def _get_replacement_strategies(

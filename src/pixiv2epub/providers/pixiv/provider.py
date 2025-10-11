@@ -1,11 +1,11 @@
-# src/pixiv2epub/providers/pixiv/provider.py
-
+# FILE: src/pixiv2epub/providers/pixiv/provider.py
 import json
 import os
 import shutil
 from datetime import datetime, timezone
 from typing import Any, List, Set, Tuple
 
+from loguru import logger
 from pixivpy3 import PixivError
 
 from ...core.exceptions import DownloadError
@@ -41,16 +41,15 @@ class PixivProvider(BaseProvider):
         workspace_path = self.workspace_dir / f"pixiv_{novel_id}"
         workspace = Workspace(id=f"pixiv_{novel_id}", root_path=workspace_path)
 
-        # 必須ディレクトリを作成
         workspace.source_path.mkdir(parents=True, exist_ok=True)
         (workspace.assets_path / "images").mkdir(parents=True, exist_ok=True)
 
-        self.logger.debug(f"ワークスペースを準備しました: {workspace.root_path}")
+        logger.debug(f"ワークスペースを準備しました: {workspace.root_path}")
         return workspace
 
     def get_novel(self, novel_id: Any) -> Workspace:
         """単一の小説を取得し、ローカルに保存します。"""
-        self.logger.info(f"小説ID: {novel_id} の処理を開始します。")
+        logger.info(f"小説ID: {novel_id} の処理を開始します。")
         workspace = self._setup_workspace(novel_id)
 
         # 既存のハッシュを読み込む
@@ -61,22 +60,19 @@ class PixivProvider(BaseProvider):
                     manifest_data = json.load(f)
                     old_hash = manifest_data.get("content_hash")
             except (json.JSONDecodeError, IOError) as e:
-                self.logger.warning(f"既存のマニフェストが読み込めません: {e}")
+                logger.warning(f"既存のマニフェストが読み込めません: {e}")
 
         # APIから最新データを取得し、新しいハッシュを計算
         novel_data_dict = self.api_client.webview_novel(novel_id)
         new_hash = generate_content_hash(novel_data_dict)
 
-        # ハッシュを比較
         if old_hash and old_hash == new_hash:
-            self.logger.info(
+            logger.info(
                 f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
             )
             return workspace
 
-        self.logger.info(
-            "コンテンツの更新を検出しました（または新規ダウンロードです）。"
-        )
+        logger.info("コンテンツの更新を検出しました（または新規ダウンロードです）。")
 
         try:
             # 更新があるので、テキスト関連の古いファイルのみをクリーンにする
@@ -84,15 +80,12 @@ class PixivProvider(BaseProvider):
                 shutil.rmtree(workspace.source_path)
             if workspace.manifest_path.exists():
                 os.remove(workspace.manifest_path)
-            
-            # ワークスペースのディレクトリ構造を再作成（assetsは維持される）
+
             workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-            # 1. APIから基本データを取得
             novel_data = NovelApiResponse.from_dict(novel_data_dict)
             detail_data_dict = self.api_client.novel_detail(novel_id)
 
-            # 2. 画像をダウンロード
             image_dir = workspace.assets_path / "images"
             downloader = ImageDownloader(
                 self.api_client,
@@ -102,7 +95,6 @@ class PixivProvider(BaseProvider):
             cover_path = downloader.download_cover(detail_data_dict.get("novel", {}))
             image_paths = downloader.download_embedded_images(novel_data)
 
-            # 3. manifest.json を準備
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
@@ -110,11 +102,10 @@ class PixivProvider(BaseProvider):
                 content_hash=new_hash,
             )
 
-            # 4. テキストとメタデータを永続化
             persister = PixivDataPersister(workspace, cover_path, image_paths)
             persister.persist(novel_data, detail_data_dict, manifest)
 
-            self.logger.info(
+            logger.info(
                 f"小説「{novel_data.title}」のデータ取得が完了しました -> {workspace.root_path}"
             )
             return workspace
@@ -129,36 +120,30 @@ class PixivProvider(BaseProvider):
 
     def get_series(self, series_id: Any) -> List[Workspace]:
         """シリーズ作品をダウンロードします。"""
-        self.logger.info(f"シリーズID: {series_id} の処理を開始します。")
+        logger.info(f"シリーズID: {series_id} の処理を開始します。")
         try:
             series_data = self.get_series_info(series_id)
             novel_ids = [novel.id for novel in series_data.novels]
 
             if not novel_ids:
-                self.logger.info(
-                    "ダウンロード対象が見つからないため、処理を終了します。"
-                )
+                logger.info("ダウンロード対象が見つからないため、処理を終了します。")
                 return []
 
             downloaded_workspaces = []
             total = len(novel_ids)
-            self.logger.info(f"計 {total} 件の小説をダウンロードします。")
+            logger.info(f"計 {total} 件の小説をダウンロードします。")
 
             for i, novel_id in enumerate(novel_ids, 1):
-                self.logger.info(
-                    f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---"
-                )
+                logger.info(f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---")
                 try:
                     workspace = self.get_novel(novel_id)
                     downloaded_workspaces.append(workspace)
                 except Exception as e:
-                    self.logger.error(
+                    logger.error(
                         f"小説ID {novel_id} のダウンロードに失敗: {e}", exc_info=True
                     )
 
-            self.logger.info(
-                f"シリーズ「{series_data.detail.title}」のDLが完了しました。"
-            )
+            logger.info(f"シリーズ「{series_data.detail.title}」のDLが完了しました。")
             return downloaded_workspaces
         except Exception as e:
             raise DownloadError(
@@ -177,39 +162,37 @@ class PixivProvider(BaseProvider):
 
     def get_user_novels(self, user_id: Any) -> List[Workspace]:
         """ユーザーの全作品をダウンロードします。"""
-        self.logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します。")
+        logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します。")
         try:
             single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
-            self.logger.info(
+            logger.info(
                 f"取得結果: {len(series_ids)}件のシリーズ、{len(single_ids)}件の単独作品"
             )
 
             downloaded_workspaces = []
             if series_ids:
-                self.logger.info("--- シリーズ作品の処理を開始 ---")
+                logger.info("--- シリーズ作品の処理を開始 ---")
                 for i, s_id in enumerate(series_ids, 1):
-                    self.logger.info(
-                        f"\n--- Processing Series {i}/{len(series_ids)} ---"
-                    )
+                    logger.info(f"\n--- Processing Series {i}/{len(series_ids)} ---")
                     try:
                         workspaces = self.get_series(s_id)
                         downloaded_workspaces.extend(workspaces)
                     except Exception as e:
-                        self.logger.error(
+                        logger.error(
                             f"シリーズID {s_id} の処理中にエラー: {e}", exc_info=True
                         )
 
             if single_ids:
-                self.logger.info("--- 単独作品の処理を開始 ---")
+                logger.info("--- 単独作品の処理を開始 ---")
                 for i, n_id in enumerate(single_ids, 1):
-                    self.logger.info(
+                    logger.info(
                         f"--- Processing Single Novel {i}/{len(single_ids)} ---"
                     )
                     try:
                         workspace = self.get_novel(n_id)
                         downloaded_workspaces.append(workspace)
                     except Exception as e:
-                        self.logger.error(
+                        logger.error(
                             f"小説ID {n_id} の処理中にエラー: {e}", exc_info=True
                         )
             return downloaded_workspaces

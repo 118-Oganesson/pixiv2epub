@@ -1,8 +1,9 @@
-# src/pixiv2epub/builders/epub/builder.py
-
+# FILE: src/pixiv2epub/builders/epub/builder.py
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+from loguru import logger
 
 from ...core.exceptions import BuildError
 from ...core.settings import Settings
@@ -25,14 +26,11 @@ class EpubBuilder(BaseBuilder):
     ):
         super().__init__(workspace, settings, custom_metadata)
 
-        # css_file を解決するロジック全体が不要になったため削除されています。
-
-        # assetsテンプレートディレクトリのパスを解決
         asset_dir = Path(__file__).parent.parent.parent / "assets"
 
         self.asset_manager = AssetManager(
             self.workspace,
-            self.metadata,  # 修正点: self.css_abs_path 引数を削除
+            self.metadata,
         )
         self.generator = EpubGenerator(self.metadata, self.workspace, asset_dir)
         self.archiver = Archiver(self.settings)
@@ -44,9 +42,9 @@ class EpubBuilder(BaseBuilder):
     def build(self) -> Path:
         """EPUBファイルを生成するメインの実行メソッド。"""
         output_path = self._determine_output_path()
-        self.logger.info(f"EPUB作成処理を開始します (Workspace: {self.workspace.id})")
+        logger.info(f"EPUB作成処理を開始します (Workspace: {self.workspace.id})")
         if output_path.exists():
-            self.logger.warning(
+            logger.warning(
                 f"出力ファイル {output_path} は既に存在するため、上書きします。"
             )
 
@@ -57,15 +55,13 @@ class EpubBuilder(BaseBuilder):
             components = self.generator.generate_components(
                 final_images,
                 raw_pages_info,
-                cover_asset,  # 修正点: self.css_abs_path 引数を削除
+                cover_asset,
             )
             self.archiver.archive(components, output_path)
-            self.logger.info(f"EPUBファイルの作成に成功しました: {output_path}")
+            logger.info(f"EPUBファイルの作成に成功しました: {output_path}")
             return output_path
         except Exception as e:
-            self.logger.exception(
-                "EPUBファイルの作成中に致命的なエラーが発生しました。"
-            )
+            logger.exception("EPUBファイルの作成中に致命的なエラーが発生しました。")
             self._cleanup_failed_build(output_path)
             raise BuildError(f"EPUBのビルドに失敗しました: {e}") from e
 
@@ -96,6 +92,6 @@ class EpubBuilder(BaseBuilder):
         try:
             if path.exists():
                 os.remove(path)
-                self.logger.info(f"不完全な出力ファイルを削除しました: {path}")
+                logger.info(f"不完全な出力ファイルを削除しました: {path}")
         except OSError as e:
-            self.logger.error(f"出力ファイルの削除に失敗しました: {path}, {e}")
+            logger.error(f"出力ファイルの削除に失敗しました: {path}, {e}")

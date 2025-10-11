@@ -1,6 +1,4 @@
-# src/pixiv2epub/core/auth.py
-
-import logging
+# FILE: src/pixiv2epub/core/auth.py
 import re
 import time
 from base64 import urlsafe_b64encode
@@ -11,6 +9,7 @@ from typing import Tuple
 from urllib.parse import urlencode
 
 import requests
+from loguru import logger
 from playwright.sync_api import Request, TimeoutError, sync_playwright
 
 from .exceptions import AuthenticationError
@@ -22,8 +21,6 @@ AUTH_TOKEN_URL = "https://oauth.secure.pixiv.net/auth/token"
 CLIENT_ID = "MOBrBDS8blbauoSck0ZfDbtuzpyT"
 CLIENT_SECRET = "lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"
 REDIRECT_URI = "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback"
-
-logger = logging.getLogger(__name__)
 
 
 def _s256(data: bytes) -> str:
@@ -58,7 +55,9 @@ def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
                 auth_code_holder.append(match.groups()[0])
 
     with sync_playwright() as p:
-        context = p.chromium.launch_persistent_context(save_session_path, headless=False)
+        context = p.chromium.launch_persistent_context(
+            save_session_path, headless=False
+        )
         page = context.new_page()
         logger.info(
             "ブラウザを起動しました。表示されたウィンドウでPixivにログインしてください..."

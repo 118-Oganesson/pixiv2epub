@@ -1,4 +1,4 @@
-# src/pixiv2epub/core/exceptions.py
+# FILE: src/pixiv2epub/core/exceptions.py
 
 
 class Pixiv2EpubError(Exception):

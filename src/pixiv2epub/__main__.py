@@ -1,10 +1,10 @@
-# src/pixiv2epub/__main__.py
+# FILE: src/pixiv2epub/__main__.py
 """
 パッケージを 'python -m pixiv2epub' コマンドで実行可能にするための
 エントリーポイントです。
 """
 
-from .cli import main
+from .cli import run_app
 
 if __name__ == "__main__":
-    main()
+    run_app()

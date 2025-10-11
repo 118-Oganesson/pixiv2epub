@@ -1,4 +1,4 @@
-# src/pixiv2epub/models/workspace.py
+# FILE: src/pixiv2epub/models/workspace.py
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
