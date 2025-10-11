@@ -19,28 +19,29 @@ Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコ
 
 ## ✨ 主な機能
 
-- **永続的ライブラリと差分更新**  
-  一度取得した小説はローカルに永続化されます。二回目以降はコンテンツの変更を自動で検知し、更新があった作品のみをダウンロードするため、高速かつ効率的にライブラリを最新の状態に保てます。
+- **永続的ライブラリと差分更新**
+ 一度取得した小説はローカルに永続化されます。二回目以降はコンテンツの変更を自動で検知し、更新があった作品のみをダウンロードするため、高速かつ効率的にライブラリを最新の状態に保てます。
 
-- **安定した書籍管理**  
-  小説ごとに決定論的なIDをEPUBに付与するため、ファイルを更新しても電子書籍リーダー上で別の本として重複することなく、読書進捗やメモが維持されます。
+- **安定した書籍管理**
+ 小説ごとに決定論的なIDをEPUBに付与するため、ファイルを更新しても電子書籍リーダー上で別の本として重複することなく、読書進捗やメモが維持されます。
 
-- **高品質なEPUB3生成**  
-  小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
+- **高品質なEPUB3生成**
+ 小説本文、挿絵、メタデータを取得し、目次や作品情報ページを含むEPUB3を生成します。
 
-- **GUIモード** ブラウザを起動し、表示しているPixivの小説ページから直接EPUB化を実行できます。URLをコピー＆ペーストする必要はありません。
+- **GUIモード**
+ ブラウザを起動し、表示しているPixivの小説ページから直接EPUB化を実行できます。URLをコピー＆ペーストする必要はありません。
 
-- **スマートなURL/ID処理**  
-  URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
+- **スマートなURL/ID処理**
+ URLやIDを渡すだけで、単一の小説・シリーズ・ユーザー作品かを自動で判別して一括処理します。
 
-- **Pixiv独自タグ変換**  
-  `[newpage]`, `[chapter:]`, `[[rb:...]]` などのタグを適切に解釈し、XHTMLに変換します。
+- **Pixiv独自タグ変換**
+ `[newpage]`, `[chapter:]`, `[[rb:...]]` などのタグを適切に解釈し、XHTMLに変換します。
 
-- **柔軟な画像処理**  
-  カバー画像と本文中の挿絵を自動で取得・同梱します。pngquantなどの外部ツールと連携し、ファイルサイズを最適化する画像圧縮も可能です。
+- **柔軟な画像処理**
+ カバー画像と本文中の挿絵を自動で取得・同梱します。pngquantなどの外部ツールと連携し、ファイルサイズを最適化する画像圧縮も可能です。
 
-- **モダンなCLI**  
-  `rich` ライブラリによる見やすいログ出力や、直感的なサブコマンド体系を提供します。
+- **モダンなCLI**
+ `Typer`と`rich`ライブラリによる、見やすく直感的なコマンド体系とログ出力を提供します。
 
 ---
 
@@ -60,7 +61,7 @@ uv venv
 source .venv/bin/activate  # macOS / Linux
 # .venv\Scripts\activate   # Windows
 
-# 3. 開発ツールをインストール
+# 3. 依存関係をインストール
 uv sync
 
 # 4. プロジェクトのセットアップタスクを実行
@@ -123,14 +124,14 @@ Pixivの小説・シリーズ・ユーザーのページを開くと、画面上
 
 ```bash
 pixiv2epub download "https://www.pixiv.net/novel/show.php?id=12345678"
-# > ℹ️ ダウンロードが完了しました: ./.Workspace/pixiv_12345678
+# > ℹ️ ダウンロードが完了しました: ./.workspace/pixiv_12345678
 ```
 
 #### ステップ2: ローカルデータからEPUBを生成
 
 ```bash
-pixiv2epub build ./.Workspace/pixiv_12345678
-# > ℹ️ ビルドが完了しました: ./Epubs/作者名/[12345678] 小説タイトル.epub
+pixiv2epub build ./.workspace/pixiv_12345678
+# > ℹ️ ビルドが完了しました: ./epubs/作者名/小説タイトル.epub
 ```
 
 ---
@@ -153,94 +154,66 @@ pixiv2epub run 12345678 -c config.toml
 
 ## ⌨️ コマンドリファレンス
 
-### グローバルオプション
+```bash
+Usage: pixiv2epub [OPTIONS] COMMAND [ARGS]...
 
-```text
-usage: pixiv2epub [-h] [-v] {auth,run,download,build} ...
+Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。
 
-options:
-  -h, --help            Show this help message and exit
-  -v, --verbose         Enable detailed debug logging.
+Options:
+  -v, --verbose                   詳細なデバッグログを有効にします。
+  -c, --config FILE               カスタム設定TOMLファイルへのパス。
+  --install-completion            現在のシェルに補完機能をインストールします。
+  --show-completion               現在のシェル用の補完スクリプトを表示します。
+  --help                          このメッセージを表示して終了します。
+
+Commands:
+  auth      ブラウザでPixivにログインし、認証トークンとGUIセッションを保存します。
+  build     既存のワークスペースディレクトリからEPUBをビルドします。
+  download  小説データをワークスペースにダウンロードするだけで終了します。
+  gui       ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。
+  run       指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。
 ```
-
----
-
-### `auth`
-
-ブラウザでPixivにログインし、認証トークンを `.env` ファイルに保存します。
-
-```text
-usage: pixiv2epub auth [-h]
-
-options:
-  -h, --help  Show this help message and exit
-```
-
----
 
 ### `run`
 
-指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。
-
 ```text
-usage: pixiv2epub run [-h] [-c CONFIG] input
+Usage: pixiv2epub run [OPTIONS] INPUT
 
-positional arguments:
-  input                 URL or ID of the Pixiv novel, series, or user.
+  指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。
 
-options:
-  -h, --help            Show this help message and exit
-  -c CONFIG, --config CONFIG
-                        Path to a custom TOML configuration file.
+Arguments:
+  INPUT  Pixivの小説・シリーズ・ユーザーのURLまたはID。 [required]
+
+Options:
+  --help  このメッセージを表示して終了します。
 ```
-
----
 
 ### `download`
 
-小説データをワークスペースにダウンロードするだけで終了します。
-
 ```text
-usage: pixiv2epub download [-h] [-c CONFIG] input
+Usage: pixiv2epub download [OPTIONS] INPUT
 
-positional arguments:
-  input                 URL or ID of the Pixiv novel, series, or user.
+  小説データをワークスペースにダウンロードするだけで終了します。
 
-options:
-  -h, --help            Show this help message and exit
-  -c CONFIG, --config CONFIG
-                        Path to a custom TOML configuration file.
+Arguments:
+  INPUT  Pixivの小説・シリーズ・ユーザーのURLまたはID。 [required]
+
+Options:
+  --help  このメッセージを表示して終了します。
 ```
-
----
 
 ### `build`
 
-既存のワークスペースディレクトリからEPUBをビルドします。
-
 ```text
-usage: pixiv2epub build [-h] [-c CONFIG] WORKSPACE_PATH
+Usage: pixiv2epub build [OPTIONS] WORKSPACE_PATH
 
-positional arguments:
-  WORKSPACE_PATH        Path to the workspace directory to be built.
+  既存のワークスペースディレクトリからEPUBをビルドします。
 
-options:
-  -h, --help            Show this help message and exit
-  -c CONFIG, --config CONFIG
-                        Path to a custom TOML configuration file.
-```
+Arguments:
+  WORKSPACE_PATH  ビルド対象のワークスペースディレクトリへのパス。 [required]
 
----
-
-### `gui`
-
-ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。
-
-```text
-usage: pixiv2epub gui [-h]
-
-options:
-  -h, --help  Show this help message and exit
+Options:
+  --help  このメッセージを表示して終了します。
 ```
 
 ---
