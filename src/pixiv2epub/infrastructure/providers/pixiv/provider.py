@@ -25,7 +25,7 @@ class PixivProvider(IProvider, INovelProvider, ISeriesProvider, IUserNovelsProvi
     def __init__(self, settings: Settings):
         super().__init__(settings)
         self.api_client = PixivApiClient(
-            refresh_token=self.settings.auth.refresh_token,
+            refresh_token=self.settings.providers.pixiv.refresh_token,
             api_delay=self.settings.downloader.api_delay,
             api_retries=self.settings.downloader.api_retries,
         )

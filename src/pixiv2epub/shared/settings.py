@@ -4,7 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -16,7 +16,7 @@ from .exceptions import SettingsError
 
 # --- TOMLファイル読み込みロジック ---
 def load_toml_config(toml_file: Path) -> Dict[str, Any]:
-    """指定されたTOMLファイルを読み込む。"""
+    """指定されたTOMLファイルを読み込みます。"""
     if not toml_file.is_file():
         return {}
     try:
@@ -27,49 +27,92 @@ def load_toml_config(toml_file: Path) -> Dict[str, Any]:
 
 
 def get_project_defaults() -> Dict[str, Any]:
-    """pyproject.tomlから[tool.pixiv2epub]セクションを読み込む。"""
+    """pyproject.tomlから[tool.pixiv2epub]セクションを読み込みます。"""
     pyproject_path = Path.cwd() / "pyproject.toml"
     config = load_toml_config(pyproject_path)
     return config.get("tool", {}).get("pixiv2epub", {})
 
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
-    """
-    ユーザー指定のTOML設定ファイルを読み込むためのカスタムソース。
-    """
+    """ユーザー指定のTOML設定ファイルを読み込むためのカスタムソース。"""
 
     def __init__(self, settings_cls: type[BaseSettings], config_file: Optional[Path]):
         super().__init__(settings_cls)
         self.config_file = config_file
+        self._toml_config: Dict[str, Any] = (
+            load_toml_config(self.config_file) if self.config_file else {}
+        )
 
     def get_field_value(self, field, field_name):
-        return None
+        """このカスタムソースはフィールドごとの値取得をサポートしないため、__call__に処理を委ねます。"""
+        # Pydanticの仕様に合わせ、(値, キー, 複合的か)のタプルを返す
+        return None, None, False
 
     def __call__(self) -> Dict[str, Any]:
-        if not self.config_file:
-            return {}
-        return load_toml_config(self.config_file)
+        """設定ファイル全体を辞書として一度に返します。"""
+        return self._toml_config
 
 
 # --- 設定モデル定義 ---
-class AuthSettings(BaseModel):
-    refresh_token: Optional[str] = Field(None)
+
+
+class PixivAuthSettings(BaseModel):
+    """Pixiv認証に特化した設定モデル。"""
+
+    refresh_token: Optional[str] = Field(
+        None, description="Pixiv APIのリフレッシュトークン。"
+    )
+
+
+class FanboxAuthSettings(BaseModel):
+    """Fanbox認証に特化した設定モデル。"""
+
+    sessid: Optional[str] = Field(
+        None, description="FANBOXにログインした際のFANBOXSESSIDクッキー。"
+    )
+
+
+class ProviderSettings(BaseModel):
+    """各プロバイダの設定をまとめるモデル。"""
+
+    pixiv: PixivAuthSettings = PixivAuthSettings()
+    fanbox: FanboxAuthSettings = FanboxAuthSettings()
 
 
 class DownloaderSettings(BaseModel):
-    api_delay: float = 1.0
-    api_retries: int = 3
-    overwrite_existing_images: bool = False
+    """ダウンロード処理に関する設定。"""
+
+    api_delay: float = Field(1.0, description="APIリクエスト間の遅延時間（秒）。")
+    api_retries: int = Field(
+        3, description="APIリクエストが失敗した場合のリトライ回数。"
+    )
+    overwrite_existing_images: bool = Field(
+        False, description="同名の画像が既に存在する場合に上書きするかどうか。"
+    )
 
 
 class BuilderSettings(BaseModel):
-    output_directory: Path = Path("./epubs")
-    filename_template: str = "{author_name}/{title}.epub"
-    series_filename_template: str = "{author_name}/{series_title}/{title}.epub"
-    cleanup_after_build: bool = False
+    """EPUB生成処理に関する設定。"""
+
+    output_directory: Path = Field(
+        Path("./epubs"), description="生成されたEPUBファイルの保存先ディレクトリ。"
+    )
+    filename_template: str = Field(
+        "{author_name}/{title}.epub", description="単独作品のファイル名テンプレート。"
+    )
+    series_filename_template: str = Field(
+        "{author_name}/{series_title}/{title}.epub",
+        description="シリーズ作品のファイル名テンプレート。",
+    )
+    cleanup_after_build: bool = Field(
+        False,
+        description="EPUB生成後に中間ファイル（ワークスペース）を削除するかどうか。",
+    )
 
 
 class PngquantSettings(BaseModel):
+    """pngquantによるPNG圧縮の設定。"""
+
     colors: int = 256
     quality: str = "65-90"
     speed: int = 3
@@ -77,6 +120,8 @@ class PngquantSettings(BaseModel):
 
 
 class JpegoptimSettings(BaseModel):
+    """jpegoptimによるJPEG圧縮の設定。"""
+
     max_quality: int = 85
     strip_all: bool = True
     progressive: bool = True
@@ -84,30 +129,50 @@ class JpegoptimSettings(BaseModel):
 
 
 class CwebpSettings(BaseModel):
+    """cwebpによるWebP圧縮の設定。"""
+
     quality: int = 75
     lossless: bool = False
     metadata: str = "none"
 
 
 class CompressionSettings(BaseModel):
-    enabled: bool = True
-    skip_if_larger: bool = True
-    max_workers: int = 4
+    """画像圧縮に関する全体設定。"""
+
+    enabled: bool = Field(True, description="画像圧縮を有効にするかどうか。")
+    skip_if_larger: bool = Field(
+        True,
+        description="圧縮後のファイルサイズが元より大きい場合に圧縮をスキップするかどうか。",
+    )
+    max_workers: int = Field(
+        4, description="画像圧縮を並列実行する際の最大ワーカー数。"
+    )
     pngquant: PngquantSettings = PngquantSettings()
     jpegoptim: JpegoptimSettings = JpegoptimSettings()
     cwebp: CwebpSettings = CwebpSettings()
 
 
 class WorkspaceSettings(BaseModel):
-    root_directory: Path = Path("./.workspace")
+    """ワークスペースに関する設定。"""
+
+    root_directory: Path = Field(
+        Path("./.workspace"),
+        description="中間ファイルを保存するワークスペースのルートディレクトリ。",
+    )
 
 
 class Settings(BaseSettings):
     """
     アプリケーションの階層的設定管理クラス。
+    以下の優先順位で設定を読み込みます:
+    1. 環境変数 (例: PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN=...)
+    2. .env ファイル
+    3. --config で指定されたカスタムTOMLファイル
+    4. pyproject.toml内の [tool.pixiv2epub] セクション
+    5. モデルで定義されたデフォルト値
     """
 
-    auth: AuthSettings = AuthSettings()
+    providers: ProviderSettings = ProviderSettings()
     downloader: DownloaderSettings = DownloaderSettings()
     builder: BuilderSettings = BuilderSettings()
     compression: CompressionSettings = CompressionSettings()
@@ -119,12 +184,16 @@ class Settings(BaseSettings):
     def __init__(self, **values: Any):
         config_file_path = values.pop("_config_file", None)
         self._config_file = Path(config_file_path) if config_file_path else None
-        super().__init__(**values)
+        try:
+            super().__init__(**values)
+        except ValidationError as e:
+            raise SettingsError(f"設定の検証に失敗しました:\n{e}")
 
-        if not self.auth.refresh_token:
+        if not self.providers.pixiv.refresh_token and not self.providers.fanbox.sessid:
             raise SettingsError(
-                "Pixivのrefresh_tokenが見つかりません。"
-                "設定ファイル、.envファイル、または環境変数 (PIXIV2EPUB_AUTH__REFRESH_TOKEN) で設定してください。"
+                "PixivまたはFanboxの認証情報が見つかりません。"
+                " 'pixiv2epub auth <service>' コマンドを実行するか、"
+                "設定ファイル、.env、または環境変数で設定してください。"
             )
 
     model_config = SettingsConfigDict(

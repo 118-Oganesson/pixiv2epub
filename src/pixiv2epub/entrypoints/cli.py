@@ -1,7 +1,8 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
-import shutil
+import asyncio
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Literal
+from dotenv import set_key, find_dotenv
 
 import typer
 from loguru import logger
@@ -10,6 +11,7 @@ from typing_extensions import Annotated
 
 from ..app import Application
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
+from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..shared.exceptions import AuthenticationError, SettingsError
 from ..shared.settings import Settings
 from ..utils.logging import setup_logging
@@ -95,38 +97,49 @@ def main_callback(
 
 
 @app.command()
-def auth():
-    """ブラウザでPixivにログインし、認証トークンとGUIセッションを保存します。"""
+def auth(
+    service: Annotated[
+        Literal["pixiv", "fanbox"],
+        typer.Argument(
+            help="認証するサービスを選択します ('pixiv' または 'fanbox')。",
+            case_sensitive=False,
+        ),
+    ] = "pixiv",
+):
+    """ブラウザで指定されたサービスにログインし、認証情報を保存します。"""
     session_path = Path("./.gui_session")
+    env_path_str = find_dotenv()
+    if not env_path_str:
+        env_path = Path(".env")
+        env_path.touch()
+    else:
+        env_path = Path(env_path_str)
+
     logger.info(
-        f"GUI用のブラウザセッションを '{session_path.resolve()}' に作成します。"
+        f"GUI用のブラウザセッションを '{session_path.resolve()}' で使用します。"
     )
 
-    if session_path.exists():
-        logger.warning(
-            f"既存のGUIセッションを削除して上書きします: {session_path.resolve()}"
-        )
-        shutil.rmtree(session_path)
-
-    logger.info("Pixiv認証を開始します...")
     try:
-        refresh_token = get_pixiv_refresh_token(save_session_path=session_path)
-        env_path = Path(".env")
-        env_content = f'PIXIV2EPUB_AUTH__REFRESH_TOKEN="{refresh_token}"'
-
-        if env_path.exists():
-            typer.confirm(
-                "'.env' ファイルは既に存在します。上書きしますか？", abort=True
+        if service == "pixiv":
+            logger.info("Pixiv認証を開始します...")
+            refresh_token = get_pixiv_refresh_token(save_session_path=session_path)
+            set_key(
+                str(env_path),
+                "PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN",
+                refresh_token,
+            )
+            logger.info(
+                f"✅ Pixiv認証成功！ リフレッシュトークンを '{env_path.resolve()}' に保存しました。"
             )
 
-        env_path.write_text(env_content, encoding="utf-8")
-        logger.info(
-            f"✅ 認証に成功しました！ リフレッシュトークンを '{env_path.resolve()}' に保存しました。"
-        )
-        logger.info("✅ GUI用のログインセッションも保存されました。")
+        elif service == "fanbox":
+            logger.info("FANBOX認証を開始します...")
+            sessid = asyncio.run(get_fanbox_sessid(session_path))
+            set_key(str(env_path), "PIXIV2EPUB_PROVIDERS__FANBOX__SESSID", sessid)
+            logger.info(
+                f"✅ FANBOX認証成功！ FANBOXSESSIDを '{env_path.resolve()}' に保存しました。"
+            )
 
-    except typer.Abort:
-        logger.info("操作を中断しました。")
     except AuthenticationError as e:
         logger.error(f"❌ 認証に失敗しました: {e}")
         raise typer.Exit(code=1)
