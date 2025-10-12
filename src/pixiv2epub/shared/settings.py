@@ -65,10 +65,8 @@ class DownloaderSettings(BaseModel):
 class BuilderSettings(BaseModel):
     output_directory: Path = Path("./epubs")
     filename_template: str = "{author_name}/{title}.epub"
-    series_filename_template: str = (
-        "{author_name}/{series_title}/[{author_name}] {series_title} - {title}.epub"
-    )
-    cleanup_after_build: bool = True
+    series_filename_template: str = "{author_name}/{series_title}/{title}.epub"
+    cleanup_after_build: bool = False
 
 
 class PngquantSettings(BaseModel):
@@ -101,7 +99,7 @@ class CompressionSettings(BaseModel):
 
 
 class WorkspaceSettings(BaseModel):
-    root_directory: Path = Path("./.pixiv2epub_work")
+    root_directory: Path = Path("./.workspace")
 
 
 class Settings(BaseSettings):
