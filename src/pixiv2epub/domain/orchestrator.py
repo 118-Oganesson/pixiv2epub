@@ -6,7 +6,7 @@ from typing import Any, List, Type
 from loguru import logger
 
 from ..infrastructure.builders.base import BaseBuilder
-from ..infrastructure.providers.base import BaseProvider
+from ..infrastructure.providers.base import IProvider
 from ..models.workspace import Workspace
 from ..shared.settings import Settings
 
@@ -18,7 +18,7 @@ class DownloadBuildOrchestrator:
 
     def __init__(
         self,
-        provider: BaseProvider,
+        provider: IProvider,
         builder_class: Type[BaseBuilder],
         settings: Settings,
     ):

@@ -8,7 +8,7 @@ from ...models.workspace import Workspace
 from ...shared.settings import Settings
 
 
-class BaseProvider(ABC):
+class IProvider(ABC):
     """データソースプロバイダの抽象基底クラス。"""
 
     def __init__(self, settings: Settings):
@@ -27,15 +27,27 @@ class BaseProvider(ABC):
         """プロバイダの名前を返すクラスメソッド。"""
         pass
 
+
+class INovelProvider(ABC):
+    """単一の小説を取得するためのインターフェース"""
+
     @abstractmethod
     def get_novel(self, novel_id: Any) -> Workspace:
         """単一の小説を取得し、Workspaceを生成して返します。"""
         pass
 
+
+class ISeriesProvider(ABC):
+    """シリーズ作品を取得するためのインターフェ-ス"""
+
     @abstractmethod
     def get_series(self, series_id: Any) -> List[Workspace]:
         """シリーズに含まれるすべての小説を取得し、Workspaceのリストを返します。"""
         pass
+
+
+class IUserNovelsProvider(ABC):
+    """ユーザーの全作品を取得するためのインターフェース"""
 
     @abstractmethod
     def get_user_novels(self, user_id: Any) -> List[Workspace]:

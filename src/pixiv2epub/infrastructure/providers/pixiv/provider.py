@@ -12,14 +12,14 @@ from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import DownloadError
 from ....shared.settings import Settings
-from ..base import BaseProvider
+from ..base import IProvider, INovelProvider, ISeriesProvider, IUserNovelsProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
 from .fingerprint import generate_content_hash
 from .workspace_writer import PixivWorkspaceWriter
 
 
-class PixivProvider(BaseProvider):
+class PixivProvider(IProvider, INovelProvider, ISeriesProvider, IUserNovelsProvider):
     """Pixivから小説データを取得し、ワークスペースを生成するためのプロバイダ。"""
 
     def __init__(self, settings: Settings):
