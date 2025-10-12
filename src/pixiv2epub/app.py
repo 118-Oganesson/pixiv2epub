@@ -4,8 +4,8 @@ from typing import Any, List
 
 from loguru import logger
 
-from .core.coordinator import Coordinator
-from .core.settings import Settings
+from .domain.orchestrator import Coordinator
+from .domain.settings import Settings
 from .models.workspace import Workspace
 from .utils.logging import setup_logging
 

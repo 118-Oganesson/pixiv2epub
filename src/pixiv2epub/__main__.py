@@ -4,7 +4,7 @@
 エントリーポイントです。
 """
 
-from .cli import run_app
+from .entrypoints.cli import run_app
 
 if __name__ == "__main__":
     run_app()

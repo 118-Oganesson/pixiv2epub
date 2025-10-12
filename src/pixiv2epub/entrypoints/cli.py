@@ -8,13 +8,13 @@ import typer
 from loguru import logger
 from playwright.sync_api import sync_playwright
 
-from .app import Application
-from .core.auth import get_pixiv_refresh_token
-from .core.exceptions import AuthenticationError, SettingsError
-from .core.settings import Settings
-from .gui import GuiManager
-from .utils.logging import setup_logging
-from .utils.url_parser import parse_input
+from ..app import Application
+from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
+from ..domain.exceptions import AuthenticationError, SettingsError
+from ..domain.settings import Settings
+from .gui.manager import GuiManager
+from ..utils.logging import setup_logging
+from ..utils.url_parser import parse_input
 
 app = typer.Typer(
     help="Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",

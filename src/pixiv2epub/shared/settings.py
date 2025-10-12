@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/core/settings.py
+# FILE: src/pixiv2epub/shared/settings.py
 
 import tomllib
 from pathlib import Path

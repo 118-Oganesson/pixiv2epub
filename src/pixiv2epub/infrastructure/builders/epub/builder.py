@@ -8,11 +8,11 @@ from loguru import logger
 from ...core.exceptions import BuildError
 from ...core.settings import Settings
 from ...models.workspace import Workspace
-from ...utils.path_manager import generate_sanitized_path
+from ...utils.filesystem_sanitizer import generate_sanitized_path
 from ..base import BaseBuilder
-from .archiver import Archiver
+from .package_assembler import Archiver
 from .asset_manager import AssetManager
-from .generator import EpubGenerator
+from .component_generator import EpubGenerator
 
 
 class EpubBuilder(BaseBuilder):

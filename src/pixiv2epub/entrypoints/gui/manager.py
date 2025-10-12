@@ -4,9 +4,9 @@ from pathlib import Path
 from loguru import logger
 from playwright.sync_api import Page
 
-from .app import Application
-from .core.exceptions import InvalidInputError
-from .utils.url_parser import parse_input
+from ...app import Application
+from ...domain.exceptions import InvalidInputError
+from ...utils.url_parser import parse_input
 
 
 class GuiManager:

@@ -16,7 +16,7 @@ from ..base import BaseProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
 from .fingerprint import generate_content_hash
-from .persister import PixivDataPersister
+from .workspace_writer import PixivDataPersister
 
 
 class PixivProvider(BaseProvider):
