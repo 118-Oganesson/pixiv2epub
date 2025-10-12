@@ -1,18 +1,18 @@
-# FILE: src/pixiv2epub/builders/epub/builder.py
+# FILE: src/pixiv2epub/infrastructure/builders/epub/builder.py
 import os
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from loguru import logger
 
-from ...core.exceptions import BuildError
-from ...core.settings import Settings
-from ...models.workspace import Workspace
-from ...utils.filesystem_sanitizer import generate_sanitized_path
+from ....models.workspace import Workspace
+from ....shared.exceptions import BuildError
+from ....shared.settings import Settings
+from ....utils.filesystem_sanitizer import generate_sanitized_path
 from ..base import BaseBuilder
-from .package_assembler import Archiver
 from .asset_manager import AssetManager
-from .component_generator import EpubGenerator
+from .component_generator import EpubComponentGenerator
+from .package_assembler import EpubPackageAssembler
 
 
 class EpubBuilder(BaseBuilder):
@@ -26,14 +26,19 @@ class EpubBuilder(BaseBuilder):
     ):
         super().__init__(workspace, settings, custom_metadata)
 
-        asset_dir = Path(__file__).parent.parent.parent / "assets"
+        # パッケージルートのassetsディレクトリを基準にする
+        assets_root = Path(__file__).parent.parent.parent.parent / "assets"
+        # 現状は 'pixiv' テーマに固定
+        template_dir = assets_root / "epub" / "pixiv"
 
         self.asset_manager = AssetManager(
             self.workspace,
             self.metadata,
         )
-        self.generator = EpubGenerator(self.metadata, self.workspace, asset_dir)
-        self.archiver = Archiver(self.settings)
+        self.generator = EpubComponentGenerator(
+            self.metadata, self.workspace, template_dir
+        )
+        self.archiver = EpubPackageAssembler(self.settings)
 
     @classmethod
     def get_builder_name(cls) -> str:

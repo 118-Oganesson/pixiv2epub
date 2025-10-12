@@ -1,11 +1,11 @@
-# FILE: src/pixiv2epub/providers/base.py
+# FILE: src/pixiv2epub/infrastructure/providers/base.py
 from abc import ABC, abstractmethod
 from typing import Any, List
 
 from loguru import logger
 
-from ..core.settings import Settings
-from ..models.workspace import Workspace
+from ...models.workspace import Workspace
+from ...shared.settings import Settings
 
 
 class BaseProvider(ABC):

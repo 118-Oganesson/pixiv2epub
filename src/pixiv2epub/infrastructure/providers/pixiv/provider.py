@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/providers/pixiv/provider.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
 import json
 import os
 import shutil
@@ -8,15 +8,15 @@ from typing import Any, List, Set, Tuple
 from loguru import logger
 from pixivpy3 import PixivError
 
-from ...core.exceptions import DownloadError
-from ...core.settings import Settings
-from ...models.pixiv import NovelApiResponse, NovelSeriesApiResponse
-from ...models.workspace import Workspace, WorkspaceManifest
+from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
+from ....models.workspace import Workspace, WorkspaceManifest
+from ....shared.exceptions import DownloadError
+from ....shared.settings import Settings
 from ..base import BaseProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
 from .fingerprint import generate_content_hash
-from .workspace_writer import PixivDataPersister
+from .workspace_writer import PixivWorkspaceWriter
 
 
 class PixivProvider(BaseProvider):
@@ -102,7 +102,7 @@ class PixivProvider(BaseProvider):
                 content_hash=new_hash,
             )
 
-            persister = PixivDataPersister(workspace, cover_path, image_paths)
+            persister = PixivWorkspaceWriter(workspace, cover_path, image_paths)
             persister.persist(novel_data, detail_data_dict, manifest)
 
             logger.info(

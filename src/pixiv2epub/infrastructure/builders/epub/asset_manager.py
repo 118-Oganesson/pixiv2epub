@@ -1,13 +1,13 @@
-# FILE: src/pixiv2epub/builders/epub/asset_manager.py
+# FILE: src/pixiv2epub/infrastructure/builders/epub/asset_manager.py
 import re
 from pathlib import Path
 from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from ...constants import IMAGES_DIR_NAME
-from ...models.local import ImageAsset, NovelMetadata, PageInfo
-from ...models.workspace import Workspace
+from .... import constants as const
+from ....models.local import ImageAsset, NovelMetadata, PageInfo
+from ....models.workspace import Workspace
 
 MEDIA_TYPES = {
     "jpg": "image/jpeg",
@@ -38,7 +38,7 @@ class AssetManager:
         self.workspace = workspace
         self.metadata = metadata
         self.source_dir = workspace.source_path
-        self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
+        self.image_dir = workspace.assets_path / const.IMAGES_DIR_NAME
 
     def gather_assets(
         self,
@@ -66,7 +66,7 @@ class AssetManager:
             image_assets.append(
                 ImageAsset(
                     id=f"img_{i}",
-                    href=f"{IMAGES_DIR_NAME}/{path.name}",
+                    href=f"{const.IMAGES_DIR_NAME}/{path.name}",
                     path=path,
                     media_type=get_media_type_from_filename(path.name),
                     properties="",

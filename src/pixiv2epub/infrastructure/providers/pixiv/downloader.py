@@ -1,11 +1,11 @@
-# FILE: src/pixiv2epub/providers/pixiv/downloader.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/downloader.py
 import re
 from pathlib import Path
 from typing import Dict, Optional
 
 from loguru import logger
 
-from ...models.pixiv import NovelApiResponse
+from ....models.pixiv import NovelApiResponse
 from .client import PixivApiClient
 
 

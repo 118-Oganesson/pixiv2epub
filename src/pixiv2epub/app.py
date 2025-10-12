@@ -4,70 +4,68 @@ from typing import Any, List
 
 from loguru import logger
 
-from .domain.orchestrator import Coordinator
-from .domain.settings import Settings
+from .domain.orchestrator import DownloadBuildOrchestrator
+from .infrastructure.builders.epub.builder import EpubBuilder
+from .infrastructure.providers.pixiv.provider import PixivProvider
 from .models.workspace import Workspace
+from .shared.settings import Settings
 from .utils.logging import setup_logging
 
 
 class Application:
     """
-    設定とコアロジックをカプセル化し、アプリケーションの
+    設定とドメインロジックをカプセル化し、アプリケーションの
     主要な機能を提供する中心的なクラス。
+    依存性の注入(DI)の管理も担当する。
     """
 
     def __init__(self, settings: Settings):
-        """
-        Applicationのインスタンスを初期化します。
-        このインスタンスはアプリケーション実行中、一貫して使用されます。
-
-        Args:
-            settings (Settings): アプリケーション全体の設定オブジェクト。
-        """
         self.settings = settings
         setup_logging(self.settings.log_level)
-        self.coordinator = Coordinator(self.settings)
         logger.debug("Pixiv2Epubアプリケーションが初期化されました。")
+
+    def _create_orchestrator(self) -> DownloadBuildOrchestrator:
+        """
+        具体的なProviderとBuilderをインスタンス化し、Orchestratorを生成する。
+        """
+        # 現状はpixivとepubに固定
+        provider = PixivProvider(self.settings)
+        # Builderはクラスそのものを渡し、Orchestrator内でインスタンス化する
+        builder_class = EpubBuilder
+        return DownloadBuildOrchestrator(provider, builder_class, self.settings)
 
     # --- 通常実行 (Download & Build) ---
 
-    def run_novel(self, novel_id: Any) -> Path:
+    def process_novel_to_epub(self, novel_id: Any) -> Path:
         """単一のPixiv小説をダウンロードし、EPUBを生成します。"""
-        return self.coordinator.download_and_build_novel(
-            provider_name="pixiv",
-            builder_name="epub",
-            novel_id=novel_id,
-        )
+        orchestrator = self._create_orchestrator()
+        return orchestrator.process_novel(novel_id)
 
-    def run_series(self, series_id: Any) -> List[Path]:
+    def process_series_to_epub(self, series_id: Any) -> List[Path]:
         """Pixivのシリーズをダウンロードし、EPUBを生成します。"""
-        return self.coordinator.download_and_build_series(
-            provider_name="pixiv",
-            builder_name="epub",
-            series_id=series_id,
-        )
+        orchestrator = self._create_orchestrator()
+        return orchestrator.process_series(series_id)
 
-    def run_user_novels(self, user_id: Any) -> List[Path]:
+    def process_user_novels_to_epub(self, user_id: Any) -> List[Path]:
         """Pixivユーザーの全作品をダウンロードし、EPUBを生成します。"""
-        return self.coordinator.download_and_build_user_novels(
-            provider_name="pixiv", builder_name="epub", user_id=user_id
-        )
+        orchestrator = self._create_orchestrator()
+        return orchestrator.process_user_novels(user_id)
 
     # --- 分割実行 ---
 
     def download_novel(self, novel_id: Any) -> Workspace:
         """単一の小説をダウンロードのみ行い、ワークスペースを返します。"""
-        provider = self.coordinator._get_provider("pixiv")
+        provider = PixivProvider(self.settings)
         return provider.get_novel(novel_id)
 
     def download_series(self, series_id: Any) -> List[Workspace]:
         """シリーズ作品をダウンロードのみ行い、ワークスペースのリストを返します。"""
-        provider = self.coordinator._get_provider("pixiv")
+        provider = PixivProvider(self.settings)
         return provider.get_series(series_id)
 
     def download_user_novels(self, user_id: Any) -> List[Workspace]:
         """ユーザーの全作品をダウンロードのみ行い、ワークスペースのリストを返します。"""
-        provider = self.coordinator._get_provider("pixiv")
+        provider = PixivProvider(self.settings)
         return provider.get_user_novels(user_id)
 
     def build_from_workspace(self, workspace_path: Path) -> Path:
@@ -81,5 +79,5 @@ class Application:
             id=workspace_path.name, root_path=workspace_path.resolve()
         )
 
-        builder = self.coordinator._get_builder("epub", workspace)
+        builder = EpubBuilder(workspace=workspace, settings=self.settings)
         return builder.build()

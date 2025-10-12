@@ -3,7 +3,7 @@
 import re
 from typing import Tuple
 
-from ..domain.exceptions import InvalidInputError
+from ..shared.exceptions import InvalidInputError
 
 URL_PATTERNS = {
     "novel": re.compile(r"pixiv\.net/novel/show\.php\?id=(\d+)"),

@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/builders/epub/generator.py
+# FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
@@ -8,20 +8,20 @@ from typing import Dict, List, Optional
 from jinja2 import Environment, FileSystemLoader
 from loguru import logger
 
-from ...models.local import (
+from ....models.local import (
     EpubComponents,
     ImageAsset,
     NovelMetadata,
     PageAsset,
     PageInfo,
 )
-from ...models.workspace import Workspace
+from ....models.workspace import Workspace
 
 # 決定論的なブックIDを生成するための固定の名前空間UUID
 PIXIV_NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
 
 
-class EpubGenerator:
+class EpubComponentGenerator:
     """EPUBの構成要素を生成するクラス。"""
 
     def __init__(
@@ -64,7 +64,7 @@ class EpubGenerator:
     def _generate_css(self) -> Optional[PageAsset]:
         """style.css.j2 テンプレートをレンダリングします。"""
         try:
-            content_bytes = self._render_template("epub/pixiv/style.css.j2", {})
+            content_bytes = self._render_template("style.css.j2", {})
             return PageAsset(
                 id="css_style",
                 href="css/style.css",
@@ -99,7 +99,7 @@ class EpubGenerator:
                     "css_path": css_path,
                 }
                 page_content_bytes = self._render_template(
-                    "epub/pixiv/page_wrapper.xhtml.j2", context
+                    "page_wrapper.xhtml.j2", context
                 )
                 pages.append(
                     PageAsset(
@@ -146,7 +146,7 @@ class EpubGenerator:
                 "cover_href": f"../{cover_asset.href}" if cover_asset else None,
             },
         }
-        content_bytes = self._render_template("epub/pixiv/info_page.xhtml.j2", context)
+        content_bytes = self._render_template("info_page.xhtml.j2", context)
         return PageAsset(
             id="info_page",
             href="text/info.xhtml",
@@ -161,7 +161,7 @@ class EpubGenerator:
         if not cover_asset:
             return None
         context = {"cover_image_href": f"../{cover_asset.href}"}
-        content_bytes = self._render_template("epub/pixiv/cover_page.xhtml.j2", context)
+        content_bytes = self._render_template("cover_page.xhtml.j2", context)
         return PageAsset(
             id="cover_page",
             href="text/cover.xhtml",
@@ -188,6 +188,7 @@ class EpubGenerator:
                 "properties": "nav",
             }
         )
+
         if css_asset:
             manifest_items.append(
                 {
@@ -196,6 +197,7 @@ class EpubGenerator:
                     "media_type": "text/css",
                 }
             )
+
         if cover_page:
             manifest_items.append(
                 {
@@ -239,7 +241,7 @@ class EpubGenerator:
             "spine_itemrefs": spine_itemrefs,
             "cover_image_id": cover_asset.id if cover_asset else None,
         }
-        return self._render_template("epub/pixiv/content.opf.j2", context)
+        return self._render_template("content.opf.j2", context)
 
     def _generate_nav(
         self, pages: List[PageAsset], info_page: PageAsset, has_cover: bool
@@ -252,4 +254,4 @@ class EpubGenerator:
             "info_page_title": info_page.title,
             "has_cover": has_cover,
         }
-        return self._render_template("epub/pixiv/nav.xhtml.j2", context)
+        return self._render_template("nav.xhtml.j2", context)

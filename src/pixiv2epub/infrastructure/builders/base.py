@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/builders/base.py
+# FILE: src/pixiv2epub/infrastructure/builders/base.py
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -6,10 +6,10 @@ from typing import Any, Dict, Optional
 
 from loguru import logger
 
-from ..core.exceptions import BuildError
-from ..core.settings import Settings
-from ..models.local import NovelMetadata
-from ..models.workspace import Workspace
+from ...models.local import NovelMetadata
+from ...models.workspace import Workspace
+from ...shared.exceptions import BuildError
+from ...shared.settings import Settings
 
 
 class BaseBuilder(ABC):

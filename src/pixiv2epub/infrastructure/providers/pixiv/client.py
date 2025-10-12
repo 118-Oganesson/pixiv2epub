@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/providers/pixiv/client.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/client.py
 import time
 from pathlib import Path
 from typing import Any, Callable, Dict
@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
 
-from ...core.exceptions import AuthenticationError
+from ....shared.exceptions import AuthenticationError
 
 
 class PixivApiClient:

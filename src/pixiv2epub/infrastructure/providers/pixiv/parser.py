@@ -1,11 +1,11 @@
-# FILE: src/pixiv2epub/providers/pixiv/parser.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/parser.py
 import re
 from pathlib import Path
 from typing import Callable, Dict, List, Tuple, Union
 
 from loguru import logger
 
-from ... import constants as const
+from .... import constants as const
 
 
 class PixivParser:

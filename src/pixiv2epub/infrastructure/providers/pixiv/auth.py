@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/core/auth.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/auth.py
 import re
 import time
 from base64 import urlsafe_b64encode
@@ -12,7 +12,7 @@ import requests
 from loguru import logger
 from playwright.sync_api import Request, TimeoutError, sync_playwright
 
-from .exceptions import AuthenticationError
+from ....shared.exceptions import AuthenticationError
 
 # ----- 定数 -----
 USER_AGENT = "PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)"

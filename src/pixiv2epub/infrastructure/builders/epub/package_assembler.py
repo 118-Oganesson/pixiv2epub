@@ -1,15 +1,16 @@
-# FILE: src/pixiv2epub/builders/epub/archiver.py
+# FILE: src/pixiv2epub/infrastructure/builders/epub/package_assembler.py
+
 import zipfile
 from pathlib import Path
 
 from loguru import logger
 
-from ...core.settings import Settings
-from ...models.local import EpubComponents, ImageAsset
-from ...utils.image_optimizer import ImageCompressor
+from ....models.local import EpubComponents, ImageAsset
+from ....shared.settings import Settings
+from ....utils.image_optimizer import ImageCompressor
 
 
-class Archiver:
+class EpubPackageAssembler:
     """EPUBコンポーネントをZIPファイルに圧縮・梱包するクラス。"""
 
     def __init__(self, settings: Settings):
@@ -55,6 +56,7 @@ class Archiver:
                 zf.writestr(
                     f"OEBPS/{components.css_asset.href}", components.css_asset.content
                 )
+
             if not components.final_images:
                 logger.debug("画像ファイルはありません。")
                 return

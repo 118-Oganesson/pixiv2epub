@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/providers/pixiv/persister.py
+# FILE: src/pixiv2epub/infrastructure/providers/pixiv/workspace_writer.py
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -6,14 +6,14 @@ from typing import Dict, Optional
 
 from loguru import logger
 
-from ... import constants as const
-from ...models.local import Author, NovelMetadata, PageInfo, SeriesInfo
-from ...models.pixiv import NovelApiResponse
-from ...models.workspace import Workspace, WorkspaceManifest
+from .... import constants as const
+from ....models.local import Author, NovelMetadata, PageInfo, SeriesInfo
+from ....models.pixiv import NovelApiResponse
+from ....models.workspace import Workspace, WorkspaceManifest
 from .parser import PixivParser
 
 
-class PixivDataPersister:
+class PixivWorkspaceWriter:
     """APIから取得したデータを解釈し、ワークスペース内に永続化するクラス。"""
 
     def __init__(

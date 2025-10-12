@@ -1,20 +1,20 @@
-# FILE: src/pixiv2epub/cli.py
+# FILE: src/pixiv2epub/entrypoints/cli.py
 import shutil
 from pathlib import Path
 from typing import List, Optional
-from typing_extensions import Annotated
 
 import typer
 from loguru import logger
 from playwright.sync_api import sync_playwright
+from typing_extensions import Annotated
 
 from ..app import Application
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
-from ..domain.exceptions import AuthenticationError, SettingsError
-from ..domain.settings import Settings
-from .gui.manager import GuiManager
+from ..shared.exceptions import AuthenticationError, SettingsError
+from ..shared.settings import Settings
 from ..utils.logging import setup_logging
 from ..utils.url_parser import parse_input
+from .gui.manager import GuiManager
 
 app = typer.Typer(
     help="Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
@@ -133,11 +133,11 @@ def run(
     logger.info("ダウンロードとビルド処理を実行します...")
 
     if target_type == "novel":
-        app_state.app.run_novel(target_id)
+        app_state.app.process_novel_to_epub(target_id)
     elif target_type == "series":
-        app_state.app.run_series(target_id)
+        app_state.app.process_series_to_epub(target_id)
     elif target_type == "user":
-        app_state.app.run_user_novels(target_id)
+        app_state.app.process_user_novels_to_epub(target_id)
 
     logger.info("✅ 処理が完了しました。")
 

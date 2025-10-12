@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Union
 
 from loguru import logger
 
-from ..domain.settings import Settings
 from ..models.local import CompressionResult
+from ..shared.settings import Settings
 
 
 def _human_readable_size(size_bytes: Optional[int]) -> str:
