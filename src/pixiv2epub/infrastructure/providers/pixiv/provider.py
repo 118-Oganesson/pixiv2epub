@@ -47,34 +47,56 @@ class PixivProvider(BaseProvider):
         logger.debug(f"ワークスペースを準備しました: {workspace.root_path}")
         return workspace
 
-    def get_novel(self, novel_id: Any) -> Workspace:
-        """単一の小説を取得し、ローカルに保存します。"""
-        logger.info(f"小説ID: {novel_id} の処理を開始します。")
-        workspace = self._setup_workspace(novel_id)
+    def _is_update_required(
+        self, workspace: Workspace, novel_id: int
+    ) -> Tuple[bool, str, dict]:
+        """
+        APIから最新データを取得し、ローカルのコンテンツハッシュと比較して更新が必要か判断する。
 
-        # 既存のハッシュを読み込む
-        old_hash = None
-        if workspace.manifest_path.exists():
-            try:
-                with open(workspace.manifest_path, "r", encoding="utf-8") as f:
-                    manifest_data = json.load(f)
-                    old_hash = manifest_data.get("content_hash")
-            except (json.JSONDecodeError, IOError) as e:
-                logger.warning(f"既存のマニフェストが読み込めません: {e}")
+        Returns:
+            Tuple[bool, str, dict]: (更新が必要か, 新しいコンテンツハッシュ, APIから取得したデータ)
+        """
+        try:
+            novel_data_dict = self.api_client.webview_novel(novel_id)
+            new_hash = generate_content_hash(novel_data_dict)
+        except Exception as e:
+            logger.warning(f"APIからのデータ取得またはハッシュ生成に失敗: {e}")
+            # エラー時は安全のため更新が必要と判断し、後続の処理で適切にエラーハンドリングさせる
+            raise DownloadError(
+                f"小説ID {novel_id} のAPIデータ取得に失敗しました。"
+            ) from e
 
-        # APIから最新データを取得し、新しいハッシュを計算
-        novel_data_dict = self.api_client.webview_novel(novel_id)
-        new_hash = generate_content_hash(novel_data_dict)
+        if not workspace.manifest_path.exists():
+            return True, new_hash, novel_data_dict
+
+        try:
+            with open(workspace.manifest_path, "r", encoding="utf-8") as f:
+                manifest_data = json.load(f)
+            old_hash = manifest_data.get("content_hash")
+        except (json.JSONDecodeError, IOError):
+            return True, new_hash, novel_data_dict
 
         if old_hash and old_hash == new_hash:
             logger.info(
                 f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
             )
-            return workspace
+            return False, new_hash, novel_data_dict
 
         logger.info("コンテンツの更新を検出しました（または新規ダウンロードです）。")
+        return True, new_hash, novel_data_dict
+
+    def get_novel(self, novel_id: Any) -> Workspace:
+        """単一の小説を取得し、ローカルに保存します。"""
+        logger.info(f"小説ID: {novel_id} の処理を開始します。")
+        workspace = self._setup_workspace(novel_id)
 
         try:
+            update_required, new_hash, novel_data_dict = self._is_update_required(
+                workspace, novel_id
+            )
+            if not update_required:
+                return workspace
+
             # 更新があるので、テキスト関連の古いファイルのみをクリーンにする
             if workspace.source_path.exists():
                 shutil.rmtree(workspace.source_path)
@@ -109,9 +131,12 @@ class PixivProvider(BaseProvider):
                 f"小説「{novel_data.title}」のデータ取得が完了しました -> {workspace.root_path}"
             )
             return workspace
+
         except Exception as e:
             # エラー発生時は作成したワークスペースをクリーンアップ
-            shutil.rmtree(workspace.root_path, ignore_errors=True)
+            # shutil.rmtree(workspace.root_path, ignore_errors=True)
+            if isinstance(e, DownloadError):
+                raise
             if isinstance(e, PixivError):
                 raise DownloadError(f"小説ID {novel_id} のデータ取得に失敗: {e}") from e
             raise DownloadError(

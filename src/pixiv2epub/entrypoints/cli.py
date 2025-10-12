@@ -25,8 +25,32 @@ app = typer.Typer(
 class AppState:
     """サブコマンドに渡すための状態を保持するクラス"""
 
-    def __init__(self, app_instance: Optional[Application] = None):
-        self.app = app_instance
+    def __init__(self):
+        self._settings: Optional[Settings] = None
+        self._app: Optional[Application] = None
+
+    def initialize_settings(self, config_file: Optional[Path], log_level: str):
+        """設定オブジェクトを初期化する。"""
+        if self._settings is None:
+            try:
+                self._settings = Settings(_config_file=config_file, log_level=log_level)
+            except SettingsError as e:
+                logger.error(f"❌ 設定エラー: {e}")
+                logger.info(
+                    "先に 'pixiv2epub auth' コマンドを実行して認証を完了してください。"
+                )
+                raise typer.Exit(code=1)
+
+    @property
+    def app(self) -> Application:
+        """Applicationインスタンスへのアクセス。初回アクセス時に生成される。"""
+        if self._settings is None:
+            # このケースは通常発生しないはず
+            raise RuntimeError("Settingsが初期化されていません。")
+        if self._app is None:
+            logger.debug("Applicationインスタンスを生成します。")
+            self._app = Application(self._settings)
+        return self._app
 
 
 @app.callback(invoke_without_command=True)
@@ -59,20 +83,15 @@ def main_callback(
     Pixiv to EPUB Converter
     """
     log_level = "DEBUG" if verbose else "INFO"
+    # setup_loggingは早い段階で実行
     setup_logging(log_level)
 
-    if ctx.invoked_subcommand == "auth":
-        ctx.obj = AppState()
-        return
+    # AppStateを初期化してコンテキストに格納
+    ctx.obj = AppState()
 
-    try:
-        settings = Settings(_config_file=config, log_level=log_level)
-        app_instance = Application(settings)
-        ctx.obj = AppState(app_instance=app_instance)
-    except SettingsError as e:
-        logger.error(f"❌ 設定エラー: {e}")
-        logger.info("先に 'pixiv2epub auth' コマンドを実行して認証を完了してください。")
-        raise typer.Exit(code=1)
+    # authコマンド以外の場合に限り、設定を初期化する
+    if ctx.invoked_subcommand != "auth":
+        ctx.obj.initialize_settings(config, log_level)
 
 
 @app.command()
@@ -125,19 +144,17 @@ def run(
 ):
     """指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。"""
     app_state: AppState = ctx.obj
-    if not app_state.app:
-        logger.error("Applicationインスタンスが初期化されていません。")
-        raise typer.Exit(code=1)
+    app_instance = app_state.app  # ここで初めてApplicationが初期化される
 
     target_type, target_id = parse_input(input_url_or_id)
     logger.info("ダウンロードとビルド処理を実行します...")
 
     if target_type == "novel":
-        app_state.app.process_novel_to_epub(target_id)
+        app_instance.process_novel_to_epub(target_id)
     elif target_type == "series":
-        app_state.app.process_series_to_epub(target_id)
+        app_instance.process_series_to_epub(target_id)
     elif target_type == "user":
-        app_state.app.process_user_novels_to_epub(target_id)
+        app_instance.process_user_novels_to_epub(target_id)
 
     logger.info("✅ 処理が完了しました。")
 
@@ -154,21 +171,19 @@ def download(
 ):
     """小説データをワークスペースにダウンロードするだけで終了します。"""
     app_state: AppState = ctx.obj
-    if not app_state.app:
-        logger.error("Applicationインスタンスが初期化されていません。")
-        raise typer.Exit(code=1)
+    app_instance = app_state.app
 
     target_type, target_id = parse_input(input_url_or_id)
     logger.info("ダウンロード処理のみを実行します...")
 
     if target_type == "novel":
-        ws = app_state.app.download_novel(target_id)
+        ws = app_instance.download_novel(target_id)
         logger.info(f"✅ ダウンロードが完了しました: {ws.root_path}")
     elif target_type == "series":
-        wss = app_state.app.download_series(target_id)
+        wss = app_instance.download_series(target_id)
         logger.info(f"✅ {len(wss)}件のダウンロードが完了しました。")
     elif target_type == "user":
-        wss = app_state.app.download_user_novels(target_id)
+        wss = app_instance.download_user_novels(target_id)
         logger.info(f"✅ {len(wss)}件のダウンロードが完了しました。")
 
 
@@ -189,9 +204,7 @@ def build(
 ):
     """既存のワークスペースディレクトリからEPUBをビルドします。"""
     app_state: AppState = ctx.obj
-    if not app_state.app:
-        logger.error("Applicationインスタンスが初期化されていません。")
-        raise typer.Exit(code=1)
+    app_instance = app_state.app
 
     workspaces_to_build: List[Path] = []
 
@@ -217,7 +230,7 @@ def build(
     for i, path in enumerate(workspaces_to_build, 1):
         logger.info(f"--- ビルド処理 ({i}/{total}): {path.name} ---")
         try:
-            output_path = app_state.app.build_from_workspace(path)
+            output_path = app_instance.build_from_workspace(path)
             logger.info(f"✅ ビルド成功: {output_path}")
             success_count += 1
         except Exception as e:
@@ -231,9 +244,7 @@ def build(
 def gui(ctx: typer.Context):
     """ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
-    if not app_state.app:
-        logger.error("Applicationインスタンスが初期化されていません。")
-        raise typer.Exit(code=1)
+    app_instance = app_state.app
 
     session_path = Path("./.gui_session")
     logger.info(
@@ -251,7 +262,7 @@ def gui(ctx: typer.Context):
                 headless=False,
             )
             page = context.pages[0] if context.pages else context.new_page()
-            gui_manager = GuiManager(page, app_state.app)
+            gui_manager = GuiManager(page, app_instance)
             gui_manager.setup_bridge()
 
             if page.url == "about:blank":

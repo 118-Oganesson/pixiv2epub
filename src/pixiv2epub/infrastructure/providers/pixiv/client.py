@@ -6,7 +6,7 @@ from typing import Any, Callable, Dict
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
 
-from ....shared.exceptions import AuthenticationError
+from ....shared.exceptions import AuthenticationError, DownloadError
 
 
 class PixivApiClient:
@@ -40,19 +40,29 @@ class PixivApiClient:
             except PixivError as e:
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
 
-                # 4xx系のクライアントエラーは永続的なエラーとみなし、リトライしない
+                # 認証エラー (401, 403など) は AuthenticationError にラップ
+                if status_code in [401, 403]:
+                    raise AuthenticationError(
+                        f"Pixiv API認証エラー (HTTP {status_code})"
+                    ) from e
+
+                # 4xx系のクライアントエラーはリトライせず、DownloadErrorにラップ
                 if status_code and 400 <= status_code < 500:
                     logger.error(
-                        f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code}) が発生しました。処理を中断します。"
+                        f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code})"
                     )
-                    raise e
+                    raise DownloadError(
+                        f"APIクライアントエラー (HTTP {status_code})"
+                    ) from e
 
                 logger.warning(
                     f"API '{func.__name__}' 呼び出し中にエラー (試行 {attempt}/{self.retry}): {e} (HTTP: {status_code or 'N/A'})"
                 )
                 if attempt == self.retry:
                     logger.error(f"API呼び出しが最終的に失敗しました: {func.__name__}")
-                    raise e
+                    raise DownloadError(
+                        f"API呼び出しがリトライ上限に達しました: {func.__name__}"
+                    ) from e
                 time.sleep(self.delay * attempt)
         raise RuntimeError("API呼び出しがリトライ回数を超えました。")
 
