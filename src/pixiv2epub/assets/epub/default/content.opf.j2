@@ -12,6 +12,9 @@
         {% if metadata.identifier.get("novel_id") -%}
         <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ metadata.identifier.get("novel_id") }}</dc:identifier>
         {% endif -%}
+        {% if metadata.identifier.get("post_id") -%}
+        <dc:identifier id="fanbox-id">urn:fanbox:post:{{ metadata.identifier.get("post_id") }}</dc:identifier>
+        {% endif -%}
 
         {% if metadata.series -%}
         <meta property="belongs-to-collection" id="series-title">{{ metadata.series.title }}</meta>

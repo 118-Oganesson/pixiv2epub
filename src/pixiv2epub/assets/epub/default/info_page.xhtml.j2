@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
+
+<head>
+    <title>{{ novel.title }}</title>
+    <meta charset="utf-8" />
+    {% if css_path %}
+    <link rel="stylesheet" type="text/css" href="{{ css_path }}" />{% endif %}
+</head>
+
+<body>
+    <div class="main-content">
+        <h3 epub:type="title">{{ novel.title }}</h3>
+        <p class="author">作者：{{ novel.author }}</p>
+
+        {% if novel.cover_href %}
+        <div class="cover-container">
+            <img src="{{ novel.cover_href }}" alt="カバー画像" />
+        </div>
+        {% endif %}
+
+        {% if novel.description %}
+        <div class="description">{{ novel.description | safe }}</div>
+        {% endif %}
+
+        {% if novel.tags %}
+        <p class="tags">{% for tag in novel.tags %}#{{ tag }}{% if not loop.last %} {% endif %}{% endfor %}</p>
+        {% endif %}
+
+        <p class="date">{{ novel.formatted_date }}</p>
+        <p class="source-link"><a href="{{ novel.source_url }}">{{ novel.source_url }}</a></p>
+    </div>
+</body>
+
+</html>

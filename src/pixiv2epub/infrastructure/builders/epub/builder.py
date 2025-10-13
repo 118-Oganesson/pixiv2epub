@@ -1,8 +1,10 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/builder.py
 import os
+import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from jinja2 import Environment, FileSystemLoader, ChoiceLoader
 from loguru import logger
 
 from ....models.workspace import Workspace
@@ -26,17 +28,50 @@ class EpubBuilder(BaseBuilder):
     ):
         super().__init__(workspace, settings, custom_metadata)
 
-        # パッケージルートのassetsディレクトリを基準にする
+        # manifestからプロバイダー名を取得
+        provider_name = "default"  # フォールバック先
+        try:
+            with open(self.workspace.manifest_path, "r", encoding="utf-8") as f:
+                manifest = json.load(f)
+                provider_name = manifest.get("provider_name", "default")
+                logger.debug(f"Provider '{provider_name}' のテーマを使用します。")
+        except (IOError, json.JSONDecodeError):
+            logger.warning(
+                "manifest.jsonが読み取れないため、デフォルトテーマを使用します。"
+            )
+
+        # テンプレートディレクトリを動的に設定
         assets_root = Path(__file__).parent.parent.parent.parent / "assets"
-        # 現状は 'pixiv' テーマに固定
-        template_dir = assets_root / "epub" / "pixiv"
+        epub_assets_root = assets_root / "epub"
+
+        provider_template_dir = epub_assets_root / provider_name
+        default_template_dir = epub_assets_root / "default"
+
+        # プロバイダー固有のテーマ -> デフォルトテーマの順で探すローダーを設定
+        # 存在しないディレクトリを渡すとエラーになるため、存在チェックを行う
+        loaders = []
+        if provider_template_dir.is_dir() and provider_name != "default":
+            loaders.append(FileSystemLoader(str(provider_template_dir)))
+
+        if default_template_dir.is_dir():
+            loaders.append(FileSystemLoader(str(default_template_dir)))
+        else:
+            raise BuildError(
+                f"デフォルトのテンプレートディレクトリが見つかりません: {default_template_dir}"
+            )
+
+        loader = ChoiceLoader(loaders)
+
+        # EpubComponentGeneratorに渡すEnvironmentを差し替える
+        template_env = Environment(loader=loader, autoescape=True)
 
         self.asset_manager = AssetManager(
             self.workspace,
             self.metadata,
         )
+        # generatorの初期化を修正
         self.generator = EpubComponentGenerator(
-            self.metadata, self.workspace, template_dir
+            self.metadata, self.workspace, template_env
         )
         self.archiver = EpubPackageAssembler(self.settings)
 
@@ -79,7 +114,8 @@ class EpubBuilder(BaseBuilder):
 
         template_vars = {
             "title": self.metadata.title or "untitled",
-            "id": self.metadata.identifier.get("novel_id", "0"),
+            "id": self.metadata.identifier.get("novel_id")
+            or self.metadata.identifier.get("post_id", "0"),
             "author_name": self.metadata.authors.name or "unknown_author",
             "author_id": str(self.metadata.authors.id or "0"),
             "series_title": self.metadata.series.title if self.metadata.series else "",

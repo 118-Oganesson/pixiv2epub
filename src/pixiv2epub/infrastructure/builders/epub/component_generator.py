@@ -2,10 +2,9 @@
 import uuid
 from dataclasses import asdict
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Dict, List, Optional
 
-from jinja2 import Environment, FileSystemLoader
+from jinja2 import Environment
 from loguru import logger
 
 from ....models.local import (
@@ -25,13 +24,11 @@ class EpubComponentGenerator:
     """EPUBの構成要素を生成するクラス。"""
 
     def __init__(
-        self, metadata: NovelMetadata, workspace: Workspace, template_dir: Path
+        self, metadata: NovelMetadata, workspace: Workspace, template_env: Environment
     ):
         self.metadata = metadata
         self.workspace = workspace
-        self.template_env = Environment(
-            loader=FileSystemLoader(str(template_dir)), autoescape=True
-        )
+        self.template_env = template_env
 
     def generate_components(
         self,
@@ -41,7 +38,7 @@ class EpubComponentGenerator:
     ) -> EpubComponents:
         """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
         css_asset = self._generate_css()
-        css_rel_path = css_asset.href if css_asset else None
+        css_rel_path = f"../{css_asset.href}" if css_asset else None
 
         final_pages = self._generate_main_pages(page_infos, css_rel_path)
         info_page = self._generate_info_page(css_rel_path, cover_asset)
@@ -225,14 +222,29 @@ class EpubComponentGenerator:
             )
             spine_itemrefs.append({"idref": page.id, "linear": True})
         for image in images:
+            # `_asdict` is a method of NamedTuple
             manifest_items.append(image._asdict())
 
         metadata_as_dict = asdict(self.metadata)
 
-        novel_id = self.metadata.identifier.get("novel_id")
-        deterministic_uuid = uuid.uuid5(PIXIV_NAMESPACE_UUID, str(novel_id))
+        # provider and content id for uuid generation
+        provider_name = self.workspace.id.split("_")[0]
+        content_id = self.workspace.id.split("_", 1)[1]
+
+        # Use provider-specific identifier if available
+        novel_id = (
+            self.metadata.identifier.get("novel_id")
+            or self.metadata.identifier.get("post_id")
+            or content_id
+        )
+
+        deterministic_uuid = uuid.uuid5(
+            PIXIV_NAMESPACE_UUID, f"{provider_name}-{novel_id}"
+        )
         metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{deterministic_uuid}"
-        modified_time = self.metadata.updated_date or datetime.now(timezone.utc).isoformat()
+        modified_time = (
+            self.metadata.updated_date or datetime.now(timezone.utc).isoformat()
+        )
 
         context = {
             "metadata": metadata_as_dict,
