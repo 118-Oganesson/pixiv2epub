@@ -198,6 +198,9 @@ def download(
     elif target_type == "user":
         wss = app_instance.download_user_novels(target_id)
         logger.info(f"✅ {len(wss)}件のダウンロードが完了しました。")
+    elif target_type == "fanbox_post":
+        ws = app_instance.download_fanbox_post(target_id)
+        logger.info(f"✅ ダウンロードが完了しました: {ws.root_path}")
 
 
 @app.command()

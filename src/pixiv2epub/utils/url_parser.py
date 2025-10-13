@@ -9,6 +9,7 @@ URL_PATTERNS = {
     "novel": re.compile(r"pixiv\.net/novel/show\.php\?id=(\d+)"),
     "series": re.compile(r"pixiv\.net/novel/series/(\d+)"),
     "user": re.compile(r"pixiv\.net/users/(\d+)"),
+    "fanbox_post": re.compile(r"fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)"),
 }
 
 

@@ -4,7 +4,7 @@ FANBOX APIのJSONレスポンスをマッピングするためのPydanticデー�
 'article'形式（多様なブロックを含む）と'text'形式の両方に対応しています。
 """
 
-from typing import Any, Dict, List, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Union, Annotated
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -162,14 +162,18 @@ UrlEmbedMapItem = Union[
 class PostBodyArticle(BaseModel):
     """typeが "article" のときの本文"""
 
-    blocks: List[BodyBlock] = Field(default_factory=list, discriminator="type")
+    blocks: List[Annotated[BodyBlock, Field(discriminator="type")]] = Field(
+        default_factory=list
+    )
     image_map: Dict[str, ImageMapItem] = Field(default_factory=dict, alias="imageMap")
     file_map: Dict[str, FileMapItem] = Field(default_factory=dict, alias="fileMap")
-    url_embed_map: Dict[str, UrlEmbedMapItem] = Field(
+    url_embed_map: Dict[
+        str, Annotated[UrlEmbedMapItem, Field(discriminator="type")]
+    ] = Field(
         default_factory=dict,
         alias="urlEmbedMap",
-        discriminator="type",
     )
+
     embed_map: Dict = Field(default_factory=dict, alias="embedMap")
 
 
@@ -187,6 +191,7 @@ class Post(BaseModel):
     fee_required: int = Field(..., alias="feeRequired")
     published_datetime: str = Field(..., alias="publishedDatetime")
     updated_datetime: str = Field(..., alias="updatedDatetime")
+    excerpt: Optional[str] = ""  # excerptが存在しないケースに対応
     user: FanboxUser
     creator_id: str = Field(..., alias="creatorId")
     cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
