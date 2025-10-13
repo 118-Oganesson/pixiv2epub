@@ -17,8 +17,8 @@ class PixivParser:
             image_paths (Dict[str, Path]): 画像IDとローカルファイルパスのマッピング。
         """
         self.image_relative_paths = {
-            k: f"../assets/{const.IMAGES_DIR_NAME}/{v.name}"
-            for k, v in image_paths.items()
+            image_id: f"../assets/{const.IMAGES_DIR_NAME}/{file_path.name}"
+            for image_id, file_path in image_paths.items()
         }
 
     def _replace_image_tag(self, match: re.Match) -> str:
