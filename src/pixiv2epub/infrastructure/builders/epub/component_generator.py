@@ -118,13 +118,13 @@ class EpubComponentGenerator:
     ) -> PageAsset:
         """作品情報ページを生成します。"""
         # 日付フォーマット処理
-        formatted_date = self.metadata.date
+        formatted_date = self.metadata.published_date
         try:
-            if self.metadata.date:
-                dt_object = datetime.fromisoformat(self.metadata.date)
+            if self.metadata.published_date:
+                dt_object = datetime.fromisoformat(self.metadata.published_date)
                 formatted_date = dt_object.strftime("%Y年%m月%d日 %H:%M")
         except (ValueError, TypeError):
-            pass  # フォーマットできない場合は元の文字列を使用
+            pass
 
         context = {
             "title": self.metadata.title,
@@ -232,11 +232,12 @@ class EpubComponentGenerator:
         novel_id = self.metadata.identifier.get("novel_id")
         deterministic_uuid = uuid.uuid5(PIXIV_NAMESPACE_UUID, str(novel_id))
         metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{deterministic_uuid}"
+        modified_time = self.metadata.updated_date or datetime.now(timezone.utc).isoformat()
 
         context = {
             "metadata": metadata_as_dict,
-            "formatted_date": self.metadata.date,
-            "modified_time": datetime.now(timezone.utc).isoformat(),
+            "formatted_date": self.metadata.published_date,
+            "modified_time": modified_time,
             "manifest_items": manifest_items,
             "spine_itemrefs": spine_itemrefs,
             "cover_image_id": cover_asset.id if cover_asset else None,

@@ -1,29 +1,27 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/client.py
-
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any, Callable, Dict, Optional
+from typing import Dict, Optional, Type
 
 import cloudscraper
 from loguru import logger
 from requests.exceptions import RequestException
 
 from ....shared.exceptions import AuthenticationError, DownloadError
+from ..base_client import BaseApiClient
 
-# APIのベースURL
 BASE_URL = "https://api.fanbox.cc/"
 
 
-class FanboxApiClient:
+class FanboxApiClient(BaseApiClient):
     """FANBOX APIと通信するためのラッパークラス。"""
 
     def __init__(self, sessid: str, api_delay: float = 1.0, api_retries: int = 3):
+        super().__init__(api_delay, api_retries)
         if not sessid or sessid == "your_fanbox_sessid_here":
             raise AuthenticationError("設定に有効なFANBOXのsessidが見つかりません。")
 
-        self.delay = api_delay
-        self.retry = api_retries
         self.session = cloudscraper.create_scraper()
         self.session.headers.update(
             {
@@ -34,41 +32,9 @@ class FanboxApiClient:
         self.session.cookies.set("FANBOXSESSID", sessid, domain=".fanbox.cc")
         logger.debug("Fanbox APIクライアントの認証が完了しました。")
 
-    def _safe_api_call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """API呼び出しをリトライ機構付きで安全に実行します。"""
-        for attempt in range(1, self.retry + 1):
-            try:
-                result = func(*args, **kwargs)
-                time.sleep(self.delay)
-                return result
-            except RequestException as e:
-                status_code = getattr(e.response, "status_code", None)
-
-                # 認証エラー (401, 403など) は AuthenticationError にラップ
-                if status_code in [401, 403]:
-                    raise AuthenticationError(
-                        f"Fanbox API認証エラー (HTTP {status_code})"
-                    ) from e
-
-                # 4xx系のクライアントエラーはリトライせず、DownloadErrorにラップ
-                if status_code and 400 <= status_code < 500:
-                    logger.error(
-                        f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code})"
-                    )
-                    raise DownloadError(
-                        f"APIクライアントエラー (HTTP {status_code})"
-                    ) from e
-
-                logger.warning(
-                    f"API '{func.__name__}' 呼び出し中にエラー (試行 {attempt}/{self.retry + 1}): {e} (HTTP: {status_code or 'N/A'})"
-                )
-                if attempt > self.retry:
-                    logger.error(f"API呼び出しが最終的に失敗しました: {func.__name__}")
-                    raise DownloadError(
-                        f"API呼び出しがリトライ上限に達しました: {func.__name__}"
-                    ) from e
-                time.sleep(self.delay * attempt)
-        raise RuntimeError("API呼び出しがリトライ回数を超えました。")
+    @property
+    def _api_exception_class(self) -> Type[Exception]:
+        return RequestException
 
     def _get_json(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
         """GETリクエストを送信し、JSONレスポンスを返します。"""

@@ -112,7 +112,8 @@ class NovelMetadata:
     series: Optional[SeriesInfo]
     description: str
     identifier: Dict[str, Any]
-    date: str
+    published_date: str
+    updated_date: Optional[str]
     cover_path: Optional[str]
     tags: List[str]
     original_source: str
@@ -127,7 +128,8 @@ class NovelMetadata:
             series=SeriesInfo.from_dict(data.get("series")),
             description=data.get("description"),
             identifier=data.get("identifier", {}),
-            date=data.get("date"),
+            published_date=data.get("published_date"),
+            updated_date=data.get("updated_date"),
             cover_path=data.get("cover_path"),
             tags=data.get("tags", []),
             original_source=data.get("original_source"),
