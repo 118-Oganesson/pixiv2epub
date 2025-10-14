@@ -1,14 +1,17 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/provider.py
 import shutil
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, List
 
 from loguru import logger
+from pydantic import ValidationError
+from requests.exceptions import RequestException
 
 from ....models.fanbox import FanboxPostApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import DownloadError
+from ....shared.exceptions import DataProcessingError, DownloadError
 from ....shared.settings import Settings
+from ..base import ICreatorProvider, IWorkProvider
 from ..base_provider import BaseProvider
 from ...strategies.mappers import FanboxMetadataMapper
 from ...strategies.parsers import FanboxBlockParser
@@ -17,7 +20,7 @@ from .client import FanboxApiClient
 from .downloader import FanboxImageDownloader
 
 
-class FanboxProvider(BaseProvider):
+class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
     """Fanboxから投稿データを取得し、ワークスペースを生成するためのプロバイダ。"""
 
     def __init__(self, settings: Settings):
@@ -45,17 +48,19 @@ class FanboxProvider(BaseProvider):
         except IOError as e:
             logger.error(f"ページの保存に失敗しました: {e}")
 
-    def get_post(self, post_id: Any) -> Workspace:
-        logger.info(f"Fanbox 投稿ID: {post_id} の処理を開始します。")
-        workspace = self._setup_workspace(post_id)
+    def get_work(self, work_id: Any) -> Workspace:
+        logger.info(f"Fanbox 投稿ID: {work_id} の処理を開始します。")
+        workspace = self._setup_workspace(work_id)
 
         try:
-            post_data_dict = self.api_client.post_info(post_id)
+            # --- API呼び出しと画像ダウンロード ---
+            post_data_dict = self.api_client.post_info(work_id)
             post_data_body = post_data_dict.get("body", {})
 
             update_required, new_timestamp = self.update_checker.is_update_required(
                 workspace, post_data_body
             )
+
             if not update_required:
                 logger.info(
                     f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
@@ -67,13 +72,18 @@ class FanboxProvider(BaseProvider):
                 shutil.rmtree(workspace.source_path)
             workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-            post_data = FanboxPostApiResponse(**post_data_dict).body
-
             downloader = FanboxImageDownloader(
                 api_client=self.api_client,
                 image_dir=workspace.assets_path / "images",
                 overwrite=self.settings.downloader.overwrite_existing_images,
             )
+
+        except RequestException as e:
+            raise DownloadError(f"投稿ID {work_id} のデータ取得に失敗: {e}") from e
+
+        try:
+            # --- ダウンロード後のデータ処理 ---
+            post_data = FanboxPostApiResponse(**post_data_dict).body
             cover_path = downloader.download_cover(post_data)
             image_paths = downloader.download_embedded_images(post_data)
 
@@ -88,7 +98,7 @@ class FanboxProvider(BaseProvider):
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
                 source_metadata={
-                    "post_id": post_id,
+                    "post_id": work_id,
                     "creator_id": post_data.creator_id,
                 },
                 content_hash=new_timestamp,
@@ -99,9 +109,75 @@ class FanboxProvider(BaseProvider):
                 f"投稿「{post_data.title}」のデータ取得が完了しました -> {workspace.root_path}"
             )
             return workspace
+
+        except (ValidationError, KeyError, TypeError) as e:
+            raise DataProcessingError(
+                f"投稿ID {work_id} のデータ解析に失敗: {e}"
+            ) from e
+
+    def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
+        """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""
+        logger.info(f"クリエイターID: {creator_id} の全投稿IDの取得を開始します。")
+        post_ids = []
+
+        try:
+            # 1. まず、全ての投稿ページのURLリストを取得する
+            paginate_response = self.api_client.post_paginate_creator(creator_id)
+            page_urls = paginate_response.get("body")
+
+            if not isinstance(page_urls, list):
+                logger.error(
+                    "投稿ページの一覧が取得できませんでした。APIのレスポンスが予期しない形式です。"
+                )
+                return []
+
+            total_pages = len(page_urls)
+            logger.info(f"{total_pages}ページの投稿リストを取得します。")
+
+            # 2. 取得した各ページのURLを辿り、投稿リストを取得する
+            for i, page_url in enumerate(page_urls, 1):
+                logger.debug(f"投稿リストを取得中... ({i}/{total_pages})")
+                try:
+                    list_response = self.api_client.post_list_creator(page_url)
+                    post_items = list_response.get("body", [])
+                    if isinstance(post_items, list):
+                        for item in post_items:
+                            if isinstance(item, dict) and "id" in item:
+                                post_ids.append(item["id"])
+                    else:
+                        logger.warning(
+                            f"ページ {i} の投稿リストの形式が不正です。スキップします。URL: {page_url}"
+                        )
+                except Exception as e:
+                    logger.error(
+                        f"ページ {i} の投稿リスト取得中にエラーが発生しました: {e}",
+                        exc_info=True,
+                    )
+                    # 1ページの失敗で全体を止めない
+                    continue
+
         except Exception as e:
             logger.error(
-                f"投稿ID {post_id} の処理中に予期せぬエラーが発生しました。",
+                f"投稿ページ一覧の取得中に致命的なエラーが発生しました: {e}",
                 exc_info=True,
             )
-            raise DownloadError(f"投稿ID {post_id} の処理に失敗しました: {e}") from e
+            return []  # 失敗時は空のリストを返す
+
+        logger.info(f"合計 {len(post_ids)} 件の投稿IDを取得しました。")
+        return post_ids
+
+    def get_creator_works(self, creator_id: Any) -> List[Workspace]:
+        """クリエイターの全投稿をダウンロードし、Workspaceのリストを返す。"""
+        post_ids = self._fetch_all_creator_post_ids(creator_id)
+        workspaces = []
+        total = len(post_ids)
+        for i, post_id in enumerate(post_ids, 1):
+            logger.info(f"--- 投稿 {i}/{total} (ID: {post_id}) を処理中 ---")
+            try:
+                workspace = self.get_work(post_id)
+                workspaces.append(workspace)
+            except Exception as e:
+                logger.error(
+                    f"投稿ID {post_id} の処理に失敗しました: {e}", exc_info=True
+                )
+        return workspaces

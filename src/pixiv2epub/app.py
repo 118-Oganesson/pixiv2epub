@@ -6,8 +6,8 @@ from loguru import logger
 
 from .domain.orchestrator import DownloadBuildOrchestrator
 from .infrastructure.builders.epub.builder import EpubBuilder
-from .infrastructure.providers.pixiv.provider import PixivProvider
 from .infrastructure.providers.fanbox.provider import FanboxProvider
+from .infrastructure.providers.pixiv.provider import PixivProvider
 from .models.workspace import Workspace
 from .shared.settings import Settings
 from .utils.logging import setup_logging
@@ -39,55 +39,54 @@ class Application:
         builder_class = EpubBuilder
         return DownloadBuildOrchestrator(provider, builder_class, self.settings)
 
-    # --- Pixiv用実行メソッド ---
+    # --- 汎用実行メソッド ---
 
-    def process_novel_to_epub(self, novel_id: Any) -> Path:
-        """単一のPixiv小説をダウンロードし、EPUBを生成します。"""
+    def process_pixiv_work_to_epub(self, work_id: Any) -> Path:
+        """単一のPixiv作品をダウンロードし、EPUBを生成します。"""
         orchestrator = self._create_orchestrator("pixiv")
-        return orchestrator.process_novel(novel_id)
+        return orchestrator.process_work(work_id)
 
-    def process_series_to_epub(self, series_id: Any) -> List[Path]:
+    def process_pixiv_series_to_epub(self, series_id: Any) -> List[Path]:
         """Pixivのシリーズをダウンロードし、EPUBを生成します。"""
         orchestrator = self._create_orchestrator("pixiv")
-        return orchestrator.process_series(series_id)
+        return orchestrator.process_multiple_works(series_id)
 
-    def process_user_novels_to_epub(self, user_id: Any) -> List[Path]:
+    def process_pixiv_user_works_to_epub(self, user_id: Any) -> List[Path]:
         """Pixivユーザーの全作品をダウンロードし、EPUBを生成します。"""
         orchestrator = self._create_orchestrator("pixiv")
-        return orchestrator.process_user_novels(user_id)
+        return orchestrator.process_creator_works(user_id)
 
-    # --- Fanbox用実行メソッド (参考) ---
-    def process_fanbox_post_to_epub(self, post_id: Any) -> Path:
+    def process_fanbox_work_to_epub(self, work_id: Any) -> Path:
         """単一のFanbox投稿をダウンロードし、EPUBを生成します。"""
         orchestrator = self._create_orchestrator("fanbox")
-        # Orchestratorは汎用的なので、FanboxProviderが返すWorkspaceを処理できる
-        # FanboxProviderに `get_novel` という名前のメソッドがあればそのまま使える
-        # ここでは `get_post` を呼び出すようにOrchestratorを拡張するか、Providerのメソッド名を合わせる想定
-        return orchestrator.process_novel(
-            post_id
-        )  # process_novelが内部でprovider.get_novelを呼ぶ
+        return orchestrator.process_work(work_id)
+
+    def process_fanbox_creator_to_epub(self, creator_id: Any) -> List[Path]:
+        """Fanboxクリエイターの全投稿をダウンロードし、EPUBを生成します。"""
+        orchestrator = self._create_orchestrator("fanbox")
+        return orchestrator.process_creator_works(creator_id)
 
     # --- 分割実行 ---
 
-    def download_novel(self, novel_id: Any) -> Workspace:
-        """単一のPixiv小説をダウンロードのみ行い、ワークスペースを返します。"""
+    def download_pixiv_work(self, work_id: Any) -> Workspace:
+        """単一のPixiv作品をダウンロードのみ行い、ワークスペースを返します。"""
         provider = PixivProvider(self.settings)
-        return provider.get_novel(novel_id)
+        return provider.get_work(work_id)
 
-    def download_series(self, series_id: Any) -> List[Workspace]:
+    def download_pixiv_series(self, series_id: Any) -> List[Workspace]:
         """Pixivシリーズ作品をダウンロードのみ行い、ワークスペースのリストを返します。"""
         provider = PixivProvider(self.settings)
-        return provider.get_series(series_id)
+        return provider.get_multiple_works(series_id)
 
-    def download_user_novels(self, user_id: Any) -> List[Workspace]:
+    def download_pixiv_user_works(self, user_id: Any) -> List[Workspace]:
         """Pixivユーザーの全作品をダウンロードのみ行い、ワークスペースのリストを返します。"""
         provider = PixivProvider(self.settings)
-        return provider.get_user_novels(user_id)
+        return provider.get_creator_works(user_id)
 
-    def download_fanbox_post(self, post_id: Any) -> Workspace:
+    def download_fanbox_work(self, work_id: Any) -> Workspace:
         """単一のFanbox投稿をダウンロードのみ行い、ワークスペースを返します。"""
         provider = FanboxProvider(self.settings)
-        return provider.get_post(post_id)
+        return provider.get_work(work_id)
 
     def build_from_workspace(self, workspace_path: Path) -> Path:
         """ローカルのワークスペースからEPUBを生成します。"""

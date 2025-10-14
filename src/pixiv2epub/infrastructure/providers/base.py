@@ -28,28 +28,28 @@ class IProvider(ABC):
         pass
 
 
-class INovelProvider(ABC):
-    """単一の小説を取得するためのインターフェース"""
+class IWorkProvider(ABC):
+    """単一の作品を取得するためのインターフェース"""
 
     @abstractmethod
-    def get_novel(self, novel_id: Any) -> Workspace:
-        """単一の小説を取得し、Workspaceを生成して返します。"""
+    def get_work(self, work_id: Any) -> Workspace:
+        """単一の作品を取得し、Workspaceを生成して返します。"""
         pass
 
 
-class ISeriesProvider(ABC):
-    """シリーズ作品を取得するためのインターフェ-ス"""
+class IMultiWorkProvider(ABC):
+    """作品群を取得するためのインターフェース"""
 
     @abstractmethod
-    def get_series(self, series_id: Any) -> List[Workspace]:
-        """シリーズに含まれるすべての小説を取得し、Workspaceのリストを返します。"""
+    def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
+        """コレクション（シリーズなど）に含まれるすべての作品を取得し、Workspaceのリストを返します。"""
         pass
 
 
-class IUserNovelsProvider(ABC):
-    """ユーザーの全作品を取得するためのインターフェース"""
+class ICreatorProvider(ABC):
+    """クリエイターの全作品を取得するためのインターフェース"""
 
     @abstractmethod
-    def get_user_novels(self, user_id: Any) -> List[Workspace]:
-        """特定のユーザーが投稿したすべての小説を取得し、Workspaceのリストを返します。"""
+    def get_creator_works(self, creator_id: Any) -> List[Workspace]:
+        """特定のクリエイターが投稿したすべての作品を取得し、Workspaceのリストを返します。"""
         pass

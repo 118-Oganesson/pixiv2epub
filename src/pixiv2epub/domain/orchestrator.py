@@ -41,10 +41,10 @@ class DownloadBuildOrchestrator:
             except OSError as e:
                 logger.error(f"ワークスペースのクリーンアップに失敗しました: {e}")
 
-    def process_novel(self, novel_id: Any) -> Path:
-        """単一の小説をダウンロードし、ビルドします。"""
-        logger.info(f"小説ID: {novel_id} の処理を開始します...")
-        workspace = self.provider.get_novel(novel_id)
+    def process_work(self, work_id: Any) -> Path:
+        """単一の作品をダウンロードし、ビルドします。"""
+        logger.info(f"作品ID: {work_id} の処理を開始します...")
+        workspace = self.provider.get_work(work_id)
 
         # Workspaceが確定した後にBuilderをインスタンス化する
         builder = self.builder_class(workspace=workspace, settings=self.settings)
@@ -55,10 +55,10 @@ class DownloadBuildOrchestrator:
         logger.info(f"処理が正常に完了しました: {output_path}")
         return output_path
 
-    def process_series(self, series_id: Any) -> List[Path]:
-        """シリーズ作品をダウンロードし、ビルドします。"""
-        logger.info(f"シリーズID: {series_id} の処理を開始します...")
-        workspaces = self.provider.get_series(series_id)
+    def process_multiple_works(self, collection_id: Any) -> List[Path]:
+        """作品群（シリーズなど）をダウンロードし、ビルドします。"""
+        logger.info(f"コレクションID: {collection_id} の処理を開始します...")
+        workspaces = self.provider.get_multiple_works(collection_id)
 
         output_paths = []
         for workspace in workspaces:
@@ -76,13 +76,15 @@ class DownloadBuildOrchestrator:
                 )
                 self._handle_cleanup(workspace)
 
-        logger.info(f"シリーズ処理完了。{len(output_paths)}/{len(workspaces)}件成功。")
+        logger.info(
+            f"コレクション処理完了。{len(output_paths)}/{len(workspaces)}件成功。"
+        )
         return output_paths
 
-    def process_user_novels(self, user_id: Any) -> List[Path]:
-        """ユーザーの全作品をダウンロードし、ビルドします。"""
-        logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します...")
-        workspaces = self.provider.get_user_novels(user_id)
+    def process_creator_works(self, creator_id: Any) -> List[Path]:
+        """クリエイターの全作品をダウンロードし、ビルドします。"""
+        logger.info(f"クリエイターID: {creator_id} の全作品の処理を開始します...")
+        workspaces = self.provider.get_creator_works(creator_id)
 
         output_paths = []
         total = len(workspaces)
@@ -104,5 +106,5 @@ class DownloadBuildOrchestrator:
                 )
                 self._handle_cleanup(workspace)
 
-        logger.info(f"ユーザー作品処理完了。{len(output_paths)}/{total}件成功。")
+        logger.info(f"クリエイター作品処理完了。{len(output_paths)}/{total}件成功。")
         return output_paths

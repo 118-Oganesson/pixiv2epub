@@ -1,15 +1,15 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/downloader.py
-
 from pathlib import Path
 from typing import Dict, Optional
 
 from loguru import logger
 
 from ....models.fanbox import Post
+from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
 
 
-class FanboxImageDownloader:
+class FanboxImageDownloader(BaseDownloader):
     """
     Fanboxの投稿に関連する画像をダウンロードする責務を持つクラス。
     """
@@ -26,24 +26,7 @@ class FanboxImageDownloader:
             image_dir (Path): 画像の保存先ディレクトリ。
             overwrite (bool): 既存の画像を上書きするかどうか。
         """
-        self.api_client = api_client
-        self.image_dir = image_dir
-        self.overwrite = overwrite
-
-    def _download_single_image(self, url: str, filename: str) -> Optional[Path]:
-        """単一の画像をダウンロードし、ローカルパスを返します。"""
-        target_path = self.image_dir / filename
-        if target_path.exists() and not self.overwrite:
-            logger.debug(f"画像は既に存在するためスキップ: {filename}")
-            return target_path
-
-        try:
-            self.api_client.download(url, path=self.image_dir, name=filename)
-            logger.debug(f"画像をダウンロードしました: {filename}")
-            return target_path
-        except Exception as e:
-            logger.warning(f"画像 ({url}) のダウンロードに失敗しました: {e}")
-            return None
+        super().__init__(api_client, image_dir, overwrite)
 
     def download_cover(self, post_data: Post) -> Optional[Path]:
         """投稿のカバー画像をダウンロードします。"""

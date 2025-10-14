@@ -25,6 +25,12 @@ class DownloadError(Pixiv2EpubError):
     pass
 
 
+class DataProcessingError(Pixiv2EpubError):
+    """ダウンロード後のデータ処理中のエラー（パース、マッピングなど）。"""
+
+    pass
+
+
 class BuildError(Pixiv2EpubError):
     """ビルド処理中のエラー。"""
 

@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/infrastructure/providers/strategies/parsers.py
+# FILE: src/pixiv2epub/infrastructure/strategies/parsers.py
 import re
 from html import escape
 from pathlib import Path
@@ -7,7 +7,12 @@ from typing import Callable, Dict, List, Tuple, Union
 from loguru import logger
 
 from ... import constants as const
-from ...models.fanbox import HeaderBlock, ImageBlock, ParagraphBlock, PostBodyArticle
+from ...models.fanbox import (
+    HeaderBlock,
+    ImageBlock,
+    ParagraphBlock,
+    PostBodyArticle,
+)
 from .interfaces import IContentParser
 
 
@@ -104,7 +109,16 @@ class FanboxBlockParser(IContentParser):
                         f"画像ID '{block.image_id}' のパスが見つかりませんでした。"
                     )
             else:
-                logger.debug(f"未対応のブロックタイプです: {block.type}")
+                block_type = getattr(block, "type", "unknown")
+                logger.warning(
+                    f"未対応のFanboxブロックタイプを検出しました: {block_type}"
+                )
+                # ユーザーにフィードバックするためのプレースホルダーを生成
+                part = (
+                    f'<div style="padding: 1em; margin: 1em 0; border: 1px dashed #ccc; color: #777; font-style: italic;">'
+                    f"サポートされていないコンテンツブロック（タイプ: {escape(str(block_type))}）は表示できません。"
+                    f"</div>"
+                )
 
             if part:  # 空のpartは追加しない
                 final_html_parts.append(part)
@@ -139,5 +153,4 @@ class FanboxBlockParser(IContentParser):
         tags_to_insert.sort(key=lambda x: x[0], reverse=True)
         for index, tag in tags_to_insert:
             text = text[:index] + tag + text[index:]
-
         return text.replace("\n", "<br />")

@@ -1,17 +1,17 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
-import os
 import shutil
 from datetime import datetime, timezone
 from typing import Any, List, Set, Tuple
 
 from loguru import logger
 from pixivpy3 import PixivError
+from pydantic import ValidationError
 
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import DownloadError
+from ....shared.exceptions import DataProcessingError, DownloadError
 from ....shared.settings import Settings
-from ..base import INovelProvider, ISeriesProvider, IUserNovelsProvider
+from ..base import ICreatorProvider, IMultiWorkProvider, IWorkProvider
 from ..base_provider import BaseProvider
 from ...strategies.mappers import PixivMetadataMapper
 from ...strategies.parsers import PixivTagParser
@@ -20,7 +20,7 @@ from .client import PixivApiClient
 from .downloader import ImageDownloader
 
 
-class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsProvider):
+class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorProvider):
     """Pixivから小説データを取得し、ワークスペースを生成するためのプロバイダ。"""
 
     def __init__(self, settings: Settings):
@@ -50,14 +50,14 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
                 logger.error(f"ページ {i + 1} の保存に失敗しました: {e}")
         logger.debug(f"{len(pages)}ページの保存が完了しました。")
 
-    def get_novel(self, novel_id: Any) -> Workspace:
-        logger.info(f"小説ID: {novel_id} の処理を開始します。")
-        workspace = self._setup_workspace(novel_id)
+    def get_work(self, work_id: Any) -> Workspace:
+        logger.info(f"小説ID: {work_id} の処理を開始します。")
+        workspace = self._setup_workspace(work_id)
 
         try:
-            novel_data_dict = self.api_client.webview_novel(novel_id)
+            # --- Network and Download Operations ---
+            novel_data_dict = self.api_client.webview_novel(work_id)
 
-            # 戦略オブジェクトに処理を委譲
             update_required, new_hash = self.update_checker.is_update_required(
                 workspace, novel_data_dict
             )
@@ -72,19 +72,22 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
             )
             if workspace.source_path.exists():
                 shutil.rmtree(workspace.source_path)
-            if workspace.manifest_path.exists():
-                os.remove(workspace.manifest_path)
             workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-            novel_data = NovelApiResponse.from_dict(novel_data_dict)
-            detail_data_dict = self.api_client.novel_detail(novel_id)
-
+            detail_data_dict = self.api_client.novel_detail(work_id)
             downloader = ImageDownloader(
                 self.api_client,
                 workspace.assets_path / "images",
                 self.settings.downloader.overwrite_existing_images,
             )
             cover_path = downloader.download_cover(detail_data_dict.get("novel", {}))
+
+        except (PixivError, DownloadError) as e:
+            raise DownloadError(f"小説ID {work_id} のデータ取得に失敗: {e}") from e
+
+        try:
+            # --- Data Processing and Mapping Operations ---
+            novel_data = NovelApiResponse.from_dict(novel_data_dict)
             image_paths = downloader.download_embedded_images(novel_data)
 
             parsed_text = self.parser.parse(novel_data.text, image_paths)
@@ -105,7 +108,7 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={"novel_id": novel_id},
+                source_metadata={"novel_id": work_id},
                 content_hash=new_hash,
             )
             self._persist_metadata(workspace, metadata, manifest)
@@ -114,16 +117,13 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
                 f"小説「{novel_data.title}」のデータ取得が完了しました -> {workspace.root_path}"
             )
             return workspace
-        except Exception as e:
-            if isinstance(e, DownloadError):
-                raise
-            if isinstance(e, PixivError):
-                raise DownloadError(f"小説ID {novel_id} のデータ取得に失敗: {e}") from e
-            raise DownloadError(
-                f"小説ID {novel_id} の処理中に予期せぬエラーが発生: {e}"
+
+        except (ValidationError, KeyError, TypeError) as e:
+            raise DataProcessingError(
+                f"小説ID {work_id} のデータ解析に失敗: {e}"
             ) from e
 
-    def get_series(self, series_id: Any) -> List[Workspace]:
+    def get_multiple_works(self, series_id: Any) -> List[Workspace]:
         logger.info(f"シリーズID: {series_id} の処理を開始します。")
         try:
             series_data = self.get_series_info(series_id)
@@ -140,7 +140,7 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
             for i, novel_id in enumerate(novel_ids, 1):
                 logger.info(f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---")
                 try:
-                    workspace = self.get_novel(novel_id)
+                    workspace = self.get_work(novel_id)
                     downloaded_workspaces.append(workspace)
                 except Exception as e:
                     logger.error(
@@ -163,7 +163,7 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
                 f"シリーズID {series_id} のメタデータ取得に失敗: {e}"
             ) from e
 
-    def get_user_novels(self, user_id: Any) -> List[Workspace]:
+    def get_creator_works(self, user_id: Any) -> List[Workspace]:
         logger.info(f"ユーザーID: {user_id} の全作品の処理を開始します。")
         try:
             single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
@@ -177,7 +177,7 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
                 for i, s_id in enumerate(series_ids, 1):
                     logger.info(f"\n--- Processing Series {i}/{len(series_ids)} ---")
                     try:
-                        workspaces = self.get_series(s_id)
+                        workspaces = self.get_multiple_works(s_id)
                         downloaded_workspaces.extend(workspaces)
                     except Exception as e:
                         logger.error(
@@ -191,7 +191,7 @@ class PixivProvider(BaseProvider, INovelProvider, ISeriesProvider, IUserNovelsPr
                         f"--- Processing Single Novel {i}/{len(single_ids)} ---"
                     )
                     try:
-                        workspace = self.get_novel(n_id)
+                        workspace = self.get_work(n_id)
                         downloaded_workspaces.append(workspace)
                     except Exception as e:
                         logger.error(

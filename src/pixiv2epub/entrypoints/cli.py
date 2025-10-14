@@ -10,8 +10,8 @@ from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
-from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
+from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
 from ..shared.exceptions import AuthenticationError, SettingsError
 from ..shared.settings import Settings
 from ..utils.logging import setup_logging
@@ -19,7 +19,7 @@ from ..utils.url_parser import parse_input
 from .gui.manager import GuiManager
 
 app = typer.Typer(
-    help="Pixivの小説をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
+    help="PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
     rich_markup_mode="markdown",
 )
 
@@ -82,7 +82,7 @@ def main_callback(
     ] = None,
 ):
     """
-    Pixiv to EPUB Converter
+    Pixiv/Fanbox to EPUB Converter
     """
     log_level = "DEBUG" if verbose else "INFO"
     # setup_loggingは早い段階で実行
@@ -151,23 +151,28 @@ def run(
     input_url_or_id: Annotated[
         str,
         typer.Argument(
-            help="Pixivの小説・シリーズ・ユーザーのURLまたはID。", metavar="INPUT"
+            help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
+            metavar="INPUT",
         ),
     ],
 ):
-    """指定されたURLまたはIDの小説をダウンロードし、EPUBをビルドします。"""
+    """指定されたURLまたはIDの作品をダウンロードし、EPUBをビルドします。"""
     app_state: AppState = ctx.obj
     app_instance = app_state.app  # ここで初めてApplicationが初期化される
 
     target_type, target_id = parse_input(input_url_or_id)
     logger.info("ダウンロードとビルド処理を実行します...")
 
-    if target_type == "novel":
-        app_instance.process_novel_to_epub(target_id)
-    elif target_type == "series":
-        app_instance.process_series_to_epub(target_id)
-    elif target_type == "user":
-        app_instance.process_user_novels_to_epub(target_id)
+    if target_type == "pixiv_novel":
+        app_instance.process_pixiv_work_to_epub(target_id)
+    elif target_type == "pixiv_series":
+        app_instance.process_pixiv_series_to_epub(target_id)
+    elif target_type == "pixiv_user":
+        app_instance.process_pixiv_user_works_to_epub(target_id)
+    elif target_type == "fanbox_post":
+        app_instance.process_fanbox_work_to_epub(target_id)
+    elif target_type == "fanbox_creator":
+        app_instance.process_fanbox_creator_to_epub(target_id)
 
     logger.info("✅ 処理が完了しました。")
 
@@ -178,28 +183,29 @@ def download(
     input_url_or_id: Annotated[
         str,
         typer.Argument(
-            help="Pixivの小説・シリーズ・ユーザーのURLまたはID。", metavar="INPUT"
+            help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
+            metavar="INPUT",
         ),
     ],
 ):
-    """小説データをワークスペースにダウンロードするだけで終了します。"""
+    """作品データをワークスペースにダウンロードするだけで終了します。"""
     app_state: AppState = ctx.obj
     app_instance = app_state.app
 
     target_type, target_id = parse_input(input_url_or_id)
     logger.info("ダウンロード処理のみを実行します...")
 
-    if target_type == "novel":
-        ws = app_instance.download_novel(target_id)
+    if target_type == "pixiv_novel":
+        ws = app_instance.download_pixiv_work(target_id)
         logger.info(f"✅ ダウンロードが完了しました: {ws.root_path}")
-    elif target_type == "series":
-        wss = app_instance.download_series(target_id)
+    elif target_type == "pixiv_series":
+        wss = app_instance.download_pixiv_series(target_id)
         logger.info(f"✅ {len(wss)}件のダウンロードが完了しました。")
-    elif target_type == "user":
-        wss = app_instance.download_user_novels(target_id)
+    elif target_type == "pixiv_user":
+        wss = app_instance.download_pixiv_user_works(target_id)
         logger.info(f"✅ {len(wss)}件のダウンロードが完了しました。")
     elif target_type == "fanbox_post":
-        ws = app_instance.download_fanbox_post(target_id)
+        ws = app_instance.download_fanbox_work(target_id)
         logger.info(f"✅ ダウンロードが完了しました: {ws.root_path}")
 
 
