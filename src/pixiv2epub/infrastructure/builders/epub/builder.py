@@ -33,8 +33,8 @@ class EpubBuilder(BaseBuilder):
         try:
             with open(self.workspace.manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-                provider_name = manifest.get("provider_name", "default")
-                logger.debug(f"Provider '{provider_name}' のテーマを使用します。")
+            provider_name = manifest.get("provider_name", "default")
+            logger.debug(f"Provider '{provider_name}' のテーマを使用します。")
         except (IOError, json.JSONDecodeError):
             logger.warning(
                 "manifest.jsonが読み取れないため、デフォルトテーマを使用します。"
@@ -122,7 +122,12 @@ class EpubBuilder(BaseBuilder):
             "series_id": str(self.metadata.series.id if self.metadata.series else "0"),
         }
 
-        safe_relative_path = generate_sanitized_path(template, template_vars)
+        safe_relative_path = generate_sanitized_path(
+            template,
+            template_vars,
+            max_length=self.settings.builder.max_filename_length,
+        )
+
         output_dir_base = self.settings.builder.output_directory
         final_path = output_dir_base.resolve() / safe_relative_path
         final_path.parent.mkdir(parents=True, exist_ok=True)

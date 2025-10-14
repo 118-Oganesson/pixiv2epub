@@ -104,6 +104,10 @@ class BuilderSettings(BaseModel):
         "{author_name}/{series_title}/{title}.epub",
         description="シリーズ作品のファイル名テンプレート。",
     )
+    max_filename_length: int = Field(
+        50,
+        description="ファイル/ディレクトリ名の最大長。長すぎる場合は自動的に切り詰められます。",
+    )
     cleanup_after_build: bool = Field(
         False,
         description="EPUB生成後に中間ファイル（ワークスペース）を削除するかどうか。",

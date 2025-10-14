@@ -51,6 +51,7 @@ overwrite_existing_images = false
 output_directory = "./epubs"
 filename_template = "{author_name}/{title}.epub"
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
+max_filename_length = 50 
 cleanup_after_build = false
 
 [tool.pixiv2epub.compression]
