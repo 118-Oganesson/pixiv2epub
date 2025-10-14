@@ -9,7 +9,7 @@ from requests.exceptions import RequestException
 
 from ....models.fanbox import FanboxPostApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import DataProcessingError, DownloadError
+from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
 from ..base import ICreatorProvider, IWorkProvider
 from ..base_provider import BaseProvider
@@ -78,8 +78,10 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 overwrite=self.settings.downloader.overwrite_existing_images,
             )
 
-        except RequestException as e:
-            raise DownloadError(f"投稿ID {work_id} のデータ取得に失敗: {e}") from e
+        except (RequestException, ApiError) as e:
+            raise ApiError(
+                f"投稿ID {work_id} のデータ取得に失敗: {e}", self.get_provider_name()
+            ) from e
 
         try:
             # --- ダウンロード後のデータ処理 ---

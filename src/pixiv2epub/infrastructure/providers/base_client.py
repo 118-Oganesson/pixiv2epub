@@ -6,7 +6,7 @@ from typing import Any, Callable, Type
 from loguru import logger
 from requests.exceptions import RequestException
 
-from ...shared.exceptions import AuthenticationError, DownloadError
+from ...shared.exceptions import ApiError, AuthenticationError
 
 
 class BaseApiClient(ABC):
@@ -37,7 +37,7 @@ class BaseApiClient(ABC):
                 # 認証エラー
                 if status_code in [401, 403]:
                     raise AuthenticationError(
-                        f"API認証エラー (HTTP {status_code})"
+                        f"API認証エラー (HTTP {status_code})", provider_name=None
                     ) from e
 
                 # 回復不能なクライアントエラー
@@ -45,8 +45,9 @@ class BaseApiClient(ABC):
                     logger.error(
                         f"API '{func.__name__}' で回復不能なクライアントエラー (HTTP {status_code})"
                     )
-                    raise DownloadError(
-                        f"APIクライアントエラー (HTTP {status_code})"
+                    raise ApiError(
+                        f"APIクライアントエラー (HTTP {status_code})",
+                        provider_name=None,
                     ) from e
 
                 logger.warning(
@@ -57,6 +58,7 @@ class BaseApiClient(ABC):
                 time.sleep(self.delay * attempt)
 
         logger.error(f"API呼び出しが最終的に失敗しました: {func.__name__}")
-        raise DownloadError(
-            f"API呼び出しがリトライ上限に達しました: {func.__name__}"
+        raise ApiError(
+            f"API呼び出しがリトライ上限に達しました: {func.__name__}",
+            provider_name=None,
         ) from last_exception

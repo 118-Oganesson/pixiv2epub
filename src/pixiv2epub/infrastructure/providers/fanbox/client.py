@@ -8,7 +8,7 @@ import cloudscraper
 from loguru import logger
 from requests.exceptions import RequestException
 
-from ....shared.exceptions import AuthenticationError, DownloadError
+from ....shared.exceptions import ApiError, AuthenticationError
 from ..base_client import BaseApiClient
 
 BASE_URL = "https://api.fanbox.cc/"
@@ -20,7 +20,9 @@ class FanboxApiClient(BaseApiClient):
     def __init__(self, sessid: str, api_delay: float = 1.0, api_retries: int = 3):
         super().__init__(api_delay, api_retries)
         if not sessid or sessid == "your_fanbox_sessid_here":
-            raise AuthenticationError("設定に有効なFANBOXのsessidが見つかりません。")
+            raise AuthenticationError(
+                "設定に有効なFANBOXのsessidが見つかりません。", "fanbox"
+            )
 
         self.session = cloudscraper.create_scraper()
         self.session.headers.update(
@@ -90,7 +92,11 @@ class FanboxApiClient(BaseApiClient):
 
         except RequestException as e:
             logger.error(f"ダウンロードに失敗しました: {url}, エラー: {e}")
-            raise DownloadError(f"ファイルのダウンロードに失敗しました: {url}") from e
+            raise ApiError(
+                f"ファイルのダウンロードに失敗しました: {url}", "fanbox"
+            ) from e
         except IOError as e:
             logger.error(f"ファイル書き込みに失敗しました: {save_path}, エラー: {e}")
-            raise DownloadError(f"ファイルの書き込みに失敗しました: {save_path}") from e
+            raise ApiError(
+                f"ファイルの書き込みに失敗しました: {save_path}", "fanbox"
+            ) from e

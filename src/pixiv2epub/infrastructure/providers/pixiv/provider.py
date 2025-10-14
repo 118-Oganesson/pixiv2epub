@@ -9,7 +9,7 @@ from pydantic import ValidationError
 
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import DataProcessingError, DownloadError
+from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
 from ..base import ICreatorProvider, IMultiWorkProvider, IWorkProvider
 from ..base_provider import BaseProvider
@@ -61,6 +61,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             update_required, new_hash = self.update_checker.is_update_required(
                 workspace, novel_data_dict
             )
+
             if not update_required:
                 logger.info(
                     f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
@@ -82,8 +83,10 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             )
             cover_path = downloader.download_cover(detail_data_dict.get("novel", {}))
 
-        except (PixivError, DownloadError) as e:
-            raise DownloadError(f"小説ID {work_id} のデータ取得に失敗: {e}") from e
+        except (PixivError, ApiError) as e:
+            raise ApiError(
+                f"小説ID {work_id} のデータ取得に失敗: {e}", self.get_provider_name()
+            ) from e
 
         try:
             # --- Data Processing and Mapping Operations ---
@@ -150,8 +153,9 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             logger.info(f"シリーズ「{series_data.detail.title}」のDLが完了しました。")
             return downloaded_workspaces
         except Exception as e:
-            raise DownloadError(
-                f"シリーズID {series_id} の処理中にエラーが発生: {e}"
+            raise ApiError(
+                f"シリーズID {series_id} の処理中にエラーが発生: {e}",
+                self.get_provider_name(),
             ) from e
 
     def get_series_info(self, series_id: Any) -> NovelSeriesApiResponse:
@@ -159,8 +163,9 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             series_data_dict = self.api_client.novel_series(series_id)
             return NovelSeriesApiResponse.from_dict(series_data_dict)
         except PixivError as e:
-            raise DownloadError(
-                f"シリーズID {series_id} のメタデータ取得に失敗: {e}"
+            raise ApiError(
+                f"シリーズID {series_id} のメタデータ取得に失敗: {e}",
+                self.get_provider_name(),
             ) from e
 
     def get_creator_works(self, user_id: Any) -> List[Workspace]:
@@ -199,8 +204,9 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                         )
             return downloaded_workspaces
         except Exception as e:
-            raise DownloadError(
-                f"ユーザーID {user_id} の作品処理中にエラーが発生: {e}"
+            raise ApiError(
+                f"ユーザーID {user_id} の作品処理中にエラーが発生: {e}",
+                self.get_provider_name(),
             ) from e
 
     def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], Set[int]]:

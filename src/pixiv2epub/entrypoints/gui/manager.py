@@ -5,8 +5,9 @@ from loguru import logger
 from playwright.sync_api import Page
 
 from ...app import Application
-from ...shared.exceptions import InvalidInputError
+from ...shared.exceptions import Pixiv2EpubError
 from ...utils.url_parser import parse_input
+from ..providers import ProviderFactory
 
 
 class GuiManager:
@@ -15,39 +16,39 @@ class GuiManager:
     def __init__(self, page: Page, app: Application):
         self.page = page
         self.app = app
+        self.provider_factory = ProviderFactory(app.settings)
 
     async def _run_task_from_browser(self, url: str) -> dict:
         """ブラウザから呼び出される非同期ラッパー関数。"""
         logger.info(f"ブラウザからタスク実行リクエスト: {url}")
         try:
-            # 既存のURLパーサーを再利用して、IDとタイプを特定
-            target_type, target_id = parse_input(url)
+            provider_enum, content_type_enum, target_id = parse_input(url)
 
-            message = f"処理を開始します: タイプ={target_type}, ID={target_id}"
-            logger.info(message)
+            logger.info(
+                f"処理を開始します: Provider={provider_enum.name}, "
+                f"Type={content_type_enum.name}, ID={target_id}"
+            )
 
-            # Applicationクラスの同期メソッドを呼び出す
-            if target_type == "novel":
-                result_path = self.app.process_novel_to_epub(target_id)
-                message = f"EPUBの生成に成功しました: {result_path}"
-            elif target_type == "series":
-                result_paths = self.app.process_series_to_epub(target_id)
-                message = (
-                    f"シリーズ内の {len(result_paths)} 件のEPUB生成に成功しました。"
-                )
-            elif target_type == "user":
-                result_paths = self.app.process_user_novels_to_epub(target_id)
-                message = f"ユーザーの {len(result_paths)} 件のEPUB生成に成功しました。"
-            else:
-                # このケースは通常発生しないはず
-                raise InvalidInputError(f"未対応のターゲットタイプです: {target_type}")
+            # Factoryを使用して適切なProviderを生成
+            provider = self.provider_factory.create(provider_enum)
 
-            logger.info(f"タスク完了: {message}")
+            # 統一されたApplicationのメソッドを呼び出す
+            result_paths = self.app.run_download_and_build(
+                provider, content_type_enum, target_id
+            )
+
+            message = f"{len(result_paths)}件のEPUB生成に成功しました。"
+            logger.success(f"タスク完了: {message}")
             return {"status": "success", "message": message}
 
-        except Exception as e:
-            logger.error(f"GUIタスクの処理中にエラーが発生しました: {e}", exc_info=True)
+        except Pixiv2EpubError as e:
+            logger.error(f"GUIタスクの処理中にエラーが発生しました: {e}")
             return {"status": "error", "message": str(e)}
+        except Exception as e:
+            logger.error(
+                f"GUIタスクの処理中に予期せぬエラーが発生しました: {e}", exc_info=True
+            )
+            return {"status": "error", "message": f"予期せぬエラーが発生しました: {e}"}
 
     def setup_bridge(self):
         """Python関数をJavaScriptに公開し、UI注入スクリプトをページに登録します。"""
@@ -55,7 +56,6 @@ class GuiManager:
             # 'pixiv2epub_run'という名前でPythonのメソッドをwindowオブジェクトに公開
             self.page.expose_function("pixiv2epub_run", self._run_task_from_browser)
 
-            # injector.jsの絶対パスを解決
             injector_path = Path(__file__).parent / "assets" / "injector.js"
             if not injector_path.is_file():
                 raise FileNotFoundError(
