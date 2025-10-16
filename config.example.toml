@@ -11,12 +11,24 @@ api_retries = 3
 # 既に存在する画像を上書きしてダウンロードするかどうか。
 overwrite_existing_images = false
 
+# --- サーキットブレーカー設定 ---
+# 外部APIが不安定な場合に、無駄なリクエストを防ぐための設定です。
+[downloader.circuit_breaker]
+# 何回連続でAPI呼び出しが失敗したら、一時的にそのAPIへのアクセスを遮断するか。
+fail_max = 5
+# アクセスを遮断してから、復旧を試みるまでの待機時間（秒）。
+reset_timeout = 60
+
+
 # --- ビルダー設定 ---
 [builder]
 # EPUBファイルの出力先ディレクトリ。
 output_directory = "./epubs"
 # 中間ファイル（ワークスペース）をビルド後に削除するかどうか。
 cleanup_after_build = true
+# ファイル/ディレクトリ名の最大長（文字数）。長すぎる場合は自動的に切り詰められます。
+max_filename_length = 50
+
 
 # --- ファイル名テンプレート ---
 # 利用可能な変数:
@@ -26,10 +38,12 @@ cleanup_after_build = true
 #   {author_id}:    作者のID
 #   {series_title}: シリーズのタイトル (シリーズ作品の場合)
 #   {series_id}:    シリーズのID (シリーズ作品の場合)
+
 # 単発作品のファイル名テンプレート。
 filename_template = "{author_name}/{title}.epub"
 # シリーズ作品のファイル名テンプレート。
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
+
 
 # --- 画像圧縮設定 ---
 [compression]
@@ -58,11 +72,16 @@ quality = 75
 lossless = false
 metadata = "none"
 
+
 # --- ワークスペース設定 ---
 [workspace]
 # 中間ファイルを保存するルートディレクトリ。
 root_directory = "./.workspace"
 
+
 # --- 認証設定 (通常は .env ファイルで管理) ---
-# [auth]
-# refresh_token = "your_token_here_if_not_using_env"
+# [providers]
+# [providers.pixiv]
+# refresh_token = "your_refresh_token_here"
+# [providers.fanbox]
+# sessid = "your_fanbox_sessid_here"
