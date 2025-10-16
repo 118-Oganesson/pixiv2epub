@@ -2,7 +2,7 @@
 import json
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from loguru import logger
 
@@ -17,24 +17,23 @@ class BaseBuilder(ABC):
 
     def __init__(
         self,
-        workspace: Workspace,
         settings: Settings,
-        custom_metadata: Optional[Dict[str, Any]] = None,
     ):
         """
         Args:
-            workspace (Workspace): ビルド対象のデータを含むワークスペース。
             settings (Settings): アプリケーション設定。
-            custom_metadata (Optional[Dict[str, Any]]): detail.jsonの代わりのメタデータ。
         """
-        self.workspace = workspace
         self.settings = settings
 
+    def _load_metadata(
+        self, workspace: Workspace, custom_metadata: Dict[str, Any] | None = None
+    ) -> NovelMetadata:
+        """ビルド対象のメタデータを読み込みます。"""
         if custom_metadata:
             metadata_dict = custom_metadata
             logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
         else:
-            detail_json_path = self.workspace.source_path / "detail.json"
+            detail_json_path = workspace.source_path / "detail.json"
             if not detail_json_path.is_file():
                 raise BuildError(
                     f"ビルドに必要な 'detail.json' が見つかりません: {detail_json_path}"
@@ -42,7 +41,7 @@ class BaseBuilder(ABC):
             with open(detail_json_path, "r", encoding="utf-8") as f:
                 metadata_dict = json.load(f)
 
-        self.metadata = NovelMetadata.model_validate(metadata_dict)
+        return NovelMetadata.model_validate(metadata_dict)
 
     @classmethod
     @abstractmethod
@@ -51,6 +50,6 @@ class BaseBuilder(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def build(self) -> Path:
+    def build(self, workspace: Workspace) -> Path:
         """ビルド処理を実行し、生成されたファイルのパスを返します。"""
         raise NotImplementedError

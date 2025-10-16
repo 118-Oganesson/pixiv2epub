@@ -11,9 +11,7 @@ from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
-from ..infrastructure.builders.epub.builder import (
-    EpubBuilder,
-)
+from ..infrastructure.builders.epub.builder import EpubBuilder
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
 from ..shared.constants import MANIFEST_FILE_NAME
@@ -182,8 +180,9 @@ def _execute_command(
 
     if mode == "run":
         logger.info("ダウンロードとビルド処理を実行します...")
+        builder = EpubBuilder(settings=app_state.settings)
         app_instance.run_download_and_build(
-            provider, content_type_enum, target_id, builder_class=EpubBuilder
+            provider, content_type_enum, target_id, builder=builder
         )
         logger.success("✅ すべての処理が完了しました。")
     elif mode == "download":
@@ -270,12 +269,11 @@ def build(
     success_count = 0
     logger.info("✅ {}件のビルド対象ワークスペースが見つかりました。", total)
 
+    builder = EpubBuilder(settings=app_state.settings)
     for i, path in enumerate(workspaces_to_build, 1):
-        logger.info("--- ビルド処理 ({}/{total}): {} ---", i, path.name, total=total)
+        logger.info("--- ビルド処理 ({}/{}): {} ---", i, path.name, total=total)
         try:
-            output_path = app_instance.build_from_workspace(
-                path, builder_class=EpubBuilder
-            )
+            output_path = app_instance.build_from_workspace(path, builder=builder)
             logger.success("ビルド成功: {}", output_path)
             success_count += 1
         except Exception as e:

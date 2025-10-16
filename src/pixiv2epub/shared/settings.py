@@ -181,11 +181,12 @@ class Settings(BaseSettings):
     """
     アプリケーションの階層的設定管理クラス。
     以下の優先順位で設定を読み込みます:
-    1. 環境変数 (例: PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN=...)
-    2. .env ファイル
-    3. --config で指定されたカスタムTOMLファイル
-    4. pyproject.toml内の [tool.pixiv2epub] セクション
-    5. モデルで定義されたデフォルト値
+    1. Pythonコードからの直接初期化
+    2. --config で指定されたカスタムTOMLファイル
+    3. 環境変数 (例: PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN=...)
+    4. .env ファイル
+    5. pyproject.toml内の [tool.pixiv2epub] セクション
+    6. モデルで定義されたデフォルト値
     """
 
     providers: ProviderSettings = ProviderSettings()
@@ -234,8 +235,8 @@ class Settings(BaseSettings):
 
         return (
             init_settings,
+            TomlConfigSettingsSource(settings_cls, config_file_path),
             env_settings,
             dotenv_settings,
-            TomlConfigSettingsSource(settings_cls, config_file_path),
             get_project_defaults,
         )

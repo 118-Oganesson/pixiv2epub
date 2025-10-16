@@ -1,11 +1,10 @@
 # FILE: src/pixiv2epub/domain/orchestrator.py
 import shutil
 from pathlib import Path
-from typing import Any, List, Optional, Type
+from typing import Any, List, Optional
 
 from loguru import logger
 
-from ..infrastructure.builders.base import BaseBuilder
 from ..infrastructure.providers.base import (
     ICreatorProvider,
     IMultiWorkProvider,
@@ -15,6 +14,7 @@ from ..infrastructure.providers.base import (
 from ..models.workspace import Workspace
 from ..shared.exceptions import BuildError, ContentNotFoundError, ProviderError
 from ..shared.settings import Settings
+from .interfaces import IBuilder
 
 
 class DownloadBuildOrchestrator:
@@ -25,11 +25,11 @@ class DownloadBuildOrchestrator:
     def __init__(
         self,
         provider: IProvider,
-        builder_class: Type[BaseBuilder],
+        builder: IBuilder,
         settings: Settings,
     ):
         self.provider = provider
-        self.builder_class = builder_class
+        self.builder = builder
         self.settings = settings
 
     def _is_cleanup_enabled(self) -> bool:
@@ -41,11 +41,11 @@ class DownloadBuildOrchestrator:
         if self._is_cleanup_enabled():
             try:
                 logger.info(
-                    f"ワークスペースをクリーンアップします: {workspace.root_path}"
+                    "ワークスペースをクリーンアップします: {}", workspace.root_path
                 )
                 shutil.rmtree(workspace.root_path)
             except OSError as e:
-                logger.error(f"ワークスペースのクリーンアップに失敗しました: {e}")
+                logger.error("ワークスペースのクリーンアップに失敗しました: {}", e)
 
     def process_work(self, work_id: Any) -> Optional[Path]:
         """単一の作品をダウンロードし、ビルドします。"""
@@ -66,12 +66,9 @@ class DownloadBuildOrchestrator:
                     logger.info("更新が不要なため、ビルド処理をスキップしました。")
                     return None
 
-                builder = self.builder_class(
-                    workspace=workspace, settings=self.settings
-                )
-                output_path = builder.build()
+                output_path = self.builder.build(workspace)
 
-                logger.success(f"処理が正常に完了しました: {output_path}")
+                logger.success("処理が正常に完了しました: {}", output_path)
                 return output_path
             finally:
                 if workspace:
@@ -87,7 +84,7 @@ class DownloadBuildOrchestrator:
             collection_id=collection_id,
             is_series=is_series,
         ):
-            logger.info(f"{log_prefix}の処理を開始します...")
+            logger.info("{}の処理を開始します...", log_prefix)
 
             workspaces: List[Workspace] = []
             if is_series and isinstance(self.provider, IMultiWorkProvider):
@@ -105,34 +102,36 @@ class DownloadBuildOrchestrator:
 
             output_paths: List[Path] = []
             total = len(workspaces)
-            logger.info(f"合計 {total} 件の作品をビルドします。")
+            logger.info("合計 {} 件の作品をビルドします。", total)
 
             for i, workspace in enumerate(workspaces, 1):
                 try:
                     with logger.contextualize(workspace_id=workspace.id):
-                        logger.info(f"--- Processing {i}/{total} ---")
-                        builder = self.builder_class(
-                            workspace=workspace, settings=self.settings
-                        )
-                        output_path = builder.build()
+                        logger.info("--- Processing {}/{} ---", i, total)
+                        output_path = self.builder.build(workspace)
                         output_paths.append(output_path)
                 except ContentNotFoundError as e:
                     logger.warning(
-                        f"コンテンツが見つからなかったためスキップします: {e}"
+                        "コンテンツが見つからなかったためスキップします: {}", e
                     )
                     continue
                 except (BuildError, ProviderError) as e:
                     logger.error(
-                        f"ワークスペース {workspace.id} の処理に失敗しました: {e}",
+                        "ワークスペース {} の処理に失敗しました: {}",
+                        workspace.id,
+                        e,
                         exc_info=self.settings.log_level == "DEBUG",
                     )
                 except Exception:
                     logger.error(
-                        f"ワークスペース {workspace.id} の処理中に予期せぬエラーが発生しました。",
+                        "ワークスペース {} の処理中に予期せぬエラーが発生しました。",
+                        workspace.id,
                         exc_info=True,
                     )
                 finally:
                     self._handle_cleanup(workspace)
 
-            logger.success(f"{log_prefix}処理完了。{len(output_paths)}/{total}件成功。")
+            logger.success(
+                "{}処理完了。{}/{}件成功。", log_prefix, len(output_paths), total
+            )
             return output_paths

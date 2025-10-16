@@ -6,9 +6,9 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, NamedTuple, Optional
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # --- 画像圧縮関連 ---
@@ -53,8 +53,10 @@ class PageAsset(BaseModel, frozen=True):
     title: str
 
 
-class EpubComponents(NamedTuple):
+class EpubComponents(BaseModel):
     """EPUBファイルを生成するために必要な全ての構成要素をまとめます。"""
+
+    model_config = ConfigDict(frozen=True)
 
     final_pages: List[PageAsset]
     final_images: List[ImageAsset]

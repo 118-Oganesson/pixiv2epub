@@ -1,13 +1,11 @@
 # FILE: src/pixiv2epub/app.py
 from pathlib import Path
-from typing import Any, List, Type  # [修正] Typeを追加
+from typing import Any, List
 
 from loguru import logger
 
+from .domain.interfaces import IBuilder
 from .domain.orchestrator import DownloadBuildOrchestrator
-from .infrastructure.builders.base import (
-    BaseBuilder,
-)
 from .infrastructure.providers.base import (
     ICreatorProvider,
     IMultiWorkProvider,
@@ -36,12 +34,12 @@ class Application:
         provider: IProvider,
         content_type: ContentType,
         target_id: Any,
-        builder_class: Type[BaseBuilder],
+        builder: IBuilder,
     ) -> List[Path]:
         """
         指定されたターゲットをダウンロードし、EPUBをビルドする一連の処理を実行します。
         """
-        orchestrator = DownloadBuildOrchestrator(provider, builder_class, self.settings)
+        orchestrator = DownloadBuildOrchestrator(provider, builder, self.settings)
 
         if content_type == ContentType.WORK:
             result = orchestrator.process_work(target_id)
@@ -83,7 +81,7 @@ class Application:
     def build_from_workspace(
         self,
         workspace_path: Path,
-        builder_class: Type[BaseBuilder],
+        builder: IBuilder,
     ) -> Path:
         """ローカルのワークスペースからEPUBを生成します。"""
         if not (workspace_path / MANIFEST_FILE_NAME).is_file():
@@ -95,5 +93,4 @@ class Application:
             id=workspace_path.name, root_path=workspace_path.resolve()
         )
 
-        builder = builder_class(workspace=workspace, settings=self.settings)
-        return builder.build()
+        return builder.build(workspace)
