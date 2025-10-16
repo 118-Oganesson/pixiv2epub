@@ -1,18 +1,21 @@
 # FILE: src/pixiv2epub/app.py
 from pathlib import Path
-from typing import Any, List
+from typing import Any, List, Type  # [修正] Typeを追加
 
 from loguru import logger
 
 from .domain.orchestrator import DownloadBuildOrchestrator
-from .infrastructure.builders.epub.builder import EpubBuilder
+from .infrastructure.builders.base import (
+    BaseBuilder,
+)
 from .infrastructure.providers.base import (
     ICreatorProvider,
     IMultiWorkProvider,
-    IWorkProvider,
     IProvider,
+    IWorkProvider,
 )
 from .models.workspace import Workspace
+from .shared.constants import MANIFEST_FILE_NAME
 from .shared.enums import ContentType
 from .shared.exceptions import AssetMissingError
 from .shared.settings import Settings
@@ -33,11 +36,12 @@ class Application:
         provider: IProvider,
         content_type: ContentType,
         target_id: Any,
+        builder_class: Type[BaseBuilder],
     ) -> List[Path]:
         """
         指定されたターゲットをダウンロードし、EPUBをビルドする一連の処理を実行します。
         """
-        orchestrator = DownloadBuildOrchestrator(provider, EpubBuilder, self.settings)
+        orchestrator = DownloadBuildOrchestrator(provider, builder_class, self.settings)
 
         if content_type == ContentType.WORK:
             result = orchestrator.process_work(target_id)
@@ -76,16 +80,20 @@ class Application:
                 f"現在のProviderは {content_type.name} のダウンロードをサポートしていません。"
             )
 
-    def build_from_workspace(self, workspace_path: Path) -> Path:
+    def build_from_workspace(
+        self,
+        workspace_path: Path,
+        builder_class: Type[BaseBuilder],
+    ) -> Path:
         """ローカルのワークスペースからEPUBを生成します。"""
-        if not (workspace_path / "manifest.json").is_file():
+        if not (workspace_path / MANIFEST_FILE_NAME).is_file():
             raise AssetMissingError(
-                f"指定されたパスに manifest.json が見つかりません: {workspace_path}"
+                f"指定されたパスに {MANIFEST_FILE_NAME} が見つかりません: {workspace_path}"
             )
 
         workspace = Workspace(
             id=workspace_path.name, root_path=workspace_path.resolve()
         )
 
-        builder = EpubBuilder(workspace=workspace, settings=self.settings)
+        builder = builder_class(workspace=workspace, settings=self.settings)
         return builder.build()

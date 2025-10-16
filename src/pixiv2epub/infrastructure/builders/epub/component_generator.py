@@ -16,7 +16,7 @@ from ....models.local import (
 from ....models.workspace import Workspace
 
 # 決定論的なブックIDを生成するための固定の名前空間UUID
-PIXIV_NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
+NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
 
 
 class EpubComponentGenerator:
@@ -238,7 +238,7 @@ class EpubComponentGenerator:
         )
 
         deterministic_uuid = uuid.uuid5(
-            PIXIV_NAMESPACE_UUID, f"{provider_name}-{novel_id}"
+            NAMESPACE_UUID, f"{provider_name}-{novel_id}"
         )
         metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{deterministic_uuid}"
         modified_time = (

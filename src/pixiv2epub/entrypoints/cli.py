@@ -11,8 +11,12 @@ from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
+from ..infrastructure.builders.epub.builder import (
+    EpubBuilder,
+)
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
+from ..shared.constants import MANIFEST_FILE_NAME
 from ..shared.exceptions import (
     AuthenticationError,
     Pixiv2EpubError,
@@ -45,7 +49,7 @@ class AppState:
                 self._settings = Settings(_config_file=config_file, log_level=log_level)
                 self.provider_factory = ProviderFactory(self._settings)
             except SettingsError as e:
-                logger.error(f"❌ 設定エラー: {e}")
+                logger.error("❌ 設定エラー: {}", e)
                 logger.info(
                     "先に 'pixiv2epub auth <service>' コマンドを実行して認証を完了してください。"
                 )
@@ -134,7 +138,7 @@ def auth(
         env_path.touch()
 
     logger.info(
-        f"GUI用のブラウザセッションを '{session_path.resolve()}' で使用します。"
+        "GUI用のブラウザセッションを '{}' で使用します。", session_path.resolve()
     )
 
     try:
@@ -147,17 +151,19 @@ def auth(
                 refresh_token,
             )
             logger.success(
-                f"Pixiv認証成功！ リフレッシュトークンを '{env_path.resolve()}' に保存しました。"
+                "Pixiv認証成功！ リフレッシュトークンを '{}' に保存しました。",
+                env_path.resolve(),
             )
         elif service == "fanbox":
             logger.info("FANBOX認証を開始します...")
             sessid = asyncio.run(get_fanbox_sessid(session_path))
             set_key(str(env_path), "PIXIV2EPUB_PROVIDERS__FANBOX__SESSID", sessid)
             logger.success(
-                f"FANBOX認証成功！ FANBOXSESSIDを '{env_path.resolve()}' に保存しました。"
+                "FANBOX認証成功！ FANBOXSESSIDを '{}' に保存しました。",
+                env_path.resolve(),
             )
     except AuthenticationError as e:
-        logger.error(f"❌ 認証に失敗しました: {e}")
+        logger.error("❌ 認証に失敗しました: {}", e)
         raise typer.Exit(code=1)
 
 
@@ -176,7 +182,9 @@ def _execute_command(
 
     if mode == "run":
         logger.info("ダウンロードとビルド処理を実行します...")
-        app_instance.run_download_and_build(provider, content_type_enum, target_id)
+        app_instance.run_download_and_build(
+            provider, content_type_enum, target_id, builder_class=EpubBuilder
+        )
         logger.success("✅ すべての処理が完了しました。")
     elif mode == "download":
         logger.info("ダウンロード処理のみを実行します...")
@@ -184,7 +192,7 @@ def _execute_command(
             provider, content_type_enum, target_id
         )
         for ws in workspaces:
-            logger.success(f"ダウンロードが完了しました: {ws.root_path}")
+            logger.success("ダウンロードが完了しました: {}", ws.root_path)
 
 
 @app.command()
@@ -242,38 +250,43 @@ def build(
 
     workspaces_to_build: List[Path] = []
 
-    if (workspace_path / "manifest.json").is_file():
+    if (workspace_path / MANIFEST_FILE_NAME).is_file():
         workspaces_to_build.append(workspace_path)
     else:
         logger.info(
-            f"'{workspace_path}' 内のビルド可能なワークスペースを再帰的に検索します..."
+            "'{}' 内のビルド可能なワークスペースを再帰的に検索します...", workspace_path
         )
-        for manifest_path in workspace_path.rglob("manifest.json"):
+        for manifest_path in workspace_path.rglob(MANIFEST_FILE_NAME):
             workspaces_to_build.append(manifest_path.parent)
 
     if not workspaces_to_build:
         logger.warning(
-            f"指定されたパスにビルド可能なワークスペースが見つかりませんでした: {workspace_path}"
+            "指定されたパスにビルド可能なワークスペースが見つかりませんでした: {}",
+            workspace_path,
         )
         return
 
     total = len(workspaces_to_build)
     success_count = 0
-    logger.info(f"✅ {total}件のビルド対象ワークスペースが見つかりました。")
+    logger.info("✅ {}件のビルド対象ワークスペースが見つかりました。", total)
 
     for i, path in enumerate(workspaces_to_build, 1):
-        logger.info(f"--- ビルド処理 ({i}/{total}): {path.name} ---")
+        logger.info("--- ビルド処理 ({}/{total}): {} ---", i, path.name, total=total)
         try:
-            output_path = app_instance.build_from_workspace(path)
-            logger.success(f"ビルド成功: {output_path}")
+            output_path = app_instance.build_from_workspace(
+                path, builder_class=EpubBuilder
+            )
+            logger.success("ビルド成功: {}", output_path)
             success_count += 1
         except Exception as e:
             logger.error(
-                f"❌ '{path.name}' のビルドに失敗しました: {e}",
+                "❌ '{}' のビルドに失敗しました: {}",
+                path.name,
+                e,
                 exc_info=app_state.settings.log_level == "DEBUG",
             )
     logger.info("---")
-    logger.info(f"✨ 全てのビルド処理が完了しました。成功: {success_count}/{total}")
+    logger.info("✨ 全てのビルド処理が完了しました。成功: {}/{}", success_count, total)
 
 
 @app.command()
@@ -300,7 +313,7 @@ def gui(
 
     session_path = Path("./.gui_session")
     logger.info(
-        f"GUIセッションのデータを '{session_path.resolve()}' に保存/読込します。"
+        "GUIセッションのデータを '{}' に保存/読込します。", session_path.resolve()
     )
     if not session_path.exists():
         logger.info(
@@ -326,7 +339,7 @@ def gui(
             logger.info(
                 "ブラウザセッション待機中... ウィンドウを閉じるとプログラムは終了します。"
             )
-            page.wait_for_close()
+            context.wait_for_event("close", timeout=0)
     finally:
         logger.info("GUIモードを終了します。")
 
@@ -340,13 +353,13 @@ def run_app():
     try:
         app()
     except AuthenticationError as e:
-        logger.error(f"❌ 認証エラー: {e}")
+        logger.error("❌ 認証エラー: {}", e)
         logger.info(
             "'pixiv2epub auth <service>' コマンドを実行して再認証してください。"
         )
         raise typer.Exit(code=1)
     except Pixiv2EpubError as e:
-        logger.error(f"❌ 処理中にエラーが発生しました: {e}")
+        logger.error("❌ 処理中にエラーが発生しました: {}", e)
         raise typer.Exit(code=1)
 
 
