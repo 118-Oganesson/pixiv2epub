@@ -1,4 +1,5 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
+
 import asyncio
 from pathlib import Path
 from typing import List, Literal, Optional
@@ -92,12 +93,21 @@ def main_callback(
             resolve_path=True,
         ),
     ] = None,
+    log_file: Annotated[
+        bool,
+        typer.Option(
+            "--log-file",
+            help="ログをJSON形式でファイルに出力します。",
+            show_default=False,
+        ),
+    ] = False,
 ):
     """
     Pixiv/Fanbox to EPUB Converter
     """
     log_level = "DEBUG" if verbose else "INFO"
-    setup_logging(log_level)
+
+    setup_logging(log_level, serialize_to_file=log_file)
 
     ctx.obj = AppState()
 
@@ -262,7 +272,6 @@ def build(
                 f"❌ '{path.name}' のビルドに失敗しました: {e}",
                 exc_info=app_state.settings.log_level == "DEBUG",
             )
-
     logger.info("---")
     logger.info(f"✨ 全てのビルド処理が完了しました。成功: {success_count}/{total}")
 

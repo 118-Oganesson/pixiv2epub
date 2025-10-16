@@ -49,7 +49,7 @@ class BaseProvider(IProvider):
 
         # detail.jsonの保存
         try:
-            metadata_dict = asdict(metadata)
+            metadata_dict = metadata.model_dump(mode="json")
             detail_path = workspace.source_path / "detail.json"
             with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)

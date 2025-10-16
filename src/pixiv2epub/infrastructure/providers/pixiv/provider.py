@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
 import shutil
 from datetime import datetime, timezone
-from typing import Any, List, Set, Tuple
+from typing import Any, List, Optional, Tuple
 
 from loguru import logger
 from pixivpy3 import PixivError
@@ -11,11 +11,11 @@ from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
-from ..base import ICreatorProvider, IMultiWorkProvider, IWorkProvider
-from ..base_provider import BaseProvider
 from ...strategies.mappers import PixivMetadataMapper
 from ...strategies.parsers import PixivTagParser
 from ...strategies.update_checkers import ContentHashUpdateStrategy
+from ..base import ICreatorProvider, IMultiWorkProvider, IWorkProvider
+from ..base_provider import BaseProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
 
@@ -50,7 +50,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 logger.error(f"ページ {i + 1} の保存に失敗しました: {e}")
         logger.debug(f"{len(pages)}ページの保存が完了しました。")
 
-    def get_work(self, work_id: Any) -> Workspace:
+    def get_work(self, work_id: Any) -> Optional[Workspace]:
         logger.info(f"小説ID: {work_id} の処理を開始します。")
         workspace = self._setup_workspace(work_id)
 
@@ -66,7 +66,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 logger.info(
                     f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
                 )
-                return workspace
+                return None
 
             logger.info(
                 "コンテンツの更新を検出しました（または新規ダウンロードです）。"
@@ -90,7 +90,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
         try:
             # --- Data Processing and Mapping Operations ---
-            novel_data = NovelApiResponse.from_dict(novel_data_dict)
+            novel_data = NovelApiResponse.model_validate(novel_data_dict)
+
             image_paths = downloader.download_embedded_images(novel_data)
 
             parsed_text = self.parser.parse(novel_data.text, image_paths)
@@ -144,13 +145,17 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 logger.info(f"--- Processing Novel {i}/{total} (ID: {novel_id}) ---")
                 try:
                     workspace = self.get_work(novel_id)
-                    downloaded_workspaces.append(workspace)
+                    if workspace:
+                        downloaded_workspaces.append(workspace)
+
                 except Exception as e:
                     logger.error(
                         f"小説ID {novel_id} のダウンロードに失敗: {e}", exc_info=True
                     )
 
-            logger.info(f"シリーズ「{series_data.detail.title}」のDLが完了しました。")
+            logger.info(
+                f"シリーズ「{series_data.novel_series_detail.title}」のDLが完了しました。"
+            )
             return downloaded_workspaces
         except Exception as e:
             raise ApiError(
@@ -161,7 +166,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
     def get_series_info(self, series_id: Any) -> NovelSeriesApiResponse:
         try:
             series_data_dict = self.api_client.novel_series(series_id)
-            return NovelSeriesApiResponse.from_dict(series_data_dict)
+            return NovelSeriesApiResponse.model_validate(series_data_dict)
         except PixivError as e:
             raise ApiError(
                 f"シリーズID {series_id} のメタデータ取得に失敗: {e}",
@@ -197,7 +202,10 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     )
                     try:
                         workspace = self.get_work(n_id)
-                        downloaded_workspaces.append(workspace)
+
+                        if workspace:
+                            downloaded_workspaces.append(workspace)
+
                     except Exception as e:
                         logger.error(
                             f"小説ID {n_id} の処理中にエラー: {e}", exc_info=True
@@ -209,7 +217,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 self.get_provider_name(),
             ) from e
 
-    def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], Set[int]]:
+    def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], List[int]]:
         single_ids, series_ids = [], set()
         next_url = None
         while True:
@@ -221,4 +229,4 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     single_ids.append(novel["id"])
             if not (next_url := res.get("next_url")):
                 break
-        return single_ids, series_ids
+        return single_ids, list(series_ids)

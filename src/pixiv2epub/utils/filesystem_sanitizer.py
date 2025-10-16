@@ -4,13 +4,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict
 
-from .. import constants as const
+# 定数をこのファイル内に配置
+INVALID_PATH_CHARS_REGEX = r'[\\/:*?"<>|]'
 
 
 def sanitize_path_part(part: str, max_length: int) -> str:
     """ファイル/ディレクトリ名として安全でない文字を'_'に置換し、長さを制限します。"""
     # 無効な文字を置換
-    sanitized_part = re.sub(const.INVALID_PATH_CHARS_REGEX, "_", part).strip()
+    sanitized_part = re.sub(INVALID_PATH_CHARS_REGEX, "_", part).strip()
 
     # 文字数がmax_lengthを超える場合は切り詰める
     if len(sanitized_part) > max_length:

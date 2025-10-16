@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
 import uuid
-from dataclasses import asdict
 from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
@@ -225,7 +224,7 @@ class EpubComponentGenerator:
             # `_asdict` is a method of NamedTuple
             manifest_items.append(image._asdict())
 
-        metadata_as_dict = asdict(self.metadata)
+        metadata_as_dict = self.metadata.model_dump(mode="json")
 
         # provider and content id for uuid generation
         provider_name = self.workspace.id.split("_")[0]

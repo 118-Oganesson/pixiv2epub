@@ -5,11 +5,19 @@ FANBOX APIのJSONレスポンスをマッピングするためのPydanticデー�
 """
 
 from typing import Any, Dict, List, Literal, Optional, Union, Annotated
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
-from pydantic import BaseModel, Field, HttpUrl
+
+class FanboxBaseModel(BaseModel):
+    """すべてのFanboxモデルで共通の設定を持つ基底クラス。"""
+
+    model_config = ConfigDict(
+        populate_by_name=True,
+        extra="ignore",
+    )
 
 
-class FanboxUser(BaseModel):
+class FanboxUser(FanboxBaseModel):
     """投稿者のユーザー情報"""
 
     user_id: str = Field(..., alias="userId")
@@ -20,7 +28,7 @@ class FanboxUser(BaseModel):
 # --- "article" 形式の本文ブロック定義 ---
 
 
-class Style(BaseModel):
+class Style(FanboxBaseModel):
     """'p' ブロック内の太字などのスタイル情報"""
 
     type: str
@@ -28,7 +36,7 @@ class Style(BaseModel):
     length: int
 
 
-class Link(BaseModel):
+class Link(FanboxBaseModel):
     """'p' ブロック内のハイパーリンク情報"""
 
     url: HttpUrl
@@ -36,7 +44,7 @@ class Link(BaseModel):
     length: int
 
 
-class ParagraphBlock(BaseModel):
+class ParagraphBlock(FanboxBaseModel):
     """段落ブロック"""
 
     type: Literal["p"]
@@ -45,45 +53,41 @@ class ParagraphBlock(BaseModel):
     links: Optional[List[Link]] = None
 
 
-class HeaderBlock(BaseModel):
+class HeaderBlock(FanboxBaseModel):
     """見出しブロック"""
 
     type: Literal["header"]
     text: str
 
 
-class ImageBlock(BaseModel):
+class ImageBlock(FanboxBaseModel):
     """画像ブロック"""
 
     type: Literal["image"]
     image_id: str = Field(..., alias="imageId")
 
 
-class FileBlock(BaseModel):
+class FileBlock(FanboxBaseModel):
     """ファイル添付ブロック"""
 
     type: Literal["file"]
     file_id: str = Field(..., alias="fileId")
 
 
-class UrlEmbedBlock(BaseModel):
+class UrlEmbedBlock(FanboxBaseModel):
     """URL埋め込みブロック"""
 
     type: Literal["url_embed"]
     url_embed_id: str = Field(..., alias="urlEmbedId")
 
 
-# 本文を構成するブロックの型をUnionで定義
-BodyBlock = Union[
-    ParagraphBlock,
-    HeaderBlock,
-    ImageBlock,
-    FileBlock,
-    UrlEmbedBlock,
+BodyBlock = Annotated[
+    Union[ParagraphBlock, HeaderBlock, ImageBlock, FileBlock, UrlEmbedBlock],
+    Field(discriminator="type"),
 ]
 
 
-class ImageMapItem(BaseModel):
+class ImageMapItem(FanboxBaseModel):
     """imageMap内の画像アイテム"""
 
     id: str
@@ -94,7 +98,7 @@ class ImageMapItem(BaseModel):
     extension: str
 
 
-class FileMapItem(BaseModel):
+class FileMapItem(FanboxBaseModel):
     """fileMap内のファイルアイテム"""
 
     id: str
@@ -107,7 +111,7 @@ class FileMapItem(BaseModel):
 # --- urlEmbedMap内の多様な埋め込みアイテム定義 ---
 
 
-class UrlEmbedPostInfo(BaseModel):
+class UrlEmbedPostInfo(FanboxBaseModel):
     """埋め込み投稿の簡易情報"""
 
     id: str
@@ -117,7 +121,7 @@ class UrlEmbedPostInfo(BaseModel):
     excerpt: str
 
 
-class UrlEmbedFanboxPost(BaseModel):
+class UrlEmbedFanboxPost(FanboxBaseModel):
     """埋め込みアイテム: FANBOX投稿"""
 
     id: str
@@ -125,7 +129,7 @@ class UrlEmbedFanboxPost(BaseModel):
     post_info: UrlEmbedPostInfo = Field(..., alias="postInfo")
 
 
-class CreatorProfile(BaseModel):
+class CreatorProfile(FanboxBaseModel):
     """埋め込みクリエイターのプロフィール情報"""
 
     user: FanboxUser
@@ -135,7 +139,7 @@ class CreatorProfile(BaseModel):
     cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
 
 
-class UrlEmbedFanboxCreator(BaseModel):
+class UrlEmbedFanboxCreator(FanboxBaseModel):
     """埋め込みアイテム: FANBOXクリエイター"""
 
     id: str
@@ -143,7 +147,7 @@ class UrlEmbedFanboxCreator(BaseModel):
     profile: CreatorProfile
 
 
-class UrlEmbedHtmlCard(BaseModel):
+class UrlEmbedHtmlCard(FanboxBaseModel):
     """埋め込みアイテム: 外部サイト (DLsiteなど)"""
 
     id: str
@@ -151,39 +155,31 @@ class UrlEmbedHtmlCard(BaseModel):
     html: str
 
 
-# urlEmbedMapのアイテム型をUnionで定義
-UrlEmbedMapItem = Union[
-    UrlEmbedFanboxPost,
-    UrlEmbedFanboxCreator,
-    UrlEmbedHtmlCard,
+UrlEmbedMapItem = Annotated[
+    Union[UrlEmbedFanboxPost, UrlEmbedFanboxCreator, UrlEmbedHtmlCard],
+    Field(discriminator="type"),
 ]
 
 
-class PostBodyArticle(BaseModel):
+class PostBodyArticle(FanboxBaseModel):
     """typeが "article" のときの本文"""
 
-    blocks: List[Annotated[BodyBlock, Field(discriminator="type")]] = Field(
-        default_factory=list
-    )
+    blocks: List[BodyBlock] = Field(default_factory=list)
     image_map: Dict[str, ImageMapItem] = Field(default_factory=dict, alias="imageMap")
     file_map: Dict[str, FileMapItem] = Field(default_factory=dict, alias="fileMap")
-    url_embed_map: Dict[
-        str, Annotated[UrlEmbedMapItem, Field(discriminator="type")]
-    ] = Field(
-        default_factory=dict,
-        alias="urlEmbedMap",
+    url_embed_map: Dict[str, UrlEmbedMapItem] = Field(
+        default_factory=dict, alias="urlEmbedMap"
     )
-
     embed_map: Dict = Field(default_factory=dict, alias="embedMap")
 
 
-class PostBodyText(BaseModel):
+class PostBodyText(FanboxBaseModel):
     """typeが "text" のときの本文"""
 
     text: str
 
 
-class Post(BaseModel):
+class Post(FanboxBaseModel):
     """単一の投稿を表すメインモデル"""
 
     id: str
@@ -191,7 +187,7 @@ class Post(BaseModel):
     fee_required: int = Field(..., alias="feeRequired")
     published_datetime: str = Field(..., alias="publishedDatetime")
     updated_datetime: str = Field(..., alias="updatedDatetime")
-    excerpt: Optional[str] = ""  # excerptが存在しないケースに対応
+    excerpt: str = ""
     user: FanboxUser
     creator_id: str = Field(..., alias="creatorId")
     cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
@@ -199,11 +195,8 @@ class Post(BaseModel):
     body: Union[PostBodyArticle, PostBodyText]
     type: str
 
-    class Config:
-        populate_by_name = True
 
-
-class FanboxPostApiResponse(BaseModel):
+class FanboxPostApiResponse(FanboxBaseModel):
     """APIレスポンス全体をラップするモデル"""
 
     body: Post

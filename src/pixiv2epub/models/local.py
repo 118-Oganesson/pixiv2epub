@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, NamedTuple, Optional
 
+from pydantic import BaseModel
+
 
 # --- 画像圧縮関連 ---
 @dataclass
@@ -64,47 +66,29 @@ class EpubComponents(NamedTuple):
 
 
 # --- ローカルメタデータ (detail.json) 関連 ---
-@dataclass
-class Author:
+class Author(BaseModel):
     """小説の作者情報を格納します。"""
 
     name: str
     id: Optional[int] = None
 
 
-@dataclass
-class PageInfo:
+class PageInfo(BaseModel):
     """`detail.json`内の各ページ（章）の情報を格納します。"""
 
     title: str
     body: str
 
-    @classmethod
-    def from_dict(cls, data: dict) -> "PageInfo":
-        return cls(title=data.get("title"), body=data.get("body"))
 
-
-@dataclass
-class SeriesInfo:
+class SeriesInfo(BaseModel):
     """小説のシリーズ情報を格納します。"""
 
     id: int
     title: str
     order: Optional[int] = None
 
-    @classmethod
-    def from_dict(cls, data: Optional[dict]) -> Optional["SeriesInfo"]:
-        if data and "id" in data and "title" in data:
-            return cls(
-                id=data["id"],
-                title=data["title"],
-                order=data.get("order"),
-            )
-        return None
 
-
-@dataclass
-class NovelMetadata:
+class NovelMetadata(BaseModel):
     """`detail.json`に記載された小説のメタデータ全体を格納します。"""
 
     title: str
@@ -119,20 +103,3 @@ class NovelMetadata:
     original_source: str
     pages: List[PageInfo]
     text_length: Optional[int]
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "NovelMetadata":
-        return cls(
-            title=data.get("title"),
-            authors=Author(**data.get("authors", {})),
-            series=SeriesInfo.from_dict(data.get("series")),
-            description=data.get("description"),
-            identifier=data.get("identifier", {}),
-            published_date=data.get("published_date"),
-            updated_date=data.get("updated_date"),
-            cover_path=data.get("cover_path"),
-            tags=data.get("tags", []),
-            original_source=data.get("original_source"),
-            pages=[PageInfo.from_dict(p) for p in data.get("pages", [])],
-            text_length=data.get("text_length"),
-        )

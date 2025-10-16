@@ -10,13 +10,12 @@ from .infrastructure.providers.base import (
     ICreatorProvider,
     IMultiWorkProvider,
     IWorkProvider,
-    IProvider
+    IProvider,
 )
 from .models.workspace import Workspace
 from .shared.enums import ContentType
 from .shared.exceptions import AssetMissingError
 from .shared.settings import Settings
-from .utils.logging import setup_logging
 
 
 class Application:
@@ -27,7 +26,6 @@ class Application:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        setup_logging(self.settings.log_level)
         logger.debug("Pixiv2Epubアプリケーションが初期化されました。")
 
     def run_download_and_build(
@@ -42,7 +40,8 @@ class Application:
         orchestrator = DownloadBuildOrchestrator(provider, EpubBuilder, self.settings)
 
         if content_type == ContentType.WORK:
-            return [orchestrator.process_work(target_id)]
+            result = orchestrator.process_work(target_id)
+            return [result] if result else []
         elif content_type == ContentType.SERIES:
             return orchestrator.process_collection(target_id, is_series=True)
         elif content_type == ContentType.CREATOR:
@@ -62,7 +61,8 @@ class Application:
         指定されたターゲットのダウンロードのみを実行し、ワークスペースを返します。
         """
         if content_type == ContentType.WORK and isinstance(provider, IWorkProvider):
-            return [provider.get_work(target_id)]
+            ws = provider.get_work(target_id)
+            return [ws] if ws else []
         elif content_type == ContentType.SERIES and isinstance(
             provider, IMultiWorkProvider
         ):

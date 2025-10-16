@@ -21,3 +21,6 @@ wheels/
 # novel files
 .workspace
 epubs
+
+# log files
+logs

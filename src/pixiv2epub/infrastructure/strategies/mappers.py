@@ -1,13 +1,15 @@
-# FILE: src/pixiv2epub/infrastructure/providers/strategies/mappers.py
+# FILE: src/pixiv2epub/infrastructure/strategies/mappers.py
+
 from html import escape
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from ... import constants as const
 from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.local import Author, NovelMetadata, PageInfo, SeriesInfo
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
+from ...shared.constants import IMAGES_DIR_NAME
+from ..providers.pixiv.constants import PIXIV_NOVEL_URL
 from .interfaces import IMetadataMapper
 from .parsers import PixivTagParser
 
@@ -40,11 +42,11 @@ class PixivMetadataMapper(IMetadataMapper):
         ]
 
         series_order: Optional[int] = None
-        if novel_data.seriesId and novel_data.seriesNavigation:
-            nav = novel_data.seriesNavigation
-            if nav.prevNovel and nav.prevNovel.contentOrder:
-                series_order = int(nav.prevNovel.contentOrder) + 1
-            elif nav.nextNovel:
+        if novel_data.series_id and novel_data.series_navigation:
+            nav = novel_data.series_navigation
+            if nav.prev_novel and nav.prev_novel.content_order:
+                series_order = int(nav.prev_novel.content_order) + 1
+            elif nav.next_novel:
                 series_order = 1
             else:
                 series_order = 1
@@ -52,10 +54,12 @@ class PixivMetadataMapper(IMetadataMapper):
         series_info_dict = novel.get("series")
         if series_info_dict and series_order:
             series_info_dict["order"] = series_order
-        series_info = SeriesInfo.from_dict(series_info_dict)
+        series_info = (
+            SeriesInfo.model_validate(series_info_dict) if series_info_dict else None
+        )
 
         relative_cover_path = (
-            f"../{workspace.assets_path.name}/{const.IMAGES_DIR_NAME}/{cover_path.name}"
+            f"../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{cover_path.name}"
             if cover_path
             else None
         )
@@ -70,7 +74,7 @@ class PixivMetadataMapper(IMetadataMapper):
             updated_date=None,
             cover_path=relative_cover_path,
             tags=[t.get("name") for t in novel.get("tags", [])],
-            original_source=const.PIXIV_NOVEL_URL.format(novel_id=novel.get("id")),
+            original_source=PIXIV_NOVEL_URL.format(novel_id=novel.get("id")),
             pages=pages_info,
             text_length=novel.get("text_length"),
         )
@@ -90,7 +94,7 @@ class FanboxMetadataMapper(IMetadataMapper):
         author_info = Author(name=post_data.user.name, id=int(post_data.user.user_id))
         pages_info = [PageInfo(title="本文", body="./page-1.xhtml")]
         relative_cover_path = (
-            f"../{workspace.assets_path.name}/{const.IMAGES_DIR_NAME}/{cover_path.name}"
+            f"../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{cover_path.name}"
             if cover_path
             else None
         )

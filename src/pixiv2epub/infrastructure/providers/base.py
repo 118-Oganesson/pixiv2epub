@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base.py
-from abc import ABC, abstractmethod
-from typing import Any, List
+from typing import Any, List, Protocol, runtime_checkable
 
 from loguru import logger
 
@@ -8,8 +7,11 @@ from ...models.workspace import Workspace
 from ...shared.settings import Settings
 
 
-class IProvider(ABC):
-    """データソースプロバイダの抽象基底クラス。"""
+@runtime_checkable
+class IProvider(Protocol):
+    """データソースプロバイダの振る舞いを定義するプロトコル。"""
+
+    settings: Settings
 
     def __init__(self, settings: Settings):
         """
@@ -22,34 +24,33 @@ class IProvider(ABC):
         logger.info(f"{self.__class__.__name__} を初期化しました。")
 
     @classmethod
-    @abstractmethod
     def get_provider_name(cls) -> str:
         """プロバイダの名前を返すクラスメソッド。"""
-        pass
+        ...
 
 
-class IWorkProvider(ABC):
+@runtime_checkable
+class IWorkProvider(Protocol):
     """単一の作品を取得するためのインターフェース"""
 
-    @abstractmethod
     def get_work(self, work_id: Any) -> Workspace:
         """単一の作品を取得し、Workspaceを生成して返します。"""
-        pass
+        ...
 
 
-class IMultiWorkProvider(ABC):
+@runtime_checkable
+class IMultiWorkProvider(Protocol):
     """作品群を取得するためのインターフェース"""
 
-    @abstractmethod
     def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
         """コレクション（シリーズなど）に含まれるすべての作品を取得し、Workspaceのリストを返します。"""
-        pass
+        ...
 
 
-class ICreatorProvider(ABC):
+@runtime_checkable
+class ICreatorProvider(Protocol):
     """クリエイターの全作品を取得するためのインターフェース"""
 
-    @abstractmethod
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
         """特定のクリエイターが投稿したすべての作品を取得し、Workspaceのリストを返します。"""
-        pass
+        ...

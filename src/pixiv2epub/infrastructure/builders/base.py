@@ -42,7 +42,7 @@ class BaseBuilder(ABC):
             with open(detail_json_path, "r", encoding="utf-8") as f:
                 metadata_dict = json.load(f)
 
-        self.metadata = NovelMetadata.from_dict(metadata_dict)
+        self.metadata = NovelMetadata.model_validate(metadata_dict)
 
     @classmethod
     @abstractmethod

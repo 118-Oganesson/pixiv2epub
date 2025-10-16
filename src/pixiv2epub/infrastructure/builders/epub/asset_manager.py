@@ -5,7 +5,7 @@ from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from .... import constants as const
+from ....shared.constants import IMAGES_DIR_NAME
 from ....models.local import ImageAsset, NovelMetadata, PageInfo
 from ....models.workspace import Workspace
 
@@ -38,7 +38,7 @@ class AssetManager:
         self.workspace = workspace
         self.metadata = metadata
         self.source_dir = workspace.source_path
-        self.image_dir = workspace.assets_path / const.IMAGES_DIR_NAME
+        self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
 
     def gather_assets(
         self,
@@ -66,7 +66,7 @@ class AssetManager:
             image_assets.append(
                 ImageAsset(
                     id=f"img_{i}",
-                    href=f"{const.IMAGES_DIR_NAME}/{path.name}",
+                    href=f"{IMAGES_DIR_NAME}/{path.name}",
                     path=path,
                     media_type=get_media_type_from_filename(path.name),
                     properties="",

@@ -3,12 +3,13 @@ from loguru import logger
 from rich.logging import RichHandler
 
 
-def setup_logging(level: str = "INFO"):
+def setup_logging(level: str = "INFO", serialize_to_file: bool = False):
     """
-    LoguruをRichHandlerを使用するように設定します。
-    Loguruのフォーマットを無効にし、RichHandlerに全てのフォーマットを委任します。
+    LoguruをRichHandlerとJSONファイル出力用に設定します。
     """
     logger.remove()  # デフォルトハンドラの削除
+
+    # コンソール用のハンドラ
     logger.add(
         RichHandler(
             rich_tracebacks=True,
@@ -21,4 +22,20 @@ def setup_logging(level: str = "INFO"):
         backtrace=False,
         diagnose=False,
     )
-    logger.info(f"ログレベルを {level.upper()} に設定しました。")
+
+    # ファイル出力用のハンドラ (JSON形式)
+    if serialize_to_file:
+        logger.add(
+            "logs/pixiv2epub_{time}.log",  # ログファイルパス
+            level="DEBUG",  # ファイルにはより詳細な情報を記録
+            serialize=True,  # この設定がログをJSON形式にする
+            enqueue=True,  # ログ出力を非同期にし、アプリケーションのパフォーマンスへの影響を最小化
+            rotation="10 MB",  # 10MBでファイルをローテーション
+            retention="7 days",  # 7日間ログを保持
+            backtrace=True,
+            diagnose=True,
+        )
+
+    logger.info(
+        f"ロガーが設定されました。レベル: {level.upper()}, ファイル出力: {serialize_to_file}"
+    )

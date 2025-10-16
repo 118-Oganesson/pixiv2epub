@@ -6,13 +6,14 @@ from typing import Callable, Dict, List, Tuple, Union
 
 from loguru import logger
 
-from ... import constants as const
 from ...models.fanbox import (
     HeaderBlock,
     ImageBlock,
     ParagraphBlock,
     PostBodyArticle,
 )
+from ...shared.constants import IMAGES_DIR_NAME
+from ..providers.pixiv.constants import PIXIV_ARTWORK_URL, PIXIV_NOVEL_URL
 from .interfaces import IContentParser
 
 
@@ -21,7 +22,7 @@ class PixivTagParser(IContentParser):
 
     def parse(self, raw_content: str, image_paths: Dict[str, Path]) -> str:
         self.image_relative_paths = {
-            image_id: f"../assets/{const.IMAGES_DIR_NAME}/{file_path.name}"
+            image_id: f"../assets/{IMAGES_DIR_NAME}/{file_path.name}"
             for image_id, file_path in image_paths.items()
         }
         text = raw_content
@@ -62,11 +63,11 @@ class PixivTagParser(IContentParser):
             ),
             (
                 re.compile(r"pixiv://novels/(\d+)"),
-                const.PIXIV_NOVEL_URL.replace("{novel_id}", r"\1"),
+                PIXIV_NOVEL_URL.replace("{novel_id}", r"\1"),
             ),
             (
                 re.compile(r"pixiv://illusts/(\d+)"),
-                const.PIXIV_ARTWORK_URL.replace("{illust_id}", r"\1"),
+                PIXIV_ARTWORK_URL.replace("{illust_id}", r"\1"),
             ),
         ]
 
@@ -81,7 +82,7 @@ class FanboxBlockParser(IContentParser):
 
     def parse(self, raw_content: PostBodyArticle, image_paths: Dict[str, Path]) -> str:
         self.image_relative_paths = {
-            image_id: f"../assets/{const.IMAGES_DIR_NAME}/{file_path.name}"
+            image_id: f"../assets/{IMAGES_DIR_NAME}/{file_path.name}"
             for image_id, file_path in image_paths.items()
         }
         body = raw_content
@@ -113,26 +114,22 @@ class FanboxBlockParser(IContentParser):
                 logger.warning(
                     f"未対応のFanboxブロックタイプを検出しました: {block_type}"
                 )
-                # ユーザーにフィードバックするためのプレースホルダーを生成
                 part = (
                     f'<div style="padding: 1em; margin: 1em 0; border: 1px dashed #ccc; color: #777; font-style: italic;">'
                     f"サポートされていないコンテンツブロック（タイプ: {escape(str(block_type))}）は表示できません。"
                     f"</div>"
                 )
 
-            if part:  # 空のpartは追加しない
+            if part:
                 final_html_parts.append(part)
 
-            # 区切り文字の<br />を、条件付きで追加する
             is_last_block = i == num_blocks - 1
-            # 現在のブロックが改行そのものではなく、かつ最後のブロックでもない場合のみ区切り文字を追加
             if part != "<br />" and not is_last_block:
                 final_html_parts.append("<br />")
 
         return "\n".join(final_html_parts)
 
     def _parse_paragraph_block(self, block: ParagraphBlock) -> str:
-        # 空のpタグは、単一の改行として機能させる
         if not block.text:
             return "<br />"
 

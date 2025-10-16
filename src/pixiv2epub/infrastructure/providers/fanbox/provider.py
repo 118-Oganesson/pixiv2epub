@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/provider.py
 import shutil
 from datetime import datetime, timezone
-from typing import Any, List
+from typing import Any, List, Optional
 
 from loguru import logger
 from pydantic import ValidationError
@@ -11,11 +11,11 @@ from ....models.fanbox import FanboxPostApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
-from ..base import ICreatorProvider, IWorkProvider
-from ..base_provider import BaseProvider
 from ...strategies.mappers import FanboxMetadataMapper
 from ...strategies.parsers import FanboxBlockParser
 from ...strategies.update_checkers import TimestampUpdateStrategy
+from ..base import ICreatorProvider, IWorkProvider
+from ..base_provider import BaseProvider
 from .client import FanboxApiClient
 from .downloader import FanboxImageDownloader
 
@@ -48,7 +48,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         except IOError as e:
             logger.error(f"ページの保存に失敗しました: {e}")
 
-    def get_work(self, work_id: Any) -> Workspace:
+    def get_work(self, work_id: Any) -> Optional[Workspace]:
         logger.info(f"Fanbox 投稿ID: {work_id} の処理を開始します。")
         workspace = self._setup_workspace(work_id)
 
@@ -65,7 +65,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 logger.info(
                     f"コンテンツに変更はありません。処理をスキップします: {workspace.id}"
                 )
-                return workspace
+                return None
 
             logger.info("コンテンツの更新を検出しました。ダウンロードを続行します。")
             if workspace.source_path.exists():
@@ -85,7 +85,8 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
         try:
             # --- ダウンロード後のデータ処理 ---
-            post_data = FanboxPostApiResponse(**post_data_dict).body
+            post_data = FanboxPostApiResponse.model_validate(post_data_dict).body
+
             cover_path = downloader.download_cover(post_data)
             image_paths = downloader.download_embedded_images(post_data)
 
@@ -177,7 +178,8 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             logger.info(f"--- 投稿 {i}/{total} (ID: {post_id}) を処理中 ---")
             try:
                 workspace = self.get_work(post_id)
-                workspaces.append(workspace)
+                if workspace:
+                    workspaces.append(workspace)
             except Exception as e:
                 logger.error(
                     f"投稿ID {post_id} の処理に失敗しました: {e}", exc_info=True
