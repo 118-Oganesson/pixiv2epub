@@ -16,6 +16,7 @@ dependencies = [
     "loguru>=0.7.3",
     "typer>=0.19.2",
     "python-dotenv>=1.1.1",
+    "pybreaker>=1.4.1",
 ]
 [dependency-groups]
 dev = ["ipykernel>=6.30.1"]
@@ -46,6 +47,10 @@ root_directory = "./.workspace"
 api_delay = 1.0
 api_retries = 3
 overwrite_existing_images = false
+
+[tool.pixiv2epub.downloader.circuit_breaker]
+fail_max = 5
+reset_timeout = 60
 
 [tool.pixiv2epub.builder]
 output_directory = "./epubs"

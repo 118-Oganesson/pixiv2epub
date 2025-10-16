@@ -5,9 +5,9 @@ from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from ....shared.constants import IMAGES_DIR_NAME
 from ....models.local import ImageAsset, NovelMetadata, PageInfo
 from ....models.workspace import Workspace
+from ....shared.constants import IMAGES_DIR_NAME
 
 MEDIA_TYPES = {
     "jpg": "image/jpeg",
@@ -82,10 +82,12 @@ class AssetManager:
         cover_filename = Path(self.metadata.cover_path).name
         for i, asset in enumerate(image_assets):
             if asset.filename == cover_filename:
-                image_assets[i] = asset._replace(properties="cover-image")
+                updated_asset = asset.model_copy(update={"properties": "cover-image"})
+                image_assets[i] = updated_asset
                 return image_assets[i]
+
         logger.warning(
-            f"指定されたカバー画像 '{cover_filename}' が見つかりませんでした。"
+            "指定されたカバー画像 '{}' が見つかりませんでした。", cover_filename
         )
         return None
 
@@ -111,6 +113,8 @@ class AssetManager:
                 for match in re.finditer(r'src=(["\'])(.*?)\1', content, re.IGNORECASE):
                     add_filename_from_path(match.group(2))
             except Exception as e:
-                logger.warning(f"ページファイル '{page_file.name}' の解析に失敗: {e}")
+                logger.warning(
+                    "ページファイル '{}' の解析に失敗: {}", page_file.name, e
+                )
 
         return filenames

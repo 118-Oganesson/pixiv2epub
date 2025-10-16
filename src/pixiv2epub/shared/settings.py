@@ -4,7 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import BaseModel, Field, SecretStr, ValidationError
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -59,7 +59,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
 class PixivAuthSettings(BaseModel):
     """Pixiv認証に特化した設定モデル。"""
 
-    refresh_token: Optional[str] = Field(
+    refresh_token: Optional[SecretStr] = Field(
         None, description="Pixiv APIのリフレッシュトークン。"
     )
 
@@ -67,7 +67,7 @@ class PixivAuthSettings(BaseModel):
 class FanboxAuthSettings(BaseModel):
     """Fanbox認証に特化した設定モデル。"""
 
-    sessid: Optional[str] = Field(
+    sessid: Optional[SecretStr] = Field(
         None, description="FANBOXにログインした際のFANBOXSESSIDクッキー。"
     )
 
@@ -77,6 +77,17 @@ class ProviderSettings(BaseModel):
 
     pixiv: PixivAuthSettings = PixivAuthSettings()
     fanbox: FanboxAuthSettings = FanboxAuthSettings()
+
+
+class CircuitBreakerSettings(BaseModel):
+    """サーキットブレーカーに関する設定。"""
+
+    fail_max: int = Field(
+        5, description="何回連続で失敗したらサーキットをOpen状態にするか。"
+    )
+    reset_timeout: int = Field(
+        60, description="サーキットがOpenしてからHalf-Open状態に移行するまでの秒数。"
+    )
 
 
 class DownloaderSettings(BaseModel):
@@ -89,6 +100,7 @@ class DownloaderSettings(BaseModel):
     overwrite_existing_images: bool = Field(
         False, description="同名の画像が既に存在する場合に上書きするかどうか。"
     )
+    circuit_breaker: CircuitBreakerSettings = CircuitBreakerSettings()
 
 
 class BuilderSettings(BaseModel):

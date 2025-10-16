@@ -114,10 +114,11 @@ class EpubBuilder(BaseBuilder):
 
         template_vars = {
             "title": self.metadata.title or "untitled",
-            "id": self.metadata.identifier.get("novel_id")
-            or self.metadata.identifier.get("post_id", "0"),
-            "author_name": self.metadata.authors.name or "unknown_author",
-            "author_id": str(self.metadata.authors.id or "0"),
+            "id": self.metadata.identifier.novel_id
+            or self.metadata.identifier.post_id
+            or "0",
+            "author_name": self.metadata.author.name or "unknown_author",
+            "author_id": str(self.metadata.author.id or "0"),
             "series_title": self.metadata.series.title if self.metadata.series else "",
             "series_id": str(self.metadata.series.id if self.metadata.series else "0"),
         }

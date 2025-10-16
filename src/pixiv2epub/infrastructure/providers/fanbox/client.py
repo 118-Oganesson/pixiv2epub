@@ -6,6 +6,8 @@ from typing import Dict, Optional, Type
 
 import cloudscraper
 from loguru import logger
+from pybreaker import CircuitBreaker
+from pydantic import SecretStr
 from requests.exceptions import RequestException
 
 from ....shared.exceptions import ApiError, AuthenticationError
@@ -17,9 +19,16 @@ BASE_URL = "https://api.fanbox.cc/"
 class FanboxApiClient(BaseApiClient):
     """FANBOX APIと通信するためのラッパークラス。"""
 
-    def __init__(self, sessid: str, api_delay: float = 1.0, api_retries: int = 3):
-        super().__init__(api_delay, api_retries)
-        if not sessid or sessid == "your_fanbox_sessid_here":
+    def __init__(
+        self,
+        breaker: CircuitBreaker,
+        sessid: SecretStr,
+        api_delay: float = 1.0,
+        api_retries: int = 3,
+    ):
+        super().__init__(breaker, api_delay, api_retries)
+        sessid_value = sessid.get_secret_value() if sessid else None
+        if not sessid_value or sessid_value == "your_fanbox_sessid_here":
             raise AuthenticationError(
                 "設定に有効なFANBOXのsessidが見つかりません。", "fanbox"
             )
@@ -31,7 +40,7 @@ class FanboxApiClient(BaseApiClient):
                 "Referer": "https://www.fanbox.cc/",
             }
         )
-        self.session.cookies.set("FANBOXSESSID", sessid, domain=".fanbox.cc")
+        self.session.cookies.set("FANBOXSESSID", sessid_value, domain=".fanbox.cc")
         logger.debug("Fanbox APIクライアントの認証が完了しました。")
 
     @property

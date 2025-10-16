@@ -6,9 +6,9 @@
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, NamedTuple, Optional
+from typing import List, NamedTuple, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # --- 画像圧縮関連 ---
@@ -33,7 +33,7 @@ class CompressionResult:
 
 
 # --- EPUBビルド関連 ---
-class ImageAsset(NamedTuple):
+class ImageAsset(BaseModel, frozen=True):
     """EPUBに含める画像アセットの情報を管理します。"""
 
     id: str
@@ -44,7 +44,7 @@ class ImageAsset(NamedTuple):
     filename: str
 
 
-class PageAsset(NamedTuple):
+class PageAsset(BaseModel, frozen=True):
     """EPUBの各ページ（XHTML）の情報を管理します。"""
 
     id: str
@@ -88,14 +88,23 @@ class SeriesInfo(BaseModel):
     order: Optional[int] = None
 
 
+class Identifier(BaseModel):
+    """作品のユニークIDを格納するモデル。"""
+
+    novel_id: Optional[int] = Field(None, alias="novel_id")
+    post_id: Optional[str] = Field(None, alias="post_id")
+    creator_id: Optional[str] = Field(None, alias="creator_id")
+    uuid: Optional[str] = None
+
+
 class NovelMetadata(BaseModel):
     """`detail.json`に記載された小説のメタデータ全体を格納します。"""
 
     title: str
-    authors: Author
+    author: Author
     series: Optional[SeriesInfo]
     description: str
-    identifier: Dict[str, Any]
+    identifier: Identifier
     published_date: str
     updated_date: Optional[str]
     cover_path: Optional[str]

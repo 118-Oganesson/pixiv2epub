@@ -3,17 +3,17 @@
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <dc:title>{{ metadata.title }}</dc:title>
         <dc:language>ja</dc:language>
-        <dc:identifier id="bookid">{{ metadata.identifier.get("uuid", "") }}</dc:identifier>
-        <dc:creator id="author">{{ metadata.authors.name }}</dc:creator>
+        <dc:identifier id="bookid">{{ metadata.identifier.uuid }}</dc:identifier>
+        <dc:creator id="author">{{ metadata.author.name }}</dc:creator>
         <meta refines="#author" property="role" scheme="marc:relators">aut</meta>
         <dc:date>{{ formatted_date }}</dc:date>
         <meta property="dcterms:modified">{{ modified_time }}</meta>
 
-        {% if metadata.identifier.get("novel_id") -%}
-        <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ metadata.identifier.get("novel_id") }}</dc:identifier>
+        {% if metadata.identifier.novel_id -%}
+        <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ metadata.identifier.novel_id }}</dc:identifier>
         {% endif -%}
-        {% if metadata.identifier.get("post_id") -%}
-        <dc:identifier id="fanbox-id">urn:fanbox:post:{{ metadata.identifier.get("post_id") }}</dc:identifier>
+        {% if metadata.identifier.post_id -%}
+        <dc:identifier id="fanbox-id">urn:fanbox:post:{{ metadata.identifier.post_id }}</dc:identifier>
         {% endif -%}
 
         {% if metadata.series -%}

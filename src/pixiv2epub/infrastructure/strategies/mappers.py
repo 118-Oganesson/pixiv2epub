@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from ...models.fanbox import Post, PostBodyArticle, PostBodyText
-from ...models.local import Author, NovelMetadata, PageInfo, SeriesInfo
+from ...models.local import Author, Identifier, NovelMetadata, PageInfo, SeriesInfo
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME
@@ -66,10 +66,10 @@ class PixivMetadataMapper(IMetadataMapper):
 
         return NovelMetadata(
             title=novel.get("title"),
-            authors=author_info,
+            author=author_info,
             series=series_info,
             description=parsed_description,
-            identifier={"novel_id": novel.get("id")},
+            identifier=Identifier(novel_id=novel.get("id")),
             published_date=novel.get("create_date"),
             updated_date=None,
             cover_path=relative_cover_path,
@@ -110,10 +110,12 @@ class FanboxMetadataMapper(IMetadataMapper):
 
         return NovelMetadata(
             title=post_data.title,
-            authors=author_info,
+            author=author_info,
             series=None,
             description=parsed_description,
-            identifier={"post_id": post_data.id, "creator_id": post_data.creator_id},
+            identifier=Identifier(
+                post_id=post_data.id, creator_id=post_data.creator_id
+            ),
             published_date=post_data.published_datetime,
             updated_date=post_data.updated_datetime,
             cover_path=relative_cover_path,

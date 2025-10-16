@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, List, Optional
 
 from loguru import logger
+from pybreaker import CircuitBreaker
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
@@ -25,10 +26,16 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def __init__(self, settings: Settings):
         super().__init__(settings)
+        breaker = CircuitBreaker(
+            fail_max=settings.downloader.circuit_breaker.fail_max,
+            reset_timeout=settings.downloader.circuit_breaker.reset_timeout,
+        )
+
         self.api_client = FanboxApiClient(
-            sessid=self.settings.providers.fanbox.sessid,
-            api_delay=self.settings.downloader.api_delay,
-            api_retries=self.settings.downloader.api_retries,
+            breaker=breaker,
+            sessid=settings.providers.fanbox.sessid,
+            api_delay=settings.downloader.api_delay,
+            api_retries=settings.downloader.api_retries,
         )
         # Fanbox用の戦略オブジェクトをインスタンス化
         self.update_checker = TimestampUpdateStrategy(timestamp_key="updatedDatetime")

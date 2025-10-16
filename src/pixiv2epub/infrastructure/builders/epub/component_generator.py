@@ -127,7 +127,7 @@ class EpubComponentGenerator:
             "css_path": css_path,
             "novel": {
                 "title": self.metadata.title,
-                "author": self.metadata.authors.name,
+                "author": self.metadata.author.name,
                 "series_title": self.metadata.series.title
                 if self.metadata.series
                 else None,
@@ -222,7 +222,7 @@ class EpubComponentGenerator:
             spine_itemrefs.append({"idref": page.id, "linear": True})
         for image in images:
             # `_asdict` is a method of NamedTuple
-            manifest_items.append(image._asdict())
+            manifest_items.append(image.model_dump())
 
         metadata_as_dict = self.metadata.model_dump(mode="json")
 
@@ -232,15 +232,14 @@ class EpubComponentGenerator:
 
         # Use provider-specific identifier if available
         novel_id = (
-            self.metadata.identifier.get("novel_id")
-            or self.metadata.identifier.get("post_id")
+            self.metadata.identifier.novel_id
+            or self.metadata.identifier.post_id
             or content_id
         )
 
-        deterministic_uuid = uuid.uuid5(
-            NAMESPACE_UUID, f"{provider_name}-{novel_id}"
-        )
-        metadata_as_dict["identifier"]["uuid"] = f"urn:uuid:{deterministic_uuid}"
+        deterministic_uuid = uuid.uuid5(NAMESPACE_UUID, f"{provider_name}-{novel_id}")
+        self.metadata.identifier.uuid = f"urn:uuid:{deterministic_uuid}"
+        metadata_as_dict = self.metadata.model_dump(mode="json")
         modified_time = (
             self.metadata.updated_date or datetime.now(timezone.utc).isoformat()
         )
