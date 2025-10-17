@@ -200,18 +200,24 @@ class Settings(BaseSettings):
 
     def __init__(self, **values: Any):
         config_file_path = values.pop("_config_file", None)
+        require_auth = values.pop("require_auth", True)
         self._config_file = Path(config_file_path) if config_file_path else None
+
         try:
             super().__init__(**values)
         except ValidationError as e:
             raise SettingsError(f"設定の検証に失敗しました:\n{e}")
 
-        if not self.providers.pixiv.refresh_token and not self.providers.fanbox.sessid:
-            raise SettingsError(
-                "PixivまたはFanboxの認証情報が見つかりません。"
-                " 'pixiv2epub auth <service>' コマンドを実行するか、"
-                "設定ファイル、.env、または環境変数で設定してください。"
-            )
+        if require_auth:
+            if (
+                not self.providers.pixiv.refresh_token
+                and not self.providers.fanbox.sessid
+            ):
+                raise SettingsError(
+                    "PixivまたはFanboxの認証情報が見つかりません。"
+                    " 'pixiv2epub auth <service>' コマンドを実行するか、"
+                    "設定ファイル、.env、または環境変数で設定してください。"
+                )
 
     model_config = SettingsConfigDict(
         env_nested_delimiter="__",

@@ -40,12 +40,22 @@ class AppState:
         self._app: Optional[Application] = None
         self.provider_factory: Optional[ProviderFactory] = None
 
-    def initialize_settings(self, config_file: Optional[Path], log_level: str):
+    def initialize_settings(
+        self,
+        config_file: Optional[Path],
+        log_level: str,
+        require_auth: bool = True,
+    ):
         """設定オブジェクトを初期化する。"""
         if self._settings is None:
             try:
-                self._settings = Settings(_config_file=config_file, log_level=log_level)
-                self.provider_factory = ProviderFactory(self._settings)
+                self._settings = Settings(
+                    _config_file=config_file,
+                    log_level=log_level,
+                    require_auth=require_auth,
+                )
+                if require_auth:
+                    self.provider_factory = ProviderFactory(self._settings)
             except SettingsError as e:
                 logger.error("❌ 設定エラー: {}", e)
                 logger.info(
@@ -111,9 +121,10 @@ def main_callback(
     setup_logging(log_level, serialize_to_file=log_file)
     ctx.obj = AppState()
 
-    # auth と gui 以外のコマンド実行時に設定を初期化
-    if ctx.invoked_subcommand not in ("auth", "gui", "build"):
-        ctx.obj.initialize_settings(config, log_level)
+    # コマンドに応じて設定の初期化を制御
+    if ctx.invoked_subcommand not in ("auth",):
+        require_auth = ctx.invoked_subcommand != "build"
+        ctx.obj.initialize_settings(config, log_level, require_auth=require_auth)
 
 
 @app.command()
@@ -239,10 +250,6 @@ def build(
 ):
     """既存のワークスペースディレクトリからEPUBをビルドします。"""
     app_state: AppState = ctx.obj
-    if ctx.invoked_subcommand == "build":
-        log_level = ctx.parent.params.get("log_level", "INFO")
-        app_state.initialize_settings(ctx.params.get("config"), log_level)
-
     app_instance = app_state.app
 
     workspaces_to_build: List[Path] = []
@@ -287,26 +294,9 @@ def build(
 
 
 @app.command()
-def gui(
-    ctx: typer.Context,
-    config: Annotated[
-        Optional[Path],
-        typer.Option(
-            "-c",
-            "--config",
-            help="カスタム設定TOMLファイルへのパス。",
-            exists=True,
-            file_okay=True,
-            dir_okay=False,
-            readable=True,
-            resolve_path=True,
-        ),
-    ] = None,
-):
+def gui(ctx: typer.Context):
     """ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
-    log_level = ctx.parent.params.get("log_level", "INFO")
-    app_state.initialize_settings(config, log_level)
     app_instance = app_state.app
 
     session_path = Path("./.gui_session")
