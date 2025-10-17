@@ -47,7 +47,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("小説の処理を開始します。")
+            logger.info("小説の処理を開始")
             workspace = self._setup_workspace(work_id)
 
             try:
@@ -57,7 +57,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 )
                 if not update_required:
                     logger.bind(workspace_id=workspace.id).info(
-                        "コンテンツに変更はありません。処理をスキップします。"
+                        "コンテンツに変更なし、スキップします。"
                     )
                     return None
 
@@ -86,7 +86,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
                 logger.bind(
                     title=novel_data.title, workspace_path=str(workspace.root_path)
-                ).info("小説のデータ取得が完了しました。")
+                ).info("小説データ取得完了")
                 return workspace
 
             except (PixivError, ApiError) as e:
@@ -108,9 +108,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             workspace, novel_data_dict
         )
         if update_required:
-            logger.info(
-                "コンテンツの更新を検出しました（または新規ダウンロードです）。"
-            )
+            logger.info("コンテンツの更新を検出（または新規ダウンロードです）。")
             if workspace.source_path.exists():
                 shutil.rmtree(workspace.source_path)
             workspace.source_path.mkdir(parents=True, exist_ok=True)
@@ -183,21 +181,19 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         with logger.contextualize(
             provider=self.get_provider_name(), series_id=series_id
         ):
-            logger.info("シリーズの処理を開始します。")
+            logger.info("シリーズの処理を開始")
             try:
                 series_data = self.get_series_info(series_id)
                 novel_ids = [novel.id for novel in series_data.novels]
 
                 if not novel_ids:
-                    logger.info(
-                        "ダウンロード対象が見つからないため、処理を終了します。"
-                    )
+                    logger.info("ダウンロード対象が見つからず処理を終了します。")
                     return []
 
                 downloaded_workspaces = []
                 total = len(novel_ids)
                 logger.bind(total_novels=total).info(
-                    "シリーズ内の小説ダウンロードを開始します。"
+                    "シリーズ内の小説ダウンロードを開始"
                 )
 
                 for i, novel_id in enumerate(novel_ids, 1):
@@ -213,7 +209,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                         )
 
                 logger.bind(series_title=series_data.novel_series_detail.title).info(
-                    "シリーズのダウンロードが完了しました。"
+                    "シリーズのダウンロード完了"
                 )
                 return downloaded_workspaces
             except Exception as e:
@@ -234,7 +230,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def get_creator_works(self, user_id: Any) -> List[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), user_id=user_id):
-            logger.info("ユーザーの全作品の処理を開始します。")
+            logger.info("ユーザーの全作品の処理を開始")
             try:
                 single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
                 logger.bind(
@@ -248,7 +244,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                         log = logger.bind(
                             current_series=i, total_series=len(series_ids)
                         )
-                        log.info("\n--- シリーズを処理中 ---")
+                        log.info("--- シリーズを処理中 ---")
                         try:
                             workspaces = self.get_multiple_works(s_id)
                             downloaded_workspaces.extend(workspaces)

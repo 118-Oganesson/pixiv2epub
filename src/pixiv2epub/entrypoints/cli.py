@@ -184,23 +184,27 @@ def _execute_command(
 
     provider_enum, content_type_enum, target_id = parse_content_identifier(input_str)
     provider = app_state.provider_factory.create(provider_enum)
+    log = logger.bind(
+        provider=provider_enum.name,
+        content_type=content_type_enum.name,
+        target_id=target_id,
+        mode=mode,
+    )
 
     if mode == "run":
-        logger.info("ダウンロードとビルド処理を実行します...")
+        log.info("ダウンロードとビルド処理を開始")
         builder = EpubBuilder(settings=app_state.settings)
         app_instance.run_download_and_build(
             provider, content_type_enum, target_id, builder=builder
         )
-        logger.success("✅ すべての処理が完了しました。")
+        log.success("✅ すべての処理が完了しました。")
     elif mode == "download":
-        logger.info("ダウンロード処理のみを実行します...")
+        log.info("ダウンロード処理のみを開始")
         workspaces = app_instance.run_download_only(
             provider, content_type_enum, target_id
         )
         for ws in workspaces:
-            logger.bind(workspace_path=str(ws.root_path)).success(
-                "ダウンロードが完了しました。"
-            )
+            logger.bind(workspace_path=str(ws.root_path)).success("ダウンロード完了")
 
 
 @app.command()
@@ -266,7 +270,7 @@ def build(
 
     if not workspaces_to_build:
         logger.bind(search_path=str(workspace_path)).warning(
-            "指定されたパスにビルド可能なワークスペースが見つかりませんでした。"
+            "ビルド可能なワークスペースが見つかりませんでした。"
         )
         return
 

@@ -38,10 +38,10 @@ class EpubBuilder(BaseBuilder):
         output_path = self._determine_output_path(metadata)
 
         log = logger.bind(workspace_id=workspace.id, output_path=str(output_path))
-        log.info("EPUB作成処理を開始します。")
+        log.info("EPUB作成処理を開始")
 
         if output_path.exists():
-            log.warning("出力ファイルは既に存在するため、上書きします。")
+            log.warning("出力ファイルは既に存在するため上書きします。")
 
         try:
             # テンプレートエンジンとジェネレータを動的に初期化
@@ -56,7 +56,7 @@ class EpubBuilder(BaseBuilder):
                 cover_asset,
             )
             self.archiver.archive(components, output_path)
-            log.success("EPUBファイルの作成に成功しました。")
+            log.success("EPUBファイルの作成成功")
             return output_path
         except Exception as e:
             logger.exception("EPUBファイルの作成中に致命的なエラーが発生しました。")
@@ -74,7 +74,7 @@ class EpubBuilder(BaseBuilder):
                 "プロバイダーのテーマを使用します。"
             )
         except (IOError, json.JSONDecodeError):
-            logger.warning(
+            logger.bind(workspace_path=str(workspace.root_path)).warning(
                 "manifest.jsonが読み取れないため、デフォルトテーマを使用します。"
             )
 

@@ -52,7 +52,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("Fanbox投稿の処理を開始します。")
+            logger.info("Fanbox投稿の処理を開始")
             workspace = self._setup_workspace(work_id)
 
             try:
@@ -66,13 +66,11 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
                 if not update_required:
                     logger.bind(workspace_id=workspace.id).info(
-                        "コンテンツに変更はありません。処理をスキップします。"
+                        "コンテンツに変更なし、スキップします。"
                     )
                     return None
 
-                logger.info(
-                    "コンテンツの更新を検出しました。ダウンロードを続行します。"
-                )
+                logger.info("コンテンツの更新を検出、ダウンロードを続行します。")
                 if workspace.source_path.exists():
                     shutil.rmtree(workspace.source_path)
                 workspace.source_path.mkdir(parents=True, exist_ok=True)
@@ -116,7 +114,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
                 logger.bind(
                     title=post_data.title, workspace_path=str(workspace.root_path)
-                ).info("投稿のデータ取得が完了しました。")
+                ).info("投稿データ取得完了")
                 return workspace
 
             except (ValidationError, KeyError, TypeError) as e:
@@ -127,9 +125,8 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
         """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""
-        logger.bind(creator_id=creator_id).info(
-            "クリエイターの全投稿IDの取得を開始します。"
-        )
+        log = logger.bind(creator_id=creator_id)
+        log.info("クリエイターの全投稿IDの取得を開始")
         post_ids = []
 
         try:
@@ -138,22 +135,22 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             page_urls = paginate_response.get("body")
 
             if not isinstance(page_urls, list):
-                logger.error(
+                log.error(
                     "投稿ページの一覧が取得できませんでした。APIのレスポンスが予期しない形式です。"
                 )
                 return []
 
             total_pages = len(page_urls)
-            logger.bind(total_pages=total_pages).info(
+            log.bind(total_pages=total_pages).info(
                 "投稿リストのページ数を取得しました。"
             )
 
             # 2. 取得した各ページのURLを辿り、投稿リストを取得する
             for i, page_url in enumerate(page_urls, 1):
-                log = logger.bind(
+                page_log = log.bind(
                     current_page=i, total_pages=total_pages, page_url=page_url
                 )
-                log.debug("投稿リストを取得中...")
+                page_log.debug("投稿リストを取得中...")
                 try:
                     list_response = self.api_client.post_list_creator(page_url)
                     post_items = list_response.get("body", [])
@@ -162,23 +159,23 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                             if isinstance(item, dict) and "id" in item:
                                 post_ids.append(item["id"])
                     else:
-                        log.warning("投稿リストの形式が不正です。スキップします。")
+                        page_log.warning("投稿リストの形式が不正です。スキップします。")
 
                 except Exception as e:
-                    log.bind(error=str(e)).error(
+                    page_log.bind(error=str(e)).error(
                         "投稿リスト取得中にエラーが発生しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
                     continue
 
         except Exception as e:
-            logger.bind(error=str(e)).error(
+            log.bind(error=str(e)).error(
                 "投稿ページ一覧の取得中に致命的なエラーが発生しました。",
                 exc_info=self.settings.log_level == "DEBUG",
             )
             return []
 
-        logger.bind(count=len(post_ids)).info("投稿IDの取得が完了しました。")
+        log.bind(count=len(post_ids)).info("投稿IDの取得が完了しました。")
         return post_ids
 
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
