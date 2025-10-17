@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
 from ...models.fanbox import Post, PostBodyArticle, PostBodyText
-from ...models.local import Author, Identifier, NovelMetadata, PageInfo, SeriesInfo
+from ...models.domain import Author, Identifier, NovelMetadata, PageInfo, SeriesInfo
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME

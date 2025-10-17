@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base_client.py
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Type
+from typing import Any, Callable, Dict, Type
 
 from loguru import logger
 from pybreaker import CircuitBreaker, CircuitBreakerError
@@ -43,13 +43,32 @@ class BaseApiClient(ABC):
                 last_exception = e
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
 
-                log = logger.bind(
-                    func_name=func.__name__,
-                    attempt=attempt,
-                    total_retries=self.retries,
-                    error=str(e),
-                    status_code=status_code or "N/A",
-                )
+                # kwargsから処理対象のIDを抽出し、ログに含めることでデバッグを容易にします。
+                context: Dict[str, Any] = {
+                    "func_name": func.__name__,
+                    "attempt": attempt,
+                    "total_retries": self.retries,
+                    "error": str(e),
+                    "status_code": status_code or "N/A",
+                }
+                id_keys = [
+                    "work_id",
+                    "novel_id",
+                    "series_id",
+                    "post_id",
+                    "creator_id",
+                    "user_id",
+                ]
+                # argsからもIDを抽出しようと試みる (例: novel_detail(12345))
+                if args:
+                    context["target_id"] = args[0]
+                # kwargsの方がキーが明示的なので優先する
+                for key in id_keys:
+                    if key in kwargs:
+                        context["target_id"] = kwargs[key]
+                        break
+
+                log = logger.bind(**context)
 
                 if status_code in [401, 403]:
                     raise AuthenticationError(

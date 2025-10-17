@@ -6,7 +6,7 @@ from typing import Any, Dict
 
 from loguru import logger
 
-from ...models.local import NovelMetadata
+from ...models.domain import NovelMetadata
 from ...models.workspace import Workspace
 
 from ...shared.constants import DETAIL_FILE_NAME

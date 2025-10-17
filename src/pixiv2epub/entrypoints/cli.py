@@ -10,6 +10,7 @@ from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
+from ..domain.orchestrator import DownloadBuildOrchestrator
 from ..infrastructure.builders.epub.builder import EpubBuilder
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
@@ -25,6 +26,7 @@ from ..utils.logging import setup_logging
 from ..utils.url_parser import parse_content_identifier
 from .gui.manager import GuiManager
 from .provider_factory import ProviderFactory
+from .constants import DEFAULT_ENV_FILENAME, DEFAULT_GUI_SESSION_PATH
 
 app = typer.Typer(
     help="PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
@@ -138,9 +140,9 @@ def auth(
     ] = "pixiv",
 ):
     """ブラウザで指定されたサービスにログインし、認証情報を保存します。"""
-    session_path = Path("./.gui_session")
+    session_path = Path(DEFAULT_GUI_SESSION_PATH)
     env_path_str = find_dotenv()
-    env_path = Path(env_path_str) if env_path_str else Path(".env")
+    env_path = Path(env_path_str) if env_path_str else Path(DEFAULT_ENV_FILENAME)
     if not env_path.exists():
         env_path.touch()
 
@@ -178,7 +180,6 @@ def _execute_command(
     mode: Literal["run", "download"],
 ):
     """CLIのrun/downloadコマンド共通実行ロジック"""
-    app_instance = app_state.app
     if not app_state.provider_factory:
         raise RuntimeError("ProviderFactoryが初期化されていません。")
 
@@ -194,15 +195,40 @@ def _execute_command(
     if mode == "run":
         log.info("ダウンロードとビルド処理を開始")
         builder = EpubBuilder(settings=app_state.settings)
-        app_instance.run_download_and_build(
-            provider, content_type_enum, target_id, builder=builder
-        )
+        orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
+        if content_type_enum.name == "WORK":
+            orchestrator.process_work(target_id)
+        elif content_type_enum.name == "SERIES":
+            orchestrator.process_series(target_id)
+        elif content_type_enum.name == "CREATOR":
+            orchestrator.process_creator(target_id)
         log.success("✅ すべての処理が完了しました。")
     elif mode == "download":
         log.info("ダウンロード処理のみを開始")
-        workspaces = app_instance.run_download_only(
-            provider, content_type_enum, target_id
+        from ..domain.interfaces import (
+            ICreatorProvider,
+            IMultiWorkProvider,
+            IWorkProvider,
         )
+
+        workspaces: List[Workspace] = []
+        if content_type_enum.name == "WORK" and isinstance(provider, IWorkProvider):
+            ws = provider.get_work(target_id)
+            if ws:
+                workspaces.append(ws)
+        elif content_type_enum.name == "SERIES" and isinstance(
+            provider, IMultiWorkProvider
+        ):
+            workspaces = provider.get_multiple_works(target_id)
+        elif content_type_enum.name == "CREATOR" and isinstance(
+            provider, ICreatorProvider
+        ):
+            workspaces = provider.get_creator_works(target_id)
+        else:
+            raise TypeError(
+                f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
+            )
+
         for ws in workspaces:
             logger.bind(workspace_path=str(ws.root_path)).success("ダウンロード完了")
 
@@ -305,7 +331,7 @@ def gui(ctx: typer.Context):
     app_state: AppState = ctx.obj
     app_instance = app_state.app
 
-    session_path = Path("./.gui_session")
+    session_path = Path(DEFAULT_GUI_SESSION_PATH)
     logger.bind(session_path=str(session_path.resolve())).info(
         "GUIセッションのデータを保存/読込します。"
     )

@@ -24,7 +24,7 @@ class PixivApiClient(BaseApiClient):
     ):
         super().__init__(breaker, provider_name, api_delay, api_retries)
         token_value = refresh_token.get_secret_value() if refresh_token else None
-        if not token_value or token_value == "your_refresh_token_here":
+        if not token_value:
             raise AuthenticationError(
                 "設定に有効なPixivのrefresh_tokenが見つかりません。", provider_name
             )
@@ -43,16 +43,16 @@ class PixivApiClient(BaseApiClient):
         return PixivError
 
     def novel_detail(self, novel_id: int) -> Dict:
-        return self._safe_api_call(self.api.novel_detail, novel_id)
+        return self._safe_api_call(self.api.novel_detail, novel_id=novel_id)
 
     def webview_novel(self, novel_id: int) -> Dict:
-        return self._safe_api_call(self.api.webview_novel, novel_id)
+        return self._safe_api_call(self.api.webview_novel, novel_id=novel_id)
 
     def novel_series(self, series_id: int) -> Dict:
         return self._safe_api_call(self.api.novel_series, series_id=series_id)
 
     def illust_detail(self, illust_id: int) -> Dict:
-        return self._safe_api_call(self.api.illust_detail, illust_id)
+        return self._safe_api_call(self.api.illust_detail, illust_id=illust_id)
 
     def user_novels(self, user_id: int, next_url: str = None) -> Dict:
         if next_url:

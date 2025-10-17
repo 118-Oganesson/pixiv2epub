@@ -7,7 +7,7 @@ from loguru import logger
 from pybreaker import CircuitBreaker
 
 from ...domain.interfaces import IProvider
-from ...models.local import NovelMetadata
+from ...models.domain import NovelMetadata
 from ...models.workspace import Workspace, WorkspaceManifest
 from ...shared.settings import Settings
 

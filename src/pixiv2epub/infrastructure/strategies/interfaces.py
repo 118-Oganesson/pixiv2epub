@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-from ...models.local import NovelMetadata
+from ...models.domain import NovelMetadata
 from ...models.workspace import Workspace
 
 

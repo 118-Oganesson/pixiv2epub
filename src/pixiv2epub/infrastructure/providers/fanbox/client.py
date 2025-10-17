@@ -13,7 +13,7 @@ from requests.exceptions import RequestException
 from ....shared.exceptions import ApiError, AuthenticationError
 from ..base_client import BaseApiClient
 
-BASE_URL = "https://api.fanbox.cc/"
+from .constants import BASE_URL
 
 
 class FanboxApiClient(BaseApiClient):
@@ -29,7 +29,7 @@ class FanboxApiClient(BaseApiClient):
     ):
         super().__init__(breaker, provider_name, api_delay, api_retries)
         sessid_value = sessid.get_secret_value() if sessid else None
-        if not sessid_value or sessid_value == "your_fanbox_sessid_here":
+        if not sessid_value:
             raise AuthenticationError(
                 "設定に有効なFANBOXのsessidが見つかりません。", provider_name
             )

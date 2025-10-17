@@ -5,7 +5,7 @@ from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from ....models.local import ImageAsset, NovelMetadata, PageInfo
+from ....models.domain import ImageAsset, NovelMetadata, PageInfo
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
 

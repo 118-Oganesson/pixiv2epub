@@ -6,7 +6,7 @@ from typing import Dict, List, Optional
 from jinja2 import Environment
 from loguru import logger
 
-from ....models.local import (
+from ....models.domain import (
     EpubComponents,
     ImageAsset,
     NovelMetadata,

@@ -6,7 +6,7 @@ from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 from loguru import logger
 
-from ....models.local import NovelMetadata
+from ....models.domain import NovelMetadata
 from ....models.workspace import Workspace
 from ....shared.constants import DEFAULT_THEME_NAME
 from ....shared.exceptions import BuildError

@@ -1,7 +1,8 @@
-# FILE: src/pixiv2epub/models/local.py
+# FILE: src/pixiv2epub/models/domain.py
 """
-アプリケーションの内部処理（ビルド、画像圧縮など）で利用されるデータモデル。
-外部APIの仕様とは独立しています。
+アプリケーションのドメイン（関心領域）における中心的なデータモデルを定義します。
+これらのモデルは、EPUBのビルドなど、プロバイダーに依存しない内部処理で使用されます。
+外部APIの仕様変更からアプリケーションのコアロジックを保護する役割も担います。
 """
 
 from dataclasses import dataclass
@@ -68,7 +69,7 @@ class EpubComponents(BaseModel):
     nav_xhtml: bytes
 
 
-# --- ローカルメタデータ (detail.json) 関連 ---
+# --- ドメインメタデータ (detail.json) 関連 ---
 class Author(BaseModel):
     """小説の作者情報を格納します。"""
 

@@ -4,7 +4,13 @@ import tomllib
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, SecretStr, ValidationError
+from pydantic import (
+    BaseModel,
+    Field,
+    SecretStr,
+    ValidationError,
+    field_validator,
+)
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -63,6 +69,21 @@ class PixivAuthSettings(BaseModel):
         None, description="Pixiv APIのリフレッシュトークン。"
     )
 
+    @field_validator("refresh_token")
+    @classmethod
+    def validate_token_is_not_placeholder(
+        cls, v: Optional[SecretStr]
+    ) -> Optional[SecretStr]:
+        if v is None:
+            return None
+        secret_value = v.get_secret_value()
+        if not secret_value or "your_refresh_token_here" in secret_value:
+            raise ValueError(
+                "無効なPixivプレースホルダートークンが検出されました。"
+                " 'auth' コマンドを実行するか、設定を更新してください。"
+            )
+        return v
+
 
 class FanboxAuthSettings(BaseModel):
     """Fanbox認証に特化した設定モデル。"""
@@ -70,6 +91,21 @@ class FanboxAuthSettings(BaseModel):
     sessid: Optional[SecretStr] = Field(
         None, description="FANBOXにログインした際のFANBOXSESSIDクッキー。"
     )
+
+    @field_validator("sessid")
+    @classmethod
+    def validate_sessid_is_not_placeholder(
+        cls, v: Optional[SecretStr]
+    ) -> Optional[SecretStr]:
+        if v is None:
+            return None
+        secret_value = v.get_secret_value()
+        if not secret_value or "your_fanbox_sessid_here" in secret_value:
+            raise ValueError(
+                "無効なFanboxプレースホルダートークンが検出されました。"
+                " 'auth' コマンドを実行するか、設定を更新してください。"
+            )
+        return v
 
 
 class ProviderSettings(BaseModel):
@@ -205,14 +241,14 @@ class Settings(BaseSettings):
 
         try:
             super().__init__(**values)
-        except ValidationError as e:
+        except (ValidationError, ValueError) as e:
             raise SettingsError(f"設定の検証に失敗しました:\n{e}")
 
         if require_auth:
-            if (
-                not self.providers.pixiv.refresh_token
-                and not self.providers.fanbox.sessid
-            ):
+            pixiv_ok = self.providers.pixiv.refresh_token is not None
+            fanbox_ok = self.providers.fanbox.sessid is not None
+
+            if not pixiv_ok and not fanbox_ok:
                 raise SettingsError(
                     "PixivまたはFanboxの認証情報が見つかりません。"
                     " 'pixiv2epub auth <service>' コマンドを実行するか、"

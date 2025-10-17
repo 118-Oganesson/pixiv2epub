@@ -9,7 +9,7 @@ from typing import Dict, List, Optional, Union
 
 from loguru import logger
 
-from ..models.local import CompressionResult
+from ..models.domain import CompressionResult
 from ..shared.settings import Settings
 
 
