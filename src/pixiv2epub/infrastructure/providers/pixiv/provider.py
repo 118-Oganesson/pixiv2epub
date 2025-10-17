@@ -8,6 +8,11 @@ from loguru import logger
 from pixivpy3 import PixivError
 from pydantic import ValidationError
 
+from ....domain.interfaces import (
+    ICreatorProvider,
+    IMultiWorkProvider,
+    IWorkProvider,
+)
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import ApiError, DataProcessingError
@@ -15,7 +20,6 @@ from ....shared.settings import Settings
 from ...strategies.mappers import PixivMetadataMapper
 from ...strategies.parsers import PixivTagParser
 from ...strategies.update_checkers import ContentHashUpdateStrategy
-from ..base import ICreatorProvider, IMultiWorkProvider, IWorkProvider
 from ..base_provider import BaseProvider
 from .client import PixivApiClient
 from .downloader import ImageDownloader
@@ -28,6 +32,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         super().__init__(settings)
         self.api_client = PixivApiClient(
             breaker=self.breaker,
+            provider_name=self.get_provider_name(),
             refresh_token=settings.providers.pixiv.refresh_token,
             api_delay=settings.downloader.api_delay,
             api_retries=settings.downloader.api_retries,
@@ -61,19 +66,20 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             downloader, cover_path = self._download_assets(workspace, detail_data_dict)
 
             # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
-            novel_data, image_paths = self._process_and_save_content(
+            novel_data, image_paths, parsed_text = self._process_and_save_content(
                 workspace, novel_data_dict, downloader
             )
 
             # --- ステップ4: メタデータを生成し、永続化 ---
             self._generate_and_persist_metadata(
-                workspace,
-                work_id,
-                new_hash,
-                novel_data,
-                detail_data_dict,
-                cover_path,
-                image_paths,
+                workspace=workspace,
+                work_id=work_id,
+                new_hash=new_hash,
+                novel_data=novel_data,
+                detail_data_dict=detail_data_dict,
+                cover_path=cover_path,
+                image_paths=image_paths,
+                parsed_text=parsed_text,
             )
 
             logger.info(
@@ -89,10 +95,10 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             ) from e
         except (ValidationError, KeyError, TypeError) as e:
             raise DataProcessingError(
-                f"小説ID {work_id} のデータ解析に失敗: {e}"
+                f"小説ID {work_id} のデータ解析に失敗: {e}",
+                self.get_provider_name(),
             ) from e
 
-    # ステップ1: API呼び出しと更新チェック
     def _fetch_and_check_update(
         self, work_id: int, workspace: Workspace
     ) -> Tuple[Dict, str, bool]:
@@ -109,7 +115,6 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             workspace.source_path.mkdir(parents=True, exist_ok=True)
         return novel_data_dict, new_hash, update_required
 
-    # ステップ2: アセットのダウンロード
     def _download_assets(
         self, workspace: Workspace, detail_data_dict: Dict
     ) -> Tuple[ImageDownloader, Optional[Path]]:
@@ -121,10 +126,9 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         cover_path = downloader.download_cover(detail_data_dict.get("novel", {}))
         return downloader, cover_path
 
-    # ステップ3: コンテンツのパースと保存
     def _process_and_save_content(
         self, workspace: Workspace, novel_data_dict: Dict, downloader: ImageDownloader
-    ) -> Tuple[NovelApiResponse, Dict[str, Path]]:
+    ) -> Tuple[NovelApiResponse, Dict[str, Path], str]:
         novel_data = NovelApiResponse.model_validate(novel_data_dict)
         image_paths = downloader.download_embedded_images(novel_data)
         parsed_text = self.parser.parse(novel_data.text, image_paths)
@@ -139,9 +143,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 logger.error("ページ {} の保存に失敗しました: {}", i + 1, e)
         logger.debug("{}ページの保存が完了しました。", len(pages))
 
-        return novel_data, image_paths
+        return novel_data, image_paths, parsed_text
 
-    # ステップ4: メタデータの生成と永続化
     def _generate_and_persist_metadata(
         self,
         workspace: Workspace,
@@ -151,13 +154,11 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         detail_data_dict: Dict,
         cover_path: Optional[Path],
         image_paths: Dict[str, Path],
+        parsed_text: str,
     ):
         parsed_description = self.parser.parse(
             detail_data_dict.get("novel", {}).get("caption", ""), image_paths
         )
-
-        # NOTE: parsed_text is needed again here for page title extraction in mapper
-        parsed_text = self.parser.parse(novel_data.text, image_paths)
 
         metadata = self.mapper.map_to_metadata(
             workspace=workspace,

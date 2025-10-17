@@ -14,9 +14,14 @@ class BaseApiClient(ABC):
     """APIクライアントの共通ロジック（リトライ、エラーハンドリング）を実装する基底クラス。"""
 
     def __init__(
-        self, breaker: CircuitBreaker, api_delay: float = 1.0, api_retries: int = 3
+        self,
+        breaker: CircuitBreaker,
+        provider_name: str,
+        api_delay: float = 1.0,
+        api_retries: int = 3,
     ):
         self.breaker = breaker
+        self.provider_name = provider_name
         self.delay = api_delay
         self.retries = api_retries
 
@@ -40,7 +45,8 @@ class BaseApiClient(ABC):
 
                 if status_code in [401, 403]:
                     raise AuthenticationError(
-                        f"API認証エラー (HTTP {status_code})", provider_name=None
+                        f"API認証エラー (HTTP {status_code})",
+                        provider_name=self.provider_name,
                     ) from e
 
                 if status_code and 400 <= status_code < 500:
@@ -51,7 +57,7 @@ class BaseApiClient(ABC):
                     )
                     raise ApiError(
                         f"APIクライアントエラー (HTTP {status_code})",
-                        provider_name=None,
+                        provider_name=self.provider_name,
                     ) from e
 
                 logger.warning(
@@ -68,7 +74,7 @@ class BaseApiClient(ABC):
         logger.error("API呼び出しが最終的に失敗しました: {}", func.__name__)
         raise ApiError(
             f"API呼び出しがリトライ上限に達しました: {func.__name__}",
-            provider_name=None,
+            provider_name=self.provider_name,
         ) from last_exception
 
     def _safe_api_call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
@@ -84,5 +90,6 @@ class BaseApiClient(ABC):
                 func.__name__,
             )
             raise ApiError(
-                "サービスが一時的に利用不可のようです。しばらくしてから再試行してください (サーキットブレーカー作動中)。"
+                "サービスが一時的に利用不可のようです。しばらくしてから再試行してください (サーキットブレーカー作動中)。",
+                provider_name=self.provider_name,
             ) from e

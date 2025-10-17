@@ -7,6 +7,7 @@ from loguru import logger
 from pydantic import ValidationError
 from requests.exceptions import RequestException
 
+from ....domain.interfaces import ICreatorProvider, IWorkProvider
 from ....models.fanbox import FanboxPostApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import ApiError, DataProcessingError
@@ -14,7 +15,6 @@ from ....shared.settings import Settings
 from ...strategies.mappers import FanboxMetadataMapper
 from ...strategies.parsers import FanboxBlockParser
 from ...strategies.update_checkers import TimestampUpdateStrategy
-from ..base import ICreatorProvider, IWorkProvider
 from ..base_provider import BaseProvider
 from .client import FanboxApiClient
 from .downloader import FanboxImageDownloader
@@ -27,6 +27,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         super().__init__(settings)
         self.api_client = FanboxApiClient(
             breaker=self.breaker,
+            provider_name=self.get_provider_name(),
             sessid=settings.providers.fanbox.sessid,
             api_delay=settings.downloader.api_delay,
             api_retries=settings.downloader.api_retries,
@@ -119,7 +120,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
         except (ValidationError, KeyError, TypeError) as e:
             raise DataProcessingError(
-                f"投稿ID {work_id} のデータ解析に失敗: {e}"
+                f"投稿ID {work_id} のデータ解析に失敗: {e}", self.get_provider_name()
             ) from e
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
@@ -162,7 +163,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                         "ページ {} の投稿リスト取得中にエラーが発生しました: {}",
                         i,
                         e,
-                        exc_info=True,
+                        exc_info=self.settings.log_level == "DEBUG",
                     )
                     # 1ページの失敗で全体を止めない
                     continue
@@ -171,7 +172,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             logger.error(
                 "投稿ページ一覧の取得中に致命的なエラーが発生しました: {}",
                 e,
-                exc_info=True,
+                exc_info=self.settings.log_level == "DEBUG",
             )
             return []  # 失敗時は空のリストを返す
 
@@ -191,6 +192,9 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                     workspaces.append(workspace)
             except Exception as e:
                 logger.error(
-                    "投稿ID {} の処理に失敗しました: {}", post_id, e, exc_info=True
+                    "投稿ID {} の処理に失敗しました: {}",
+                    post_id,
+                    e,
+                    exc_info=self.settings.log_level == "DEBUG",
                 )
         return workspaces

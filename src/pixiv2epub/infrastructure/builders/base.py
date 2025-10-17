@@ -8,6 +8,8 @@ from loguru import logger
 
 from ...models.local import NovelMetadata
 from ...models.workspace import Workspace
+
+from ...shared.constants import DETAIL_FILE_NAME
 from ...shared.exceptions import BuildError
 from ...shared.settings import Settings
 
@@ -33,10 +35,10 @@ class BaseBuilder(ABC):
             metadata_dict = custom_metadata
             logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
         else:
-            detail_json_path = workspace.source_path / "detail.json"
+            detail_json_path = workspace.source_path / DETAIL_FILE_NAME
             if not detail_json_path.is_file():
                 raise BuildError(
-                    f"ビルドに必要な 'detail.json' が見つかりません: {detail_json_path}"
+                    f"ビルドに必要な '{DETAIL_FILE_NAME}' が見つかりません: {detail_json_path}"
                 )
             with open(detail_json_path, "r", encoding="utf-8") as f:
                 metadata_dict = json.load(f)

@@ -19,8 +19,8 @@ class GuiManager:
         self.app = app
         self.provider_factory = ProviderFactory(app.settings)
 
-    async def _run_task_from_browser(self, url: str) -> dict:
-        """ブラウザから呼び出される非同期ラッパー関数。"""
+    def _run_task_from_browser(self, url: str) -> dict:
+        """ブラウザから呼び出されるラッパー関数。"""
         logger.info("ブラウザからタスク実行リクエスト: {}", url)
         try:
             provider_enum, content_type_enum, target_id = parse_input(url)
@@ -33,9 +33,10 @@ class GuiManager:
             )
 
             provider = self.provider_factory.create(provider_enum)
+            builder = EpubBuilder(self.app.settings)
 
             result_paths = self.app.run_download_and_build(
-                provider, content_type_enum, target_id, builder_class=EpubBuilder
+                provider, content_type_enum, target_id, builder=builder
             )
 
             message = f"{len(result_paths)}件のEPUB生成に成功しました。"

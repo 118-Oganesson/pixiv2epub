@@ -5,7 +5,8 @@ from typing import Any, List, Optional
 
 from loguru import logger
 
-from ..infrastructure.providers.base import (
+from ..domain.interfaces import (
+    IBuilder,
     ICreatorProvider,
     IMultiWorkProvider,
     IProvider,
@@ -14,7 +15,6 @@ from ..infrastructure.providers.base import (
 from ..models.workspace import Workspace
 from ..shared.exceptions import BuildError, ContentNotFoundError, ProviderError
 from ..shared.settings import Settings
-from .interfaces import IBuilder
 
 
 class DownloadBuildOrchestrator:
@@ -54,7 +54,7 @@ class DownloadBuildOrchestrator:
             provider=self.provider.get_provider_name(), work_id=work_id
         ):
             try:
-                logger.info("作品の処理を開始します...")
+                logger.info("作品(id={work_id})の処理を開始します。", work_id=work_id)
                 if not isinstance(self.provider, IWorkProvider):
                     raise TypeError(
                         "現在のProviderは単一作品の取得をサポートしていません。"

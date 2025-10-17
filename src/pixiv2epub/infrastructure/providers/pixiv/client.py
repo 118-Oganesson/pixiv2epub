@@ -17,15 +17,16 @@ class PixivApiClient(BaseApiClient):
     def __init__(
         self,
         breaker: CircuitBreaker,
+        provider_name: str,
         refresh_token: SecretStr,
         api_delay: float = 1.0,
         api_retries: int = 3,
     ):
-        super().__init__(breaker,api_delay, api_retries)
+        super().__init__(breaker, provider_name, api_delay, api_retries)
         token_value = refresh_token.get_secret_value() if refresh_token else None
         if not token_value or token_value == "your_refresh_token_here":
             raise AuthenticationError(
-                "設定に有効なPixivのrefresh_tokenが見つかりません。"
+                "設定に有効なPixivのrefresh_tokenが見つかりません。", provider_name
             )
 
         self.api = AppPixivAPI()
@@ -33,7 +34,9 @@ class PixivApiClient(BaseApiClient):
             self.api.auth(refresh_token=token_value)
             logger.debug("Pixiv APIの認証が完了しました。")
         except PixivError as e:
-            raise AuthenticationError(f"Pixiv APIの認証に失敗しました: {e}")
+            raise AuthenticationError(
+                f"Pixiv APIの認証に失敗しました: {e}", provider_name
+            ) from e
 
     @property
     def _api_exception_class(self) -> Type[Exception]:

@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/entrypoints/providers.py
 from typing import Dict, Type
 
-from ..infrastructure.providers.base import IProvider
+from ..domain.interfaces import IProvider
 from ..infrastructure.providers.fanbox.provider import FanboxProvider
 from ..infrastructure.providers.pixiv.provider import PixivProvider
 from ..shared.enums import Provider as ProviderEnum
@@ -14,6 +14,7 @@ class ProviderFactory:
     """
 
     def __init__(self, settings: Settings):
+        # IProviderを実装した具象クラスを登録します
         self._providers: Dict[ProviderEnum, Type[IProvider]] = {
             ProviderEnum.PIXIV: PixivProvider,
             ProviderEnum.FANBOX: FanboxProvider,

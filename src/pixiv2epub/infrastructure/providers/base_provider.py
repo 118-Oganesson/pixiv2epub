@@ -6,19 +6,24 @@ from typing import Any, Optional
 from loguru import logger
 from pybreaker import CircuitBreaker
 
+from ...domain.interfaces import IProvider
 from ...models.local import NovelMetadata
 from ...models.workspace import Workspace, WorkspaceManifest
 from ...shared.settings import Settings
-from .base import IProvider
 
 
 class BaseProvider(IProvider):
     """プロバイダーの共通ワークフローを管理する抽象基底クラス。"""
 
     def __init__(self, settings: Settings):
-        super().__init__(settings)
+        """
+        Args:
+            settings (Settings): アプリケーション設定。
+        """
+        self.settings = settings
         self.workspace_dir = settings.workspace.root_directory
         self._breaker: Optional[CircuitBreaker] = None
+        logger.info(f"{self.__class__.__name__} を初期化しました。")
 
     @property
     def breaker(self) -> CircuitBreaker:

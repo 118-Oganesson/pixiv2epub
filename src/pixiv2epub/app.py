@@ -4,14 +4,14 @@ from typing import Any, List
 
 from loguru import logger
 
-from .domain.interfaces import IBuilder
-from .domain.orchestrator import DownloadBuildOrchestrator
-from .infrastructure.providers.base import (
+from .domain.interfaces import (
+    IBuilder,
     ICreatorProvider,
     IMultiWorkProvider,
     IProvider,
     IWorkProvider,
 )
+from .domain.orchestrator import DownloadBuildOrchestrator
 from .models.workspace import Workspace
 from .shared.enums import ContentType
 from .shared.exceptions import AssetMissingError
@@ -88,5 +88,5 @@ class Application:
             return builder.build(workspace)
         except ValueError as e:
             raise AssetMissingError(
-                "指定されたパスは有効なワークスペースではありません: {}", workspace_path
+                f"指定されたパスは有効なワークスペースではありません: {workspace_path}"
             ) from e

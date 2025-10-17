@@ -5,6 +5,7 @@
 """
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
@@ -102,13 +103,15 @@ class Identifier(BaseModel):
 class NovelMetadata(BaseModel):
     """`detail.json`に記載された小説のメタデータ全体を格納します。"""
 
+    model_config = ConfigDict(frozen=True)
+
     title: str
     author: Author
     series: Optional[SeriesInfo]
     description: str
     identifier: Identifier
-    published_date: str
-    updated_date: Optional[str]
+    published_date: datetime
+    updated_date: Optional[datetime]
     cover_path: Optional[str]
     tags: List[str]
     original_source: str

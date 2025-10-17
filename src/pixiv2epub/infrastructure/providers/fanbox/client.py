@@ -22,15 +22,16 @@ class FanboxApiClient(BaseApiClient):
     def __init__(
         self,
         breaker: CircuitBreaker,
+        provider_name: str,
         sessid: SecretStr,
         api_delay: float = 1.0,
         api_retries: int = 3,
     ):
-        super().__init__(breaker, api_delay, api_retries)
+        super().__init__(breaker, provider_name, api_delay, api_retries)
         sessid_value = sessid.get_secret_value() if sessid else None
         if not sessid_value or sessid_value == "your_fanbox_sessid_here":
             raise AuthenticationError(
-                "設定に有効なFANBOXのsessidが見つかりません。", "fanbox"
+                "設定に有効なFANBOXのsessidが見つかりません。", provider_name
             )
 
         self.session = cloudscraper.create_scraper()
@@ -102,10 +103,10 @@ class FanboxApiClient(BaseApiClient):
         except RequestException as e:
             logger.error("ダウンロードに失敗しました: {}, エラー: {}", url, e)
             raise ApiError(
-                f"ファイルのダウンロードに失敗しました: {url}", "fanbox"
+                f"ファイルのダウンロードに失敗しました: {url}", self.provider_name
             ) from e
         except IOError as e:
             logger.error("ファイル書き込みに失敗しました: {}, エラー: {}", save_path, e)
             raise ApiError(
-                f"ファイルの書き込みに失敗しました: {save_path}", "fanbox"
+                f"ファイルの書き込みに失敗しました: {save_path}", self.provider_name
             ) from e

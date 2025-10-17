@@ -1,5 +1,4 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
-
 import asyncio
 from pathlib import Path
 from typing import List, Literal, Optional
@@ -109,13 +108,11 @@ def main_callback(
     Pixiv/Fanbox to EPUB Converter
     """
     log_level = "DEBUG" if verbose else "INFO"
-
     setup_logging(log_level, serialize_to_file=log_file)
-
     ctx.obj = AppState()
 
     # auth と gui 以外のコマンド実行時に設定を初期化
-    if ctx.invoked_subcommand not in ("auth", "gui"):
+    if ctx.invoked_subcommand not in ("auth", "gui", "build"):
         ctx.obj.initialize_settings(config, log_level)
 
 
@@ -242,9 +239,9 @@ def build(
 ):
     """既存のワークスペースディレクトリからEPUBをビルドします。"""
     app_state: AppState = ctx.obj
-    # buildコマンドはProviderを必要としないため、ここで初めて初期化
     if ctx.invoked_subcommand == "build":
-        app_state.initialize_settings(ctx.params.get("config"), "INFO")
+        log_level = ctx.parent.params.get("log_level", "INFO")
+        app_state.initialize_settings(ctx.params.get("config"), log_level)
 
     app_instance = app_state.app
 
@@ -308,7 +305,8 @@ def gui(
 ):
     """ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
-    app_state.initialize_settings(config, "INFO")
+    log_level = ctx.parent.params.get("log_level", "INFO")
+    app_state.initialize_settings(config, log_level)
     app_instance = app_state.app
 
     session_path = Path("./.gui_session")
@@ -361,7 +359,3 @@ def run_app():
     except Pixiv2EpubError as e:
         logger.error("❌ 処理中にエラーが発生しました: {}", e)
         raise typer.Exit(code=1)
-
-
-if __name__ == "__main__":
-    run_app()

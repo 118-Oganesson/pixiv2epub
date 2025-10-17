@@ -14,9 +14,7 @@ from ....models.local import (
     PageInfo,
 )
 from ....models.workspace import Workspace
-
-# 決定論的なブックIDを生成するための固定の名前空間UUID
-NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
+from ....shared.constants import NAMESPACE_UUID
 
 
 class EpubComponentGenerator:
@@ -113,14 +111,7 @@ class EpubComponentGenerator:
         self, css_path: Optional[str], cover_asset: Optional[ImageAsset]
     ) -> PageAsset:
         """作品情報ページを生成します。"""
-        # 日付フォーマット処理
-        formatted_date = self.metadata.published_date
-        try:
-            if self.metadata.published_date:
-                dt_object = datetime.fromisoformat(self.metadata.published_date)
-                formatted_date = dt_object.strftime("%Y年%m月%d日 %H:%M")
-        except (ValueError, TypeError):
-            pass
+        formatted_date = self.metadata.published_date.strftime("%Y年%m月%d日 %H:%M")
 
         context = {
             "title": self.metadata.title,
@@ -221,16 +212,11 @@ class EpubComponentGenerator:
             )
             spine_itemrefs.append({"idref": page.id, "linear": True})
         for image in images:
-            # `_asdict` is a method of NamedTuple
             manifest_items.append(image.model_dump())
 
-        metadata_as_dict = self.metadata.model_dump(mode="json")
-
-        # provider and content id for uuid generation
         provider_name = self.workspace.id.split("_")[0]
         content_id = self.workspace.id.split("_", 1)[1]
 
-        # Use provider-specific identifier if available
         novel_id = (
             self.metadata.identifier.novel_id
             or self.metadata.identifier.post_id
@@ -238,15 +224,23 @@ class EpubComponentGenerator:
         )
 
         deterministic_uuid = uuid.uuid5(NAMESPACE_UUID, f"{provider_name}-{novel_id}")
-        self.metadata.identifier.uuid = f"urn:uuid:{deterministic_uuid}"
-        metadata_as_dict = self.metadata.model_dump(mode="json")
-        modified_time = (
-            self.metadata.updated_date or datetime.now(timezone.utc).isoformat()
+        self.metadata = self.metadata.model_copy(
+            update={
+                "identifier": self.metadata.identifier.model_copy(
+                    update={"uuid": f"urn:uuid:{deterministic_uuid}"}
+                )
+            }
         )
+        metadata_as_dict = self.metadata.model_dump(mode="json")
+
+        modified_time_dt = self.metadata.updated_date or datetime.now(timezone.utc)
+        modified_time = modified_time_dt.isoformat()
+
+        published_date_str = self.metadata.published_date.isoformat()
 
         context = {
             "metadata": metadata_as_dict,
-            "formatted_date": self.metadata.published_date,
+            "formatted_date": published_date_str,
             "modified_time": modified_time,
             "manifest_items": manifest_items,
             "spine_itemrefs": spine_itemrefs,
