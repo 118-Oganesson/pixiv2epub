@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
 # --- 画像圧縮関連 ---
@@ -114,6 +114,6 @@ class NovelMetadata(BaseModel):
     updated_date: Optional[datetime]
     cover_path: Optional[str]
     tags: List[str]
-    original_source: str
+    original_source: HttpUrl
     pages: List[PageInfo]
     text_length: Optional[int]

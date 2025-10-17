@@ -71,7 +71,7 @@ class PixivMetadataMapper(IMetadataMapper):
             description=parsed_description,
             identifier=Identifier(novel_id=novel.get("id")),
             published_date=novel.get("create_date"),
-            updated_date=None,
+            updated_date=novel.get("create_date"),  # Use create_date as a fallback
             cover_path=relative_cover_path,
             tags=[t.get("name") for t in novel.get("tags", [])],
             original_source=PIXIV_NOVEL_URL.format(novel_id=novel.get("id")),

@@ -44,9 +44,9 @@ class Application:
             result = orchestrator.process_work(target_id)
             return [result] if result else []
         elif content_type == ContentType.SERIES:
-            return orchestrator.process_collection(target_id, is_series=True)
+            return orchestrator.process_series(target_id)
         elif content_type == ContentType.CREATOR:
-            return orchestrator.process_collection(target_id, is_series=False)
+            return orchestrator.process_creator(target_id)
         else:
             raise ValueError(
                 f"サポートされていないコンテンツタイプです: {content_type}"

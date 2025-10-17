@@ -21,7 +21,7 @@ URL_PATTERNS = {
 }
 
 
-def parse_input(
+def parse_content_identifier(
     input_str: str,
 ) -> Tuple[Provider, ContentType, Union[int, str]]:
     """

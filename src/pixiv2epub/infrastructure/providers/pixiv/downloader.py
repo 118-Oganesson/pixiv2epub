@@ -9,6 +9,10 @@ from ....models.pixiv import NovelApiResponse
 from ..base_downloader import BaseDownloader
 from .client import PixivApiClient
 
+COVER_IMAGE_STEM = "cover"
+UPLOADED_IMAGE_PREFIX = "uploaded_"
+PIXIV_IMAGE_PREFIX = "pixiv_"
+
 
 class ImageDownloader(BaseDownloader):
     """
@@ -38,7 +42,7 @@ class ImageDownloader(BaseDownloader):
             return None
 
         ext = cover_url.split(".")[-1].split("?")[0]
-        cover_filename = f"cover.{ext}"
+        cover_filename = f"{COVER_IMAGE_STEM}.{ext}"
 
         # 高解像度版、オリジナル版の順で試行
         high_res_url = re.sub(r"/c/\d+x\d+(?:_\d+)?/", "/c/600x600/", cover_url)
@@ -64,9 +68,9 @@ class ImageDownloader(BaseDownloader):
         for image_id in uploaded_ids:
             image_meta = novel_data.images.get(image_id)
             if image_meta and image_meta.urls.original:
-                url = image_meta.urls.original
+                url = str(image_meta.urls.original)
                 ext = url.split(".")[-1].split("?")[0]
-                filename = f"uploaded_{image_id}.{ext}"
+                filename = f"{UPLOADED_IMAGE_PREFIX}{image_id}.{ext}"
                 if path := self._download_single_image(url, filename):
                     image_paths[image_id] = path
 
@@ -85,7 +89,7 @@ class ImageDownloader(BaseDownloader):
                 )
                 if url:
                     ext = url.split(".")[-1].split("?")[0]
-                    filename = f"pixiv_{illust_id}.{ext}"
+                    filename = f"{PIXIV_IMAGE_PREFIX}{illust_id}.{ext}"
                     if path := self._download_single_image(url, filename):
                         image_paths[illust_id] = path
             except Exception as e:

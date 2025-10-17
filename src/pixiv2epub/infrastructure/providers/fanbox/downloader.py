@@ -8,6 +8,8 @@ from ....models.fanbox import Post
 from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
 
+COVER_IMAGE_STEM = "cover"
+
 
 class FanboxImageDownloader(BaseDownloader):
     """
@@ -36,7 +38,7 @@ class FanboxImageDownloader(BaseDownloader):
 
         cover_url = str(post_data.cover_image_url)
         ext = cover_url.split(".")[-1].split("?")[0]  # URLから拡張子を安全に取得
-        cover_filename = f"cover.{ext}"
+        cover_filename = f"{COVER_IMAGE_STEM}.{ext}"
 
         logger.info("カバー画像をダウンロードします: {}", cover_filename)
         return self._download_single_image(cover_url, cover_filename)

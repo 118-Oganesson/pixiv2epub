@@ -7,8 +7,8 @@ from playwright.sync_api import Page
 from ...app import Application
 from ...infrastructure.builders.epub.builder import EpubBuilder
 from ...shared.exceptions import Pixiv2EpubError
-from ...utils.url_parser import parse_input
-from ..providers import ProviderFactory
+from ...utils.url_parser import parse_content_identifier
+from ..provider_factory import ProviderFactory
 
 
 class GuiManager:
@@ -23,7 +23,7 @@ class GuiManager:
         """ブラウザから呼び出されるラッパー関数。"""
         logger.info("ブラウザからタスク実行リクエスト: {}", url)
         try:
-            provider_enum, content_type_enum, target_id = parse_input(url)
+            provider_enum, content_type_enum, target_id = parse_content_identifier(url)
 
             logger.info(
                 "処理を開始します: Provider={}, Type={}, ID={}",

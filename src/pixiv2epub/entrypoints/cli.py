@@ -22,9 +22,9 @@ from ..shared.exceptions import (
 )
 from ..shared.settings import Settings
 from ..utils.logging import setup_logging
-from ..utils.url_parser import parse_input
+from ..utils.url_parser import parse_content_identifier
 from .gui.manager import GuiManager
-from .providers import ProviderFactory
+from .provider_factory import ProviderFactory
 
 app = typer.Typer(
     help="PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
@@ -184,7 +184,7 @@ def _execute_command(
     if not app_state.provider_factory:
         raise RuntimeError("ProviderFactoryが初期化されていません。")
 
-    provider_enum, content_type_enum, target_id = parse_input(input_str)
+    provider_enum, content_type_enum, target_id = parse_content_identifier(input_str)
     provider = app_state.provider_factory.create(provider_enum)
 
     if mode == "run":
@@ -206,7 +206,7 @@ def _execute_command(
 @app.command()
 def run(
     ctx: typer.Context,
-    input_url_or_id: Annotated[
+    target_input: Annotated[
         str,
         typer.Argument(
             help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
@@ -215,13 +215,13 @@ def run(
     ],
 ):
     """指定されたURLまたはIDの作品をダウンロードし、EPUBをビルドします。"""
-    _execute_command(ctx.obj, input_url_or_id, "run")
+    _execute_command(ctx.obj, target_input, "run")
 
 
 @app.command()
 def download(
     ctx: typer.Context,
-    input_url_or_id: Annotated[
+    target_input: Annotated[
         str,
         typer.Argument(
             help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
@@ -230,7 +230,7 @@ def download(
     ],
 ):
     """作品データをワークスペースにダウンロードするだけで終了します。"""
-    _execute_command(ctx.obj, input_url_or_id, "download")
+    _execute_command(ctx.obj, target_input, "download")
 
 
 @app.command()
@@ -347,5 +347,5 @@ def run_app():
         )
         raise typer.Exit(code=1)
     except Pixiv2EpubError as e:
-        logger.error("❌ 処理中にエラーが発生しました: {}", e)
+        logger.error("❌ 処理中にエラーが発生しました: {}", e, exc_info=True)
         raise typer.Exit(code=1)

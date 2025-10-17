@@ -33,7 +33,7 @@ def setup_logging(level: str = "INFO", serialize_to_file: bool = False):
             rotation="10 MB",  # 10MBでファイルをローテーション
             retention="7 days",  # 7日間ログを保持
             backtrace=True,
-            diagnose=True,
+            diagnose=False,  # プロダクションでは機密情報漏洩を防ぐためFalseを推奨
         )
 
     logger.info(

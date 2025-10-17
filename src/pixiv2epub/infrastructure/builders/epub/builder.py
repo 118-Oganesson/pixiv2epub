@@ -16,6 +16,8 @@ from .asset_manager import AssetManager
 from .component_generator import EpubComponentGenerator
 from .package_assembler import EpubPackageAssembler
 
+DEFAULT_THEME_NAME = "default"
+
 
 class EpubBuilder(BaseBuilder):
     """EPUB生成プロセスを統括するクラス。"""
@@ -63,11 +65,11 @@ class EpubBuilder(BaseBuilder):
 
     def _create_template_env(self, workspace: Workspace) -> Environment:
         """ワークスペースのプロバイダーに基づいてJinja2環境を生成します。"""
-        provider_name = "default"  # フォールバック
+        provider_name = DEFAULT_THEME_NAME  # フォールバック
         try:
             with open(workspace.manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-                provider_name = manifest.get("provider_name", "default")
+            provider_name = manifest.get("provider_name", DEFAULT_THEME_NAME)
             logger.debug("Provider '{}' のテーマを使用します。", provider_name)
         except (IOError, json.JSONDecodeError):
             logger.warning(
@@ -77,10 +79,10 @@ class EpubBuilder(BaseBuilder):
         assets_root = Path(__file__).parent.parent.parent.parent / "assets"
         epub_assets_root = assets_root / "epub"
         provider_template_dir = epub_assets_root / provider_name
-        default_template_dir = epub_assets_root / "default"
+        default_template_dir = epub_assets_root / DEFAULT_THEME_NAME
 
         loaders = []
-        if provider_template_dir.is_dir() and provider_name != "default":
+        if provider_template_dir.is_dir() and provider_name != DEFAULT_THEME_NAME:
             loaders.append(FileSystemLoader(str(provider_template_dir)))
         if default_template_dir.is_dir():
             loaders.append(FileSystemLoader(str(default_template_dir)))

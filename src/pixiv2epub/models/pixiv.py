@@ -10,6 +10,7 @@ from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
+    HttpUrl,
     field_validator,
     model_validator,
 )
@@ -37,9 +38,9 @@ class IllustTag(PixivBaseModel):
 
 
 class IllustImageUrls(PixivBaseModel):
-    small: Optional[str] = None
-    medium: Optional[str] = None
-    original: Optional[str] = None
+    small: Optional[HttpUrl] = None
+    medium: Optional[HttpUrl] = None
+    original: Optional[HttpUrl] = None
 
 
 class IllustDetails(PixivBaseModel):
@@ -55,7 +56,7 @@ class IllustDetails(PixivBaseModel):
 class IllustUser(PixivBaseModel):
     id: str
     name: str
-    image: str
+    image: HttpUrl
 
 
 class PixivIllust(PixivBaseModel):
@@ -68,7 +69,7 @@ class PixivIllust(PixivBaseModel):
 
 
 class UploadedImageUrls(PixivBaseModel):
-    original: str
+    original: HttpUrl
 
 
 class UploadedImage(PixivBaseModel):
@@ -82,7 +83,7 @@ class SeriesNavigationNovel(PixivBaseModel):
     content_order: str = Field(alias="contentOrder")
     viewable: bool
     title: str
-    cover_url: str = Field(alias="coverUrl")
+    cover_url: HttpUrl = Field(alias="coverUrl")
     viewable_message: Optional[str] = Field(None, alias="viewableMessage")
 
 
@@ -97,7 +98,7 @@ class NovelApiResponse(PixivBaseModel):
     id: str
     title: str
     user_id: str = Field(alias="userId")
-    cover_url: str = Field(alias="coverUrl")
+    cover_url: HttpUrl = Field(alias="coverUrl")
     caption: str
     cdate: str
     text: str
@@ -146,7 +147,7 @@ class NovelSeriesApiResponse(PixivBaseModel):
 
     novel_series_detail: SeriesDetail = Field(alias="novel_series_detail")
     novels: List[NovelInSeries]
-    next_url: Optional[str] = Field(None, alias="next_url")
+    next_url: Optional[HttpUrl] = Field(None, alias="next_url")
 
     @model_validator(mode="after")
     def assign_order_if_missing(self) -> "NovelSeriesApiResponse":

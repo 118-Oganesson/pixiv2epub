@@ -1,4 +1,4 @@
-# FILE: src/pixiv2epub/entrypoints/providers.py
+# FILE: src/pixiv2epub/entrypoints/provider_factory.py
 from typing import Dict, Type
 
 from ..domain.interfaces import IProvider
