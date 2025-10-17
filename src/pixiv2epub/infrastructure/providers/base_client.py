@@ -43,6 +43,14 @@ class BaseApiClient(ABC):
                 last_exception = e
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
 
+                log = logger.bind(
+                    func_name=func.__name__,
+                    attempt=attempt,
+                    total_retries=self.retries,
+                    error=str(e),
+                    status_code=status_code or "N/A",
+                )
+
                 if status_code in [401, 403]:
                     raise AuthenticationError(
                         f"API認証エラー (HTTP {status_code})",
@@ -50,28 +58,19 @@ class BaseApiClient(ABC):
                     ) from e
 
                 if status_code and 400 <= status_code < 500:
-                    logger.error(
-                        "API '{}' で回復不能なクライアントエラー (HTTP {})",
-                        func.__name__,
-                        status_code,
-                    )
+                    log.error("APIで回復不能なクライアントエラーが発生しました。")
                     raise ApiError(
                         f"APIクライアントエラー (HTTP {status_code})",
                         provider_name=self.provider_name,
                     ) from e
 
-                logger.warning(
-                    "API '{}' 呼び出し中にエラー (試行 {}/{}): {} (HTTP: {})",
-                    func.__name__,
-                    attempt,
-                    self.retries,
-                    e,
-                    status_code or "N/A",
-                )
+                log.warning("API呼び出し中にエラーが発生しました。")
                 if attempt < self.retries:
                     time.sleep(self.delay * (attempt + 1))  # Backoff delay
 
-        logger.error("API呼び出しが最終的に失敗しました: {}", func.__name__)
+        logger.bind(func_name=func.__name__).error(
+            "API呼び出しが最終的に失敗しました。"
+        )
         raise ApiError(
             f"API呼び出しがリトライ上限に達しました: {func.__name__}",
             provider_name=self.provider_name,
@@ -85,9 +84,8 @@ class BaseApiClient(ABC):
         try:
             return self.breaker.call(self._execute_with_retries, func, *args, **kwargs)
         except CircuitBreakerError as e:
-            logger.error(
-                "サーキットブレーカー作動中。API '{}' の呼び出しを中止しました。",
-                func.__name__,
+            logger.bind(func_name=func.__name__).error(
+                "サーキットブレーカー作動中。API呼び出しを中止しました。"
             )
             raise ApiError(
                 "サービスが一時的に利用不可のようです。しばらくしてから再試行してください (サーキットブレーカー作動中)。",

@@ -21,16 +21,16 @@ class GuiManager:
 
     def _run_task_from_browser(self, url: str) -> dict:
         """ブラウザから呼び出されるラッパー関数。"""
-        logger.info("ブラウザからタスク実行リクエスト: {}", url)
+        log = logger.bind(url=url)
+        log.info("ブラウザからタスク実行リクエストを受け取りました。")
         try:
             provider_enum, content_type_enum, target_id = parse_content_identifier(url)
 
-            logger.info(
-                "処理を開始します: Provider={}, Type={}, ID={}",
-                provider_enum.name,
-                content_type_enum.name,
-                target_id,
-            )
+            log.bind(
+                provider=provider_enum.name,
+                content_type=content_type_enum.name,
+                target_id=target_id,
+            ).info("処理を開始します。")
 
             provider = self.provider_factory.create(provider_enum)
             builder = EpubBuilder(self.app.settings)
@@ -40,15 +40,15 @@ class GuiManager:
             )
 
             message = f"{len(result_paths)}件のEPUB生成に成功しました。"
-            logger.success("タスク完了: {}", message)
+            log.bind(result_count=len(result_paths)).success("タスクが完了しました。")
             return {"status": "success", "message": message}
 
         except Pixiv2EpubError as e:
-            logger.error("GUIタスクの処理中にエラーが発生しました: {}", e)
+            log.bind(error=str(e)).error("GUIタスクの処理中にエラーが発生しました。")
             return {"status": "error", "message": str(e)}
         except Exception as e:
-            logger.error(
-                "GUIタスクの処理中に予期せぬエラーが発生しました: {}", e, exc_info=True
+            log.bind(error=str(e)).error(
+                "GUIタスクの処理中に予期せぬエラーが発生しました。", exc_info=True
             )
             return {"status": "error", "message": f"予期せぬエラーが発生しました: {e}"}
 
@@ -69,5 +69,5 @@ class GuiManager:
                 "GUIブリッジとインジェクタースクリプトのセットアップが完了しました。"
             )
         except Exception as e:
-            logger.error("GUIブリッジのセットアップに失敗しました: {}", e)
+            logger.bind(error=str(e)).error("GUIブリッジのセットアップに失敗しました。")
             raise

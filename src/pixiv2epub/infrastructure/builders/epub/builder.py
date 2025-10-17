@@ -1,13 +1,14 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/builder.py
-import os
 import json
+import os
 from pathlib import Path
 
-from jinja2 import Environment, FileSystemLoader, ChoiceLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 from loguru import logger
 
 from ....models.local import NovelMetadata
 from ....models.workspace import Workspace
+from ....shared.constants import DEFAULT_THEME_NAME
 from ....shared.exceptions import BuildError
 from ....shared.settings import Settings
 from ....utils.filesystem_sanitizer import generate_sanitized_path
@@ -15,7 +16,6 @@ from ..base import BaseBuilder
 from .asset_manager import AssetManager
 from .component_generator import EpubComponentGenerator
 from .package_assembler import EpubPackageAssembler
-from ....shared.constants import DEFAULT_THEME_NAME
 
 
 class EpubBuilder(BaseBuilder):
@@ -36,11 +36,12 @@ class EpubBuilder(BaseBuilder):
         """EPUBファイルを生成するメインの実行メソッド。"""
         metadata = self._load_metadata(workspace)
         output_path = self._determine_output_path(metadata)
-        logger.info("EPUB作成処理を開始します (Workspace: {})", workspace.id)
+
+        log = logger.bind(workspace_id=workspace.id, output_path=str(output_path))
+        log.info("EPUB作成処理を開始します。")
+
         if output_path.exists():
-            logger.warning(
-                "出力ファイル {} は既に存在するため、上書きします。", output_path
-            )
+            log.warning("出力ファイルは既に存在するため、上書きします。")
 
         try:
             # テンプレートエンジンとジェネレータを動的に初期化
@@ -55,7 +56,7 @@ class EpubBuilder(BaseBuilder):
                 cover_asset,
             )
             self.archiver.archive(components, output_path)
-            logger.info("EPUBファイルの作成に成功しました: {}", output_path)
+            log.success("EPUBファイルの作成に成功しました。")
             return output_path
         except Exception as e:
             logger.exception("EPUBファイルの作成中に致命的なエラーが発生しました。")
@@ -69,7 +70,9 @@ class EpubBuilder(BaseBuilder):
             with open(workspace.manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
             provider_name = manifest.get("provider_name", DEFAULT_THEME_NAME)
-            logger.debug("Provider '{}' のテーマを使用します。", provider_name)
+            logger.bind(provider_name=provider_name).debug(
+                "プロバイダーのテーマを使用します。"
+            )
         except (IOError, json.JSONDecodeError):
             logger.warning(
                 "manifest.jsonが読み取れないため、デフォルトテーマを使用します。"
@@ -125,6 +128,10 @@ class EpubBuilder(BaseBuilder):
         try:
             if path.exists():
                 os.remove(path)
-                logger.info("不完全な出力ファイルを削除しました: {}", path)
+                logger.bind(file_path=str(path)).info(
+                    "不完全な出力ファイルを削除しました。"
+                )
         except OSError as e:
-            logger.error("出力ファイルの削除に失敗しました: {}, {}", path, e)
+            logger.bind(file_path=str(path), error=str(e)).error(
+                "出力ファイルの削除に失敗しました。"
+            )

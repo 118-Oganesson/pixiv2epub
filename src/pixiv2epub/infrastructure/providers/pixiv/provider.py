@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
 import shutil
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
@@ -47,7 +47,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("小説ID: {} の処理を開始します。", work_id)
+            logger.info("小説の処理を開始します。")
             workspace = self._setup_workspace(work_id)
 
             try:
@@ -56,9 +56,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     self._fetch_and_check_update(work_id, workspace)
                 )
                 if not update_required:
-                    logger.info(
-                        "コンテンツに変更はありません。処理をスキップします: {}",
-                        workspace.id,
+                    logger.bind(workspace_id=workspace.id).info(
+                        "コンテンツに変更はありません。処理をスキップします。"
                     )
                     return None
 
@@ -85,11 +84,9 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     parsed_text=parsed_text,
                 )
 
-                logger.info(
-                    "小説「{}」のデータ取得が完了しました -> {}",
-                    novel_data.title,
-                    workspace.root_path,
-                )
+                logger.bind(
+                    title=novel_data.title, workspace_path=str(workspace.root_path)
+                ).info("小説のデータ取得が完了しました。")
                 return workspace
 
             except (PixivError, ApiError) as e:
@@ -144,8 +141,10 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(page_content)
             except IOError as e:
-                logger.error("ページ {} の保存に失敗しました: {}", i + 1, e)
-        logger.debug("{}ページの保存が完了しました。", len(pages))
+                logger.bind(page=i + 1, error=str(e)).error(
+                    "ページの保存に失敗しました。"
+                )
+        logger.bind(page_count=len(pages)).debug("ページの保存が完了しました。")
 
         return novel_data, image_paths, parsed_text
 
@@ -184,7 +183,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         with logger.contextualize(
             provider=self.get_provider_name(), series_id=series_id
         ):
-            logger.info("シリーズID: {} の処理を開始します。", series_id)
+            logger.info("シリーズの処理を開始します。")
             try:
                 series_data = self.get_series_info(series_id)
                 novel_ids = [novel.id for novel in series_data.novels]
@@ -197,25 +196,24 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
                 downloaded_workspaces = []
                 total = len(novel_ids)
-                logger.info("計 {} 件の小説をダウンロードします。", total)
+                logger.bind(total_novels=total).info(
+                    "シリーズ内の小説ダウンロードを開始します。"
+                )
 
                 for i, novel_id in enumerate(novel_ids, 1):
-                    logger.info("--- 処理中 {}/{} (ID: {}) ---", i, total, novel_id)
+                    log = logger.bind(current=i, total=total, novel_id=novel_id)
+                    log.info("--- 小説を処理中 ---")
                     try:
                         workspace = self.get_work(novel_id)
                         if workspace:
                             downloaded_workspaces.append(workspace)
                     except Exception as e:
-                        logger.error(
-                            "小説ID {} のダウンロードに失敗: {}",
-                            novel_id,
-                            e,
-                            exc_info=True,
+                        log.bind(error=str(e)).error(
+                            "小説のダウンロードに失敗しました。", exc_info=True
                         )
 
-                logger.info(
-                    "シリーズ「{}」のDLが完了しました。",
-                    series_data.novel_series_detail.title,
+                logger.bind(series_title=series_data.novel_series_detail.title).info(
+                    "シリーズのダウンロードが完了しました。"
                 )
                 return downloaded_workspaces
             except Exception as e:
@@ -236,44 +234,42 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def get_creator_works(self, user_id: Any) -> List[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), user_id=user_id):
-            logger.info("ユーザーID: {} の全作品の処理を開始します。", user_id)
+            logger.info("ユーザーの全作品の処理を開始します。")
             try:
                 single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
-                logger.info(
-                    "取得結果: {}件のシリーズ、{}件の単独作品",
-                    len(series_ids),
-                    len(single_ids),
-                )
+                logger.bind(
+                    series_count=len(series_ids), single_work_count=len(single_ids)
+                ).info("ユーザー作品の取得結果")
 
                 downloaded_workspaces = []
                 if series_ids:
                     logger.info("--- シリーズ作品の処理を開始 ---")
                     for i, s_id in enumerate(series_ids, 1):
-                        logger.info(
-                            "\n--- シリーズ処理中 {}/{} ---", i, len(series_ids)
+                        log = logger.bind(
+                            current_series=i, total_series=len(series_ids)
                         )
+                        log.info("\n--- シリーズを処理中 ---")
                         try:
                             workspaces = self.get_multiple_works(s_id)
                             downloaded_workspaces.extend(workspaces)
                         except Exception as e:
-                            logger.error(
-                                "シリーズID {} の処理中にエラー: {}",
-                                s_id,
-                                e,
+                            log.bind(series_id=s_id, error=str(e)).error(
+                                "シリーズの処理中にエラーが発生しました。",
                                 exc_info=True,
                             )
 
                 if single_ids:
                     logger.info("--- 単独作品の処理を開始 ---")
                     for i, n_id in enumerate(single_ids, 1):
-                        logger.info("--- 単独作品処理中 {}/{} ---", i, len(single_ids))
+                        log = logger.bind(current_work=i, total_works=len(single_ids))
+                        log.info("--- 単独作品を処理中 ---")
                         try:
                             workspace = self.get_work(n_id)
                             if workspace:
                                 downloaded_workspaces.append(workspace)
                         except Exception as e:
-                            logger.error(
-                                "小説ID {} の処理中にエラー: {}", n_id, e, exc_info=True
+                            log.bind(novel_id=n_id, error=str(e)).error(
+                                "小説の処理中にエラーが発生しました。", exc_info=True
                             )
                 return downloaded_workspaces
             except Exception as e:

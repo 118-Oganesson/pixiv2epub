@@ -23,7 +23,9 @@ class BaseProvider(IProvider):
         self.settings = settings
         self.workspace_dir = settings.workspace.root_directory
         self._breaker: Optional[CircuitBreaker] = None
-        logger.info(f"{self.__class__.__name__} を初期化しました。")
+        logger.bind(provider_name=self.__class__.__name__).info(
+            "プロバイダーを初期化しました。"
+        )
 
     @property
     def breaker(self) -> CircuitBreaker:
@@ -46,7 +48,9 @@ class BaseProvider(IProvider):
         workspace.source_path.mkdir(parents=True, exist_ok=True)
         (workspace.assets_path / "images").mkdir(parents=True, exist_ok=True)
 
-        logger.debug("ワークスペースを準備しました: {}", workspace.root_path)
+        logger.bind(workspace_path=str(workspace.root_path)).debug(
+            "ワークスペースを準備しました。"
+        )
         return workspace
 
     def _persist_metadata(
@@ -62,7 +66,7 @@ class BaseProvider(IProvider):
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
             logger.debug("manifest.json の保存が完了しました。")
         except IOError as e:
-            logger.error("manifest.json の保存に失敗しました: {}", e)
+            logger.bind(error=str(e)).error("manifest.json の保存に失敗しました。")
 
         # detail.jsonの保存
         try:
@@ -72,4 +76,4 @@ class BaseProvider(IProvider):
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
             logger.debug("detail.json の保存が完了しました。")
         except IOError as e:
-            logger.error("detail.json の保存に失敗しました: {}", e)
+            logger.bind(error=str(e)).error("detail.json の保存に失敗しました。")

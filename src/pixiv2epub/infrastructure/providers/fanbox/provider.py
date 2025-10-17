@@ -48,11 +48,11 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 f.write(parsed_html)
             logger.debug("1ページの保存が完了しました。")
         except IOError as e:
-            logger.error("ページの保存に失敗しました: {}", e)
+            logger.bind(error=str(e)).error("ページの保存に失敗しました。")
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
         with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("Fanbox 投稿ID: {} の処理を開始します。", work_id)
+            logger.info("Fanbox投稿の処理を開始します。")
             workspace = self._setup_workspace(work_id)
 
             try:
@@ -65,9 +65,8 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 )
 
                 if not update_required:
-                    logger.info(
-                        "コンテンツに変更はありません。処理をスキップします: {}",
-                        workspace.id,
+                    logger.bind(workspace_id=workspace.id).info(
+                        "コンテンツに変更はありません。処理をスキップします。"
                     )
                     return None
 
@@ -115,11 +114,9 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 )
                 self._persist_metadata(workspace, metadata, manifest)
 
-                logger.info(
-                    "投稿「{}」のデータ取得が完了しました -> {}",
-                    post_data.title,
-                    workspace.root_path,
-                )
+                logger.bind(
+                    title=post_data.title, workspace_path=str(workspace.root_path)
+                ).info("投稿のデータ取得が完了しました。")
                 return workspace
 
             except (ValidationError, KeyError, TypeError) as e:
@@ -130,7 +127,9 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
         """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""
-        logger.info("クリエイターID: {} の全投稿IDの取得を開始します。", creator_id)
+        logger.bind(creator_id=creator_id).info(
+            "クリエイターの全投稿IDの取得を開始します。"
+        )
         post_ids = []
 
         try:
@@ -145,11 +144,16 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 return []
 
             total_pages = len(page_urls)
-            logger.info("{}ページの投稿リストを取得します。", total_pages)
+            logger.bind(total_pages=total_pages).info(
+                "投稿リストのページ数を取得しました。"
+            )
 
             # 2. 取得した各ページのURLを辿り、投稿リストを取得する
             for i, page_url in enumerate(page_urls, 1):
-                logger.debug("投稿リストを取得中... ({}/{})", i, total_pages)
+                log = logger.bind(
+                    current_page=i, total_pages=total_pages, page_url=page_url
+                )
+                log.debug("投稿リストを取得中...")
                 try:
                     list_response = self.api_client.post_list_creator(page_url)
                     post_items = list_response.get("body", [])
@@ -158,31 +162,23 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                             if isinstance(item, dict) and "id" in item:
                                 post_ids.append(item["id"])
                     else:
-                        logger.warning(
-                            "ページ {} の投稿リストの形式が不正です。スキップします。URL: {}",
-                            i,
-                            page_url,
-                        )
+                        log.warning("投稿リストの形式が不正です。スキップします。")
 
                 except Exception as e:
-                    logger.error(
-                        "ページ {} の投稿リスト取得中にエラーが発生しました: {}",
-                        i,
-                        e,
+                    log.bind(error=str(e)).error(
+                        "投稿リスト取得中にエラーが発生しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
-                    # 1ページの失敗で全体を止めない
                     continue
 
         except Exception as e:
-            logger.error(
-                "投稿ページ一覧の取得中に致命的なエラーが発生しました: {}",
-                e,
+            logger.bind(error=str(e)).error(
+                "投稿ページ一覧の取得中に致命的なエラーが発生しました。",
                 exc_info=self.settings.log_level == "DEBUG",
             )
-            return []  # 失敗時は空のリストを返す
+            return []
 
-        logger.info("合計 {} 件の投稿IDを取得しました。", len(post_ids))
+        logger.bind(count=len(post_ids)).info("投稿IDの取得が完了しました。")
         return post_ids
 
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
@@ -194,16 +190,15 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             workspaces = []
             total = len(post_ids)
             for i, post_id in enumerate(post_ids, 1):
-                logger.info("--- 投稿 {}/{} (ID: {}) を処理中 ---", i, total, post_id)
+                log = logger.bind(current=i, total=total, post_id=post_id)
+                log.info("--- 投稿を処理中 ---")
                 try:
                     workspace = self.get_work(post_id)
                     if workspace:
                         workspaces.append(workspace)
                 except Exception as e:
-                    logger.error(
-                        "投稿ID {} の処理に失敗しました: {}",
-                        post_id,
-                        e,
+                    log.bind(error=str(e)).error(
+                        "投稿の処理に失敗しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
             return workspaces

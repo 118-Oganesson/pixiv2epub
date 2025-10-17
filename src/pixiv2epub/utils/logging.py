@@ -36,8 +36,6 @@ def setup_logging(level: str = "INFO", serialize_to_file: bool = False):
             diagnose=False,  # プロダクションでは機密情報漏洩を防ぐためFalseを推奨
         )
 
-    logger.info(
-        "ロガーが設定されました。レベル: {}, ファイル出力: {}",
-        level.upper(),
-        serialize_to_file,
+    logger.bind(level=level.upper(), file_output=serialize_to_file).info(
+        "ロガーが設定されました。"
     )
