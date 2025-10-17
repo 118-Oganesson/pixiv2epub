@@ -41,22 +41,15 @@ class PixivMetadataMapper(IMetadataMapper):
             for i, content in enumerate(pages_content)
         ]
 
-        series_order: Optional[int] = None
-        if novel_data.series_id and novel_data.series_navigation:
-            nav = novel_data.series_navigation
-            if nav.prev_novel and nav.prev_novel.content_order:
-                series_order = int(nav.prev_novel.content_order) + 1
-            elif nav.next_novel:
-                series_order = 1
-            else:
-                series_order = 1
+        series_order = novel_data.computed_series_order
 
         series_info_dict = novel.get("series")
-        if series_info_dict and series_order:
-            series_info_dict["order"] = series_order
-        series_info = (
-            SeriesInfo.model_validate(series_info_dict) if series_info_dict else None
-        )
+        if series_info_dict:
+            if series_order is not None:
+                series_info_dict["order"] = series_order
+            series_info = SeriesInfo.model_validate(series_info_dict)
+        else:
+            series_info = None
 
         relative_cover_path = (
             f"../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{cover_path.name}"

@@ -52,7 +52,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
             try:
                 # --- ステップ1: APIからデータを取得し、更新が必要かチェック ---
-                novel_data_dict, new_hash, update_required = (
+                raw_webview_novel_data, new_hash, update_required = (
                     self._fetch_and_check_update(work_id, workspace)
                 )
                 if not update_required:
@@ -62,14 +62,14 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     return None
 
                 # --- ステップ2: ワークスペースを準備し、アセットをダウンロード ---
-                detail_data_dict = self.api_client.novel_detail(work_id)
+                raw_novel_detail_data = self.api_client.novel_detail(work_id)
                 downloader, cover_path = self._download_assets(
-                    workspace, detail_data_dict
+                    workspace, raw_novel_detail_data
                 )
 
                 # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
                 novel_data, image_paths, parsed_text = self._process_and_save_content(
-                    workspace, novel_data_dict, downloader
+                    workspace, raw_webview_novel_data, downloader
                 )
 
                 # --- ステップ4: メタデータを生成し、永続化 ---
@@ -78,7 +78,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     work_id=work_id,
                     new_hash=new_hash,
                     novel_data=novel_data,
-                    detail_data_dict=detail_data_dict,
+                    detail_data=raw_novel_detail_data,
                     cover_path=cover_path,
                     image_paths=image_paths,
                     parsed_text=parsed_text,
@@ -103,32 +103,35 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
     def _fetch_and_check_update(
         self, work_id: int, workspace: Workspace
     ) -> Tuple[Dict, str, bool]:
-        novel_data_dict = self.api_client.webview_novel(work_id)
+        raw_webview_novel_data = self.api_client.webview_novel(work_id)
         update_required, new_hash = self.update_checker.is_update_required(
-            workspace, novel_data_dict
+            workspace, raw_webview_novel_data
         )
         if update_required:
             logger.info("コンテンツの更新を検出（または新規ダウンロードです）。")
             if workspace.source_path.exists():
                 shutil.rmtree(workspace.source_path)
             workspace.source_path.mkdir(parents=True, exist_ok=True)
-        return novel_data_dict, new_hash, update_required
+        return raw_webview_novel_data, new_hash, update_required
 
     def _download_assets(
-        self, workspace: Workspace, detail_data_dict: Dict
+        self, workspace: Workspace, raw_novel_detail_data: Dict
     ) -> Tuple[ImageDownloader, Optional[Path]]:
         downloader = ImageDownloader(
             self.api_client,
             workspace.assets_path / "images",
             self.settings.downloader.overwrite_existing_images,
         )
-        cover_path = downloader.download_cover(detail_data_dict.get("novel", {}))
+        cover_path = downloader.download_cover(raw_novel_detail_data.get("novel", {}))
         return downloader, cover_path
 
     def _process_and_save_content(
-        self, workspace: Workspace, novel_data_dict: Dict, downloader: ImageDownloader
+        self,
+        workspace: Workspace,
+        raw_webview_novel_data: Dict,
+        downloader: ImageDownloader,
     ) -> Tuple[NovelApiResponse, Dict[str, Path], str]:
-        novel_data = NovelApiResponse.model_validate(novel_data_dict)
+        novel_data = NovelApiResponse.model_validate(raw_webview_novel_data)
         image_paths = downloader.download_embedded_images(novel_data)
         parsed_text = self.parser.parse(novel_data.text, image_paths)
 
@@ -152,20 +155,20 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         work_id: int,
         new_hash: str,
         novel_data: NovelApiResponse,
-        detail_data_dict: Dict,
+        detail_data: Dict,
         cover_path: Optional[Path],
         image_paths: Dict[str, Path],
         parsed_text: str,
     ):
         parsed_description = self.parser.parse(
-            detail_data_dict.get("novel", {}).get("caption", ""), image_paths
+            detail_data.get("novel", {}).get("caption", ""), image_paths
         )
 
         metadata = self.mapper.map_to_metadata(
             workspace=workspace,
             cover_path=cover_path,
             novel_data=novel_data,
-            detail_data=detail_data_dict,
+            detail_data=detail_data,
             parsed_text=parsed_text,
             parsed_description=parsed_description,
         )

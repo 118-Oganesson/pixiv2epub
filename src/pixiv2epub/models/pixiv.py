@@ -13,6 +13,7 @@ from pydantic import (
     HttpUrl,
     field_validator,
     model_validator,
+    computed_field,
 )
 
 
@@ -122,6 +123,28 @@ class NovelApiResponse(PixivBaseModel):
         if isinstance(v, list) and not v:
             return {}
         return v
+
+    @computed_field
+    @property
+    def computed_series_order(self) -> Optional[int]:
+        """series_navigationデータからシリーズ内の順序を導出します。"""
+        if not self.series_id or not self.series_navigation:
+            return None
+
+        nav = self.series_navigation
+        try:
+            # 前の作品が存在する場合、その作品の content_order から次の順序を計算
+            if nav.prev_novel and nav.prev_novel.content_order:
+                return int(nav.prev_novel.content_order) + 1
+            # 前の作品がなく、次の作品がある場合はシリーズの最初の作品
+            elif nav.next_novel:
+                return 1
+            # 前後どちらの作品もない場合 (シリーズにこの作品しかない場合)
+            else:
+                return 1
+        except (ValueError, TypeError):
+            # content_order が予期せぬ形式だった場合のエラーハンドリング
+            return None
 
 
 # --- `novel_series` APIレスポンスモデル ---
