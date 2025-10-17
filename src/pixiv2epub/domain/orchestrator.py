@@ -40,10 +40,12 @@ class DownloadBuildOrchestrator:
         """中間ファイル（ワークスペース）を削除する。"""
         if self._is_cleanup_enabled():
             try:
-                logger.info("Cleaning up workspace: {}", workspace.root_path)
+                logger.info(
+                    "ワークスペースをクリーンアップします: {}", workspace.root_path
+                )
                 shutil.rmtree(workspace.root_path)
             except OSError as e:
-                logger.error("Failed to clean up workspace: {}", e)
+                logger.error("ワークスペースのクリーンアップに失敗しました: {}", e)
 
     def process_work(self, work_id: Any) -> Optional[Path]:
         """単一の作品をダウンロードし、ビルドします。"""
@@ -52,21 +54,21 @@ class DownloadBuildOrchestrator:
             provider=self.provider.get_provider_name(), work_id=work_id
         ):
             try:
-                logger.info("Processing work.")
+                logger.info("単一作品の処理を開始します。")
                 if not isinstance(self.provider, IWorkProvider):
                     raise TypeError(
-                        "Current provider does not support fetching single works."
+                        "現在のプロバイダは単一作品の取得をサポートしていません。"
                     )
 
                 workspace = self.provider.get_work(work_id)
 
                 if workspace is None:
-                    logger.info("Skipping build process, no updates required.")
+                    logger.info("更新は不要なため、ビルド処理をスキップします。")
                     return None
 
                 output_path = self.builder.build(workspace)
 
-                logger.success("Processing completed successfully: {}", output_path)
+                logger.success("処理が正常に完了しました: {}", output_path)
                 return output_path
             finally:
                 if workspace:
@@ -81,45 +83,46 @@ class DownloadBuildOrchestrator:
             collection_id=collection_id,
             collection_type=collection_type,
         ):
-            logger.info("Processing collection.")
+            logger.info("コレクションの処理を開始します。")
 
             workspaces: List[Workspace] = fetch_func(collection_id)
 
             if not workspaces:
-                logger.info("No works found to process.")
+                logger.info("処理対象の作品が見つかりませんでした。")
                 return []
 
             output_paths: List[Path] = []
             total = len(workspaces)
-            logger.info("Building a total of {} works.", total)
+            logger.info("合計 {} 件の作品をビルドします。", total)
 
             for i, workspace in enumerate(workspaces, 1):
                 try:
                     with logger.contextualize(workspace_id=workspace.id):
-                        logger.info("--- Processing {}/{} ---", i, total)
+                        logger.info("--- 作品 {}/{} を処理中 ---", i, total)
                         output_path = self.builder.build(workspace)
                         output_paths.append(output_path)
                 except ContentNotFoundError as e:
-                    logger.warning("Skipping due to content not found: {}", e)
+                    logger.warning("コンテンツが見つからないためスキップします: {}", e)
                     continue
                 except (BuildError, ProviderError) as e:
                     logger.error(
-                        "Failed to process workspace {}: {}",
+                        "ワークスペース {} の処理に失敗しました: {}",
                         workspace.id,
                         e,
                         exc_info=self.settings.log_level == "DEBUG",
                     )
                 except Exception:
                     logger.error(
-                        "An unexpected error occurred while processing workspace {}.",
+                        "ワークスペース {} の処理中に予期せぬエラーが発生しました。",
                         workspace.id,
                         exc_info=True,
                     )
                 finally:
-                    self._handle_cleanup(workspace)
+                    if workspace:
+                        self._handle_cleanup(workspace)
 
             logger.success(
-                "Collection processing finished. Success: {}/{}",
+                "コレクションの処理が完了しました。成功: {}/{}",
                 len(output_paths),
                 total,
             )
@@ -128,7 +131,7 @@ class DownloadBuildOrchestrator:
     def process_series(self, series_id: Any) -> List[Path]:
         """シリーズ作品をダウンロードし、ビルドします。"""
         if not isinstance(self.provider, IMultiWorkProvider):
-            raise TypeError("Current provider does not support fetching series.")
+            raise TypeError("現在のプロバイダはシリーズの取得をサポートしていません。")
         return self._process_collection(
             series_id, self.provider.get_multiple_works, "Series"
         )
@@ -136,7 +139,9 @@ class DownloadBuildOrchestrator:
     def process_creator(self, creator_id: Any) -> List[Path]:
         """クリエイターの全作品をダウンロードし、ビルドします。"""
         if not isinstance(self.provider, ICreatorProvider):
-            raise TypeError("Current provider does not support fetching creator works.")
+            raise TypeError(
+                "現在のプロバイダはクリエイター作品の取得をサポートしていません。"
+            )
         return self._process_collection(
             creator_id, self.provider.get_creator_works, "Creator"
         )

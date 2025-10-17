@@ -51,77 +51,82 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             logger.error("ページの保存に失敗しました: {}", e)
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
-        logger.info("Fanbox 投稿ID: {} の処理を開始します。", work_id)
-        workspace = self._setup_workspace(work_id)
+        with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
+            logger.info("Fanbox 投稿ID: {} の処理を開始します。", work_id)
+            workspace = self._setup_workspace(work_id)
 
-        try:
-            # --- API呼び出しと画像ダウンロード ---
-            post_data_dict = self.api_client.post_info(work_id)
-            post_data_body = post_data_dict.get("body", {})
+            try:
+                # --- API呼び出しと画像ダウンロード ---
+                post_data_dict = self.api_client.post_info(work_id)
+                post_data_body = post_data_dict.get("body", {})
 
-            update_required, new_timestamp = self.update_checker.is_update_required(
-                workspace, post_data_body
-            )
-
-            if not update_required:
-                logger.info(
-                    "コンテンツに変更はありません。処理をスキップします: {}",
-                    workspace.id,
+                update_required, new_timestamp = self.update_checker.is_update_required(
+                    workspace, post_data_body
                 )
-                return None
 
-            logger.info("コンテンツの更新を検出しました。ダウンロードを続行します。")
-            if workspace.source_path.exists():
-                shutil.rmtree(workspace.source_path)
-            workspace.source_path.mkdir(parents=True, exist_ok=True)
+                if not update_required:
+                    logger.info(
+                        "コンテンツに変更はありません。処理をスキップします: {}",
+                        workspace.id,
+                    )
+                    return None
 
-            downloader = FanboxImageDownloader(
-                api_client=self.api_client,
-                image_dir=workspace.assets_path / "images",
-                overwrite=self.settings.downloader.overwrite_existing_images,
-            )
+                logger.info(
+                    "コンテンツの更新を検出しました。ダウンロードを続行します。"
+                )
+                if workspace.source_path.exists():
+                    shutil.rmtree(workspace.source_path)
+                workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-        except (RequestException, ApiError) as e:
-            raise ApiError(
-                f"投稿ID {work_id} のデータ取得に失敗: {e}", self.get_provider_name()
-            ) from e
+                downloader = FanboxImageDownloader(
+                    api_client=self.api_client,
+                    image_dir=workspace.assets_path / "images",
+                    overwrite=self.settings.downloader.overwrite_existing_images,
+                )
 
-        try:
-            # --- ダウンロード後のデータ処理 ---
-            post_data = FanboxPostApiResponse.model_validate(post_data_dict).body
+            except (RequestException, ApiError) as e:
+                raise ApiError(
+                    f"投稿ID {work_id} のデータ取得に失敗: {e}",
+                    self.get_provider_name(),
+                ) from e
 
-            cover_path = downloader.download_cover(post_data)
-            image_paths = downloader.download_embedded_images(post_data)
+            try:
+                # --- ダウンロード後のデータ処理 ---
+                post_data = FanboxPostApiResponse.model_validate(post_data_dict).body
 
-            parsed_html = self.parser.parse(post_data.body, image_paths)
-            self._save_page(workspace, parsed_html)
+                cover_path = downloader.download_cover(post_data)
+                image_paths = downloader.download_embedded_images(post_data)
 
-            metadata = self.mapper.map_to_metadata(
-                workspace=workspace, cover_path=cover_path, post_data=post_data
-            )
+                parsed_html = self.parser.parse(post_data.body, image_paths)
+                self._save_page(workspace, parsed_html)
 
-            manifest = WorkspaceManifest(
-                provider_name=self.get_provider_name(),
-                created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={
-                    "post_id": work_id,
-                    "creator_id": post_data.creator_id,
-                },
-                content_hash=new_timestamp,
-            )
-            self._persist_metadata(workspace, metadata, manifest)
+                metadata = self.mapper.map_to_metadata(
+                    workspace=workspace, cover_path=cover_path, post_data=post_data
+                )
 
-            logger.info(
-                "投稿「{}」のデータ取得が完了しました -> {}",
-                post_data.title,
-                workspace.root_path,
-            )
-            return workspace
+                manifest = WorkspaceManifest(
+                    provider_name=self.get_provider_name(),
+                    created_at_utc=datetime.now(timezone.utc).isoformat(),
+                    source_metadata={
+                        "post_id": work_id,
+                        "creator_id": post_data.creator_id,
+                    },
+                    content_hash=new_timestamp,
+                )
+                self._persist_metadata(workspace, metadata, manifest)
 
-        except (ValidationError, KeyError, TypeError) as e:
-            raise DataProcessingError(
-                f"投稿ID {work_id} のデータ解析に失敗: {e}", self.get_provider_name()
-            ) from e
+                logger.info(
+                    "投稿「{}」のデータ取得が完了しました -> {}",
+                    post_data.title,
+                    workspace.root_path,
+                )
+                return workspace
+
+            except (ValidationError, KeyError, TypeError) as e:
+                raise DataProcessingError(
+                    f"投稿ID {work_id} のデータ解析に失敗: {e}",
+                    self.get_provider_name(),
+                ) from e
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
         """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""
@@ -158,6 +163,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                             i,
                             page_url,
                         )
+
                 except Exception as e:
                     logger.error(
                         "ページ {} の投稿リスト取得中にエラーが発生しました: {}",
@@ -181,20 +187,23 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
         """クリエイターの全投稿をダウンロードし、Workspaceのリストを返す。"""
-        post_ids = self._fetch_all_creator_post_ids(creator_id)
-        workspaces = []
-        total = len(post_ids)
-        for i, post_id in enumerate(post_ids, 1):
-            logger.info("--- 投稿 {}/{} (ID: {}) を処理中 ---", i, total, post_id)
-            try:
-                workspace = self.get_work(post_id)
-                if workspace:
-                    workspaces.append(workspace)
-            except Exception as e:
-                logger.error(
-                    "投稿ID {} の処理に失敗しました: {}",
-                    post_id,
-                    e,
-                    exc_info=self.settings.log_level == "DEBUG",
-                )
-        return workspaces
+        with logger.contextualize(
+            provider=self.get_provider_name(), creator_id=creator_id
+        ):
+            post_ids = self._fetch_all_creator_post_ids(creator_id)
+            workspaces = []
+            total = len(post_ids)
+            for i, post_id in enumerate(post_ids, 1):
+                logger.info("--- 投稿 {}/{} (ID: {}) を処理中 ---", i, total, post_id)
+                try:
+                    workspace = self.get_work(post_id)
+                    if workspace:
+                        workspaces.append(workspace)
+                except Exception as e:
+                    logger.error(
+                        "投稿ID {} の処理に失敗しました: {}",
+                        post_id,
+                        e,
+                        exc_info=self.settings.log_level == "DEBUG",
+                    )
+            return workspaces

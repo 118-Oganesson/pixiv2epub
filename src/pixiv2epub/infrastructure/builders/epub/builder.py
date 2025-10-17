@@ -15,8 +15,7 @@ from ..base import BaseBuilder
 from .asset_manager import AssetManager
 from .component_generator import EpubComponentGenerator
 from .package_assembler import EpubPackageAssembler
-
-DEFAULT_THEME_NAME = "default"
+from ....shared.constants import DEFAULT_THEME_NAME
 
 
 class EpubBuilder(BaseBuilder):

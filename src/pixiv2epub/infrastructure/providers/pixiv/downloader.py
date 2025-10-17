@@ -8,10 +8,11 @@ from loguru import logger
 from ....models.pixiv import NovelApiResponse
 from ..base_downloader import BaseDownloader
 from .client import PixivApiClient
-
-COVER_IMAGE_STEM = "cover"
-UPLOADED_IMAGE_PREFIX = "uploaded_"
-PIXIV_IMAGE_PREFIX = "pixiv_"
+from ....shared.constants import (
+    COVER_IMAGE_STEM,
+    UPLOADED_IMAGE_PREFIX,
+    PIXIV_IMAGE_PREFIX,
+)
 
 
 class ImageDownloader(BaseDownloader):

@@ -5,19 +5,20 @@ from typing import Tuple, Union
 from ..shared.enums import ContentType, Provider
 from ..shared.exceptions import InvalidInputError
 
+PIXIV_WORK_PATTERN = re.compile(r"pixiv\.net/novel/show\.php\?id=(\d+)")
+PIXIV_SERIES_PATTERN = re.compile(r"pixiv\.net/novel/series/(\d+)")
+PIXIV_CREATOR_PATTERN = re.compile(r"pixiv\.net/users/(\d+)")
+FANBOX_WORK_PATTERN = re.compile(r"fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)")
+FANBOX_CREATOR_PATTERN = re.compile(
+    r"(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc"
+)
 
 URL_PATTERNS = {
-    (Provider.PIXIV, ContentType.WORK): re.compile(
-        r"pixiv\.net/novel/show\.php\?id=(\d+)"
-    ),
-    (Provider.PIXIV, ContentType.SERIES): re.compile(r"pixiv\.net/novel/series/(\d+)"),
-    (Provider.PIXIV, ContentType.CREATOR): re.compile(r"pixiv\.net/users/(\d+)"),
-    (Provider.FANBOX, ContentType.WORK): re.compile(
-        r"fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)"
-    ),
-    (Provider.FANBOX, ContentType.CREATOR): re.compile(
-        r"(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc"
-    ),
+    (Provider.PIXIV, ContentType.WORK): PIXIV_WORK_PATTERN,
+    (Provider.PIXIV, ContentType.SERIES): PIXIV_SERIES_PATTERN,
+    (Provider.PIXIV, ContentType.CREATOR): PIXIV_CREATOR_PATTERN,
+    (Provider.FANBOX, ContentType.WORK): FANBOX_WORK_PATTERN,
+    (Provider.FANBOX, ContentType.CREATOR): FANBOX_CREATOR_PATTERN,
 }
 
 

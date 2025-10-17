@@ -7,8 +7,7 @@ from loguru import logger
 from ....models.fanbox import Post
 from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
-
-COVER_IMAGE_STEM = "cover"
+from ....shared.constants import COVER_IMAGE_STEM
 
 
 class FanboxImageDownloader(BaseDownloader):
