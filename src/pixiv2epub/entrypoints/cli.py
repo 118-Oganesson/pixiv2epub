@@ -352,13 +352,14 @@ def gui(ctx: typer.Context):
 
             if page.url == "about:blank":
                 logger.info("Pixivトップページに移動します。")
-                page.goto("https://www.pixiv.net/")
+                page.goto("https://www.pixiv.net/", wait_until="domcontentloaded")
             else:
                 logger.info("既存のセッションを再利用します。")
 
             logger.info(
                 "ブラウザセッション待機中... ウィンドウを閉じるとプログラムは終了します。"
             )
+            # ユーザーがブラウザを閉じるまで無期限に待機
             context.wait_for_event("close", timeout=0)
     finally:
         logger.info("GUIモードを終了します。")

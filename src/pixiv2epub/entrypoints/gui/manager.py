@@ -1,13 +1,17 @@
 # FILE: src/pixiv2epub/entrypoints/gui/manager.py
 from pathlib import Path
+from typing import List
 
 from loguru import logger
 from playwright.sync_api import Page
 
 from ...app import Application
+from ...domain.orchestrator import DownloadBuildOrchestrator
 from ...infrastructure.builders.epub.builder import EpubBuilder
+from ...shared.enums import ContentType
 from ...shared.exceptions import Pixiv2EpubError
 from ...utils.url_parser import parse_content_identifier
+
 from ..provider_factory import ProviderFactory
 
 
@@ -35,9 +39,23 @@ class GuiManager:
             provider = self.provider_factory.create(provider_enum)
             builder = EpubBuilder(self.app.settings)
 
-            result_paths = self.app.run_download_and_build(
-                provider, content_type_enum, target_id, builder=builder
+            orchestrator = DownloadBuildOrchestrator(
+                provider, builder, self.app.settings
             )
+
+            result_paths: List[Path] = []
+            if content_type_enum == ContentType.WORK:
+                result = orchestrator.process_work(target_id)
+                if result:
+                    result_paths.append(result)
+            elif content_type_enum == ContentType.SERIES:
+                result_paths = orchestrator.process_series(target_id)
+            elif content_type_enum == ContentType.CREATOR:
+                result_paths = orchestrator.process_creator(target_id)
+            else:
+                raise ValueError(
+                    f"サポートされていないコンテンツタイプです: {content_type_enum}"
+                )
 
             message = f"{len(result_paths)}件のEPUB生成に成功しました。"
             log.bind(result_count=len(result_paths)).success("タスクが完了しました。")
