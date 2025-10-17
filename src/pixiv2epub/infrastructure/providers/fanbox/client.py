@@ -88,7 +88,7 @@ class FanboxApiClient(BaseApiClient):
         save_path = path / name
         save_path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.debug(f"ダウンロード中: {url} -> {save_path}")
+        logger.debug("ダウンロード中: {} -> {}", url, save_path)
         try:
             response = self.session.get(url, timeout=(10.0, 30.0))
             response.raise_for_status()
@@ -100,12 +100,12 @@ class FanboxApiClient(BaseApiClient):
             time.sleep(self.delay)
 
         except RequestException as e:
-            logger.error(f"ダウンロードに失敗しました: {url}, エラー: {e}")
+            logger.error("ダウンロードに失敗しました: {}, エラー: {}", url, e)
             raise ApiError(
                 f"ファイルのダウンロードに失敗しました: {url}", "fanbox"
             ) from e
         except IOError as e:
-            logger.error(f"ファイル書き込みに失敗しました: {save_path}, エラー: {e}")
+            logger.error("ファイル書き込みに失敗しました: {}, エラー: {}", save_path, e)
             raise ApiError(
                 f"ファイルの書き込みに失敗しました: {save_path}", "fanbox"
             ) from e

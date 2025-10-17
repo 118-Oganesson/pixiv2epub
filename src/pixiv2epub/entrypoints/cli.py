@@ -14,6 +14,7 @@ from ..app import Application
 from ..infrastructure.builders.epub.builder import EpubBuilder
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
+from ..models.workspace import Workspace
 from ..shared.constants import MANIFEST_FILE_NAME
 from ..shared.exceptions import (
     AuthenticationError,
@@ -249,9 +250,10 @@ def build(
 
     workspaces_to_build: List[Path] = []
 
-    if (workspace_path / MANIFEST_FILE_NAME).is_file():
+    try:
+        Workspace.from_path(workspace_path)
         workspaces_to_build.append(workspace_path)
-    else:
+    except ValueError:
         logger.info(
             "'{}' 内のビルド可能なワークスペースを再帰的に検索します...", workspace_path
         )
@@ -271,7 +273,7 @@ def build(
 
     builder = EpubBuilder(settings=app_state.settings)
     for i, path in enumerate(workspaces_to_build, 1):
-        logger.info("--- ビルド処理 ({}/{}): {} ---", i, path.name, total=total)
+        logger.info("--- ビルド処理 ({}/{}): {} ---", i, total, path.name)
         try:
             output_path = app_instance.build_from_workspace(path, builder=builder)
             logger.success("ビルド成功: {}", output_path)

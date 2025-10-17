@@ -1,9 +1,10 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base_provider.py
 import json
 from dataclasses import asdict
-from typing import Any
+from typing import Any, Optional
 
 from loguru import logger
+from pybreaker import CircuitBreaker
 
 from ...models.local import NovelMetadata
 from ...models.workspace import Workspace, WorkspaceManifest
@@ -17,6 +18,17 @@ class BaseProvider(IProvider):
     def __init__(self, settings: Settings):
         super().__init__(settings)
         self.workspace_dir = settings.workspace.root_directory
+        self._breaker: Optional[CircuitBreaker] = None
+
+    @property
+    def breaker(self) -> CircuitBreaker:
+        """サーキットブレーカーのインスタンスを遅延初期化して返します。"""
+        if self._breaker is None:
+            self._breaker = CircuitBreaker(
+                fail_max=self.settings.downloader.circuit_breaker.fail_max,
+                reset_timeout=self.settings.downloader.circuit_breaker.reset_timeout,
+            )
+        return self._breaker
 
     def _setup_workspace(self, content_id: Any) -> Workspace:
         """content_idに基づいた永続的なワークスペースを準備します。"""
@@ -29,7 +41,7 @@ class BaseProvider(IProvider):
         workspace.source_path.mkdir(parents=True, exist_ok=True)
         (workspace.assets_path / "images").mkdir(parents=True, exist_ok=True)
 
-        logger.debug(f"ワークスペースを準備しました: {workspace.root_path}")
+        logger.debug("ワークスペースを準備しました: {}", workspace.root_path)
         return workspace
 
     def _persist_metadata(
@@ -45,7 +57,7 @@ class BaseProvider(IProvider):
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
             logger.debug("manifest.json の保存が完了しました。")
         except IOError as e:
-            logger.error(f"manifest.json の保存に失敗しました: {e}")
+            logger.error("manifest.json の保存に失敗しました: {}", e)
 
         # detail.jsonの保存
         try:
@@ -55,4 +67,4 @@ class BaseProvider(IProvider):
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
             logger.debug("detail.json の保存が完了しました。")
         except IOError as e:
-            logger.error(f"detail.json の保存に失敗しました: {e}")
+            logger.error("detail.json の保存に失敗しました: {}", e)

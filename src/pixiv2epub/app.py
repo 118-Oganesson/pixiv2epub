@@ -13,7 +13,6 @@ from .infrastructure.providers.base import (
     IWorkProvider,
 )
 from .models.workspace import Workspace
-from .shared.constants import MANIFEST_FILE_NAME
 from .shared.enums import ContentType
 from .shared.exceptions import AssetMissingError
 from .shared.settings import Settings
@@ -84,13 +83,10 @@ class Application:
         builder: IBuilder,
     ) -> Path:
         """ローカルのワークスペースからEPUBを生成します。"""
-        if not (workspace_path / MANIFEST_FILE_NAME).is_file():
+        try:
+            workspace = Workspace.from_path(workspace_path)
+            return builder.build(workspace)
+        except ValueError as e:
             raise AssetMissingError(
-                f"指定されたパスに {MANIFEST_FILE_NAME} が見つかりません: {workspace_path}"
-            )
-
-        workspace = Workspace(
-            id=workspace_path.name, root_path=workspace_path.resolve()
-        )
-
-        return builder.build(workspace)
+                "指定されたパスは有効なワークスペースではありません: {}", workspace_path
+            ) from e

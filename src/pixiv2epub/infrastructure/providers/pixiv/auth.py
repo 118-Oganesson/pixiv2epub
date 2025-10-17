@@ -43,13 +43,13 @@ def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
         "code_challenge_method": "S256",
         "client": "pixiv-android",
     }
-    logger.debug(f"Code verifier: {code_verifier}")
+    logger.debug("Code verifier: {}", code_verifier)
 
     auth_code_holder = []
 
     def handle_request(request: Request):
         if request.url.startswith("pixiv://"):
-            logger.info(f"コールバックURLを検出: {request.url}")
+            logger.info("コールバックURLを検出: {}", request.url)
             match = re.search(r"code=([^&]*)", request.url)
             if match and not auth_code_holder:
                 auth_code_holder.append(match.groups()[0])
@@ -92,7 +92,7 @@ def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
         )
 
     code = auth_code_holder[0]
-    logger.debug(f"Auth code: {code}")
+    logger.debug("Auth code: {}", code)
     return code, code_verifier
 
 
@@ -130,5 +130,5 @@ def get_pixiv_refresh_token(save_session_path: Path) -> str:
         refresh_token = _get_refresh_token(auth_code, verifier)
         return refresh_token
     except Exception as e:
-        logger.error(f"認証中に予期せぬエラーが発生しました: {e}")
+        logger.error("認証中に予期せぬエラーが発生しました: {}", e)
         raise

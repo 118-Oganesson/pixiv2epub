@@ -47,7 +47,8 @@ class ImageCompressor:
             else:
                 self.tools_available[tool] = False
                 logger.warning(
-                    f"コマンド '{tool}' が見つかりません。この形式の画像は圧縮されません。"
+                    "コマンド '{}' が見つかりません。この形式の画像は圧縮されません。",
+                    tool,
                 )
 
     def detect_format(self, path: Union[str, Path]) -> Optional[str]:
@@ -83,7 +84,7 @@ class ImageCompressor:
         start_time = time.time()
 
         if not input_path.is_file():
-            logger.error(f"ファイルが見つかりません: {input_path}")
+            logger.error("ファイルが見つかりません: {}", input_path)
             return CompressionResult(
                 input_path,
                 None,
@@ -100,7 +101,7 @@ class ImageCompressor:
 
         fmt = self.detect_format(input_path)
         if fmt is None:
-            logger.warning(f"対応していない画像形式です: {input_path}")
+            logger.warning("対応していない画像形式です: {}", input_path)
             return CompressionResult(
                 input_path,
                 None,
@@ -138,7 +139,7 @@ class ImageCompressor:
             duration = time.time() - start_time
 
             if not res.success:
-                logger.error(f"{tool} による圧縮に失敗しました: {input_path}")
+                logger.error("{} による圧縮に失敗しました: {}", tool, input_path)
                 return CompressionResult(
                     input_path,
                     None,
@@ -156,7 +157,7 @@ class ImageCompressor:
 
             if not tmp_out_path.is_file() or tmp_out_path.stat().st_size == 0:
                 logger.error(
-                    f"予期せぬエラー: 一時出力ファイルが見つかりません: {tmp_out_path}"
+                    "予期せぬエラー: 一時出力ファイルが見つかりません: {}", tmp_out_path
                 )
                 return CompressionResult(
                     input_path,
@@ -177,8 +178,10 @@ class ImageCompressor:
             if compressed_size >= original_size and self.settings.skip_if_larger:
                 data = tmp_out_path.read_bytes() if return_bytes else None
                 logger.info(
-                    f"圧縮結果が元より大きいためスキップ: {input_path.name} "
-                    f"({_human_readable_size(original_size)} -> {_human_readable_size(compressed_size)})"
+                    "圧縮結果が元より大きいためスキップ: {} ({} -> {})",
+                    input_path.name,
+                    _human_readable_size(original_size),
+                    _human_readable_size(compressed_size),
                 )
                 return CompressionResult(
                     input_path,
@@ -214,9 +217,13 @@ class ImageCompressor:
 
             if write_output:
                 logger.info(
-                    f"圧縮完了: {input_path.name} -> {final_out_path.name if final_out_path else 'N/A'} | "
-                    f"元: {_human_readable_size(original_size)}, 圧縮後: {_human_readable_size(compressed_size)}, "
-                    f"削減: {_human_readable_size(saved_bytes)} ({saved_percent:.2f}%)"
+                    "圧縮完了: {} -> {} | 元: {}, 圧縮後: {}, 削減: {} ({:.2f}%)",
+                    input_path.name,
+                    final_out_path.name if final_out_path else "N/A",
+                    _human_readable_size(original_size),
+                    _human_readable_size(compressed_size),
+                    _human_readable_size(saved_bytes),
+                    saved_percent,
                 )
 
             return CompressionResult(
@@ -275,7 +282,7 @@ class ImageCompressor:
                 try:
                     results.append(future.result())
                 except Exception as e:
-                    logger.error(f"画像圧縮中にエラーが発生しました: {e}")
+                    logger.error("画像圧縮中にエラーが発生しました: {}", e)
         return results
 
     def _run_command(
@@ -283,7 +290,7 @@ class ImageCompressor:
     ) -> Dict[str, Union[bytes, int]]:
         """外部コマンドを実行し、結果をキャプチャします。"""
         try:
-            logger.debug(f"コマンド実行: {' '.join(cmd)}")
+            logger.debug("コマンド実行: {}", " ".join(cmd))
             proc = subprocess.run(
                 cmd, capture_output=True, timeout=timeout, check=False
             )
@@ -313,7 +320,7 @@ class ImageCompressor:
         stderr = result["stderr"].decode("utf-8", "replace") if result["stderr"] else ""
 
         if not success:
-            logger.error(f"{tool_name}による圧縮に失敗しました: {stderr}")
+            logger.error("{}による圧縮に失敗しました: {}", tool_name, stderr)
 
         return CompressionResult(
             input_path,

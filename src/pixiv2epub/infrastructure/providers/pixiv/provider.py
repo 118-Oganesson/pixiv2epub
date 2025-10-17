@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from loguru import logger
 from pixivpy3 import PixivError
-from pybreaker import CircuitBreaker
 from pydantic import ValidationError
 
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
@@ -27,12 +26,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def __init__(self, settings: Settings):
         super().__init__(settings)
-        breaker = CircuitBreaker(
-            fail_max=settings.downloader.circuit_breaker.fail_max,
-            reset_timeout=settings.downloader.circuit_breaker.reset_timeout,
-        )
         self.api_client = PixivApiClient(
-            breaker=breaker,
+            breaker=self.breaker,
             refresh_token=settings.providers.pixiv.refresh_token,
             api_delay=settings.downloader.api_delay,
             api_retries=settings.downloader.api_retries,

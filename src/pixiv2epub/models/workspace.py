@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
 
+from ..shared.constants import MANIFEST_FILE_NAME
+
 
 @dataclass(frozen=True)
 class Workspace:
@@ -24,7 +26,20 @@ class Workspace:
     @property
     def manifest_path(self) -> Path:
         """ワークスペース自体のメタデータを記述したファイルのパス。"""
-        return self.root_path / "manifest.json"
+        return self.root_path / MANIFEST_FILE_NAME
+
+    @classmethod
+    def from_path(cls, path: Path) -> "Workspace":
+        """
+        指定されたパスからWorkspaceインスタンスを生成します。
+        パスに 'manifest.json' が存在しない場合はValueErrorを送出します。
+        """
+        manifest_path = path / MANIFEST_FILE_NAME
+        if not manifest_path.is_file():
+            raise ValueError(
+                f"指定されたパスにマニフェストファイルが見つかりません: {path}"
+            )
+        return cls(id=path.name, root_path=path.resolve())
 
 
 @dataclass(frozen=True)

@@ -38,7 +38,7 @@ class FanboxImageDownloader(BaseDownloader):
         ext = cover_url.split(".")[-1].split("?")[0]  # URLから拡張子を安全に取得
         cover_filename = f"cover.{ext}"
 
-        logger.info(f"カバー画像をダウンロードします: {cover_filename}")
+        logger.info("カバー画像をダウンロードします: {}", cover_filename)
         return self._download_single_image(cover_url, cover_filename)
 
     def download_embedded_images(self, post_data: Post) -> Dict[str, Path]:
@@ -49,7 +49,7 @@ class FanboxImageDownloader(BaseDownloader):
             return image_paths
 
         total_images = len(post_data.body.image_map)
-        logger.info(f"{total_images}件の埋め込み画像をダウンロードします。")
+        logger.info("{}件の埋め込み画像をダウンロードします。", total_images)
 
         for image_id, image_item in post_data.body.image_map.items():
             url = str(image_item.original_url)
