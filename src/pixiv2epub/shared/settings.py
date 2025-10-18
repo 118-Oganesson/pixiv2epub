@@ -187,6 +187,9 @@ class BuilderSettings(BaseModel):
         False,
         description="EPUB生成後に中間ファイル（ワークスペース）を削除するかどうか。",
     )
+    default_theme_name: str = Field(
+        "default", description="EPUBテーマ（テンプレート）のデフォルト名。"
+    )
 
 
 class PngquantSettings(BaseModel):

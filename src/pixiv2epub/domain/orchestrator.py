@@ -40,17 +40,17 @@ class DownloadBuildOrchestrator:
         """
         単一の入力（URLやID）から適切な処理を判断し、実行する。
         """
-        provider_enum, content_type, target_id = parse_content_identifier(input_str)
+        provider_enum, content_type, identifier = parse_content_identifier(input_str)
         provider = self.provider_factory.create(provider_enum)
 
         with logger.contextualize(
             provider=provider_enum.name,
             content_type=content_type.name,
-            target_id=str(target_id),
+            identifier=str(identifier),
         ):
             if download_only:
                 logger.info("ダウンロード処理のみを開始")
-                workspaces = self._download(provider, content_type, target_id)
+                workspaces = self._download(provider, content_type, identifier)
                 logger.bind(download_count=len(workspaces)).success(
                     "ダウンロード処理が完了しました。"
                 )
@@ -58,12 +58,12 @@ class DownloadBuildOrchestrator:
             else:
                 logger.info("ダウンロードとビルド処理を開始")
                 if content_type == ContentType.WORK:
-                    path = self._process_work(provider, target_id)
+                    path = self._process_work(provider, identifier)
                     return [path] if path else []
                 elif content_type == ContentType.SERIES:
-                    return self._process_series(provider, target_id)
+                    return self._process_series(provider, identifier)
                 elif content_type == ContentType.CREATOR:
-                    return self._process_creator(provider, target_id)
+                    return self._process_creator(provider, identifier)
                 else:
                     logger.error(f"未対応のコンテンツタイプです: {content_type}")
                     return []
@@ -82,7 +82,7 @@ class DownloadBuildOrchestrator:
             except OSError as e:
                 log.bind(error=str(e)).error("ワークスペースのクリーンアップ失敗")
 
-    def _process_work(self, provider: IProvider, work_id: Any) -> Optional[Path]:
+    def _process_work(self, provider: IProvider, content_id: Any) -> Optional[Path]:
         """単一の作品をダウンロードし、ビルドします。"""
         workspace: Optional[Workspace] = None
         try:
@@ -92,7 +92,7 @@ class DownloadBuildOrchestrator:
                     "現在のプロバイダは単一作品の取得をサポートしていません。"
                 )
 
-            workspace = provider.get_work(work_id)
+            workspace = provider.get_work(content_id)
 
             if workspace is None:
                 logger.info("コンテンツ更新なし、ビルドをスキップ")
@@ -155,41 +155,41 @@ class DownloadBuildOrchestrator:
         )
         return output_paths
 
-    def _process_series(self, provider: IProvider, series_id: Any) -> List[Path]:
+    def _process_series(self, provider: IProvider, collection_id: Any) -> List[Path]:
         """シリーズ作品をダウンロードし、ビルドします。"""
         if not isinstance(provider, IMultiWorkProvider):
             raise TypeError("現在のプロバイダはシリーズの取得をサポートしていません。")
         return self._process_collection(
-            series_id, provider.get_multiple_works, "Series"
+            collection_id, provider.get_multiple_works, "Series"
         )
 
-    def _process_creator(self, provider: IProvider, creator_id: Any) -> List[Path]:
+    def _process_creator(self, provider: IProvider, collection_id: Any) -> List[Path]:
         """クリエイターの全作品をダウンロードし、ビルドします。"""
         if not isinstance(provider, ICreatorProvider):
             raise TypeError(
                 "現在のプロバイダはクリエイター作品の取得をサポートしていません。"
             )
         return self._process_collection(
-            creator_id, provider.get_creator_works, "Creator"
+            collection_id, provider.get_creator_works, "Creator"
         )
 
     def _download(
-        self, provider: IProvider, content_type: ContentType, target_id: Any
+        self, provider: IProvider, content_type: ContentType, identifier: Any
     ) -> List[Workspace]:
         """ダウンロード処理のみを実行します。"""
         workspaces: List[Workspace] = []
         if content_type == ContentType.WORK and isinstance(provider, IWorkProvider):
-            workspace = provider.get_work(target_id)
+            workspace = provider.get_work(identifier)
             if workspace:
                 workspaces.append(workspace)
         elif content_type == ContentType.SERIES and isinstance(
             provider, IMultiWorkProvider
         ):
-            workspaces = provider.get_multiple_works(target_id)
+            workspaces = provider.get_multiple_works(identifier)
         elif content_type == ContentType.CREATOR and isinstance(
             provider, ICreatorProvider
         ):
-            workspaces = provider.get_creator_works(target_id)
+            workspaces = provider.get_creator_works(identifier)
         else:
             raise TypeError(
                 f"現在のProviderは {content_type.name} のダウンロードをサポートしていません。"

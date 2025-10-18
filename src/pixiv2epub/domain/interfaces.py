@@ -51,7 +51,7 @@ class IProvider(Protocol):
 class IWorkProvider(IProvider, Protocol):
     """単一の作品を取得するためのインターフェース"""
 
-    def get_work(self, work_id: Any) -> Workspace | None:
+    def get_work(self, content_id: Any) -> Workspace | None:
         """単一の作品を取得し、Workspaceを生成して返します。更新がない場合はNoneを返します。"""
         ...
 
@@ -69,7 +69,7 @@ class IMultiWorkProvider(IProvider, Protocol):
 class ICreatorProvider(IProvider, Protocol):
     """クリエイターの全作品を取得するためのインターフェース"""
 
-    def get_creator_works(self, creator_id: Any) -> List[Workspace]:
+    def get_creator_works(self, collection_id: Any) -> List[Workspace]:
         """特定のクリエイターが投稿したすべての作品を取得し、Workspaceのリストを返します。"""
         ...
 

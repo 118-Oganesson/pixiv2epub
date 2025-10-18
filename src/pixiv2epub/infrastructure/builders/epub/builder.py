@@ -8,7 +8,7 @@ from loguru import logger
 
 from ....models.domain import NovelMetadata
 from ....models.workspace import Workspace
-from ....shared.constants import DEFAULT_THEME_NAME, MANIFEST_FILE_NAME
+from ....shared.constants import MANIFEST_FILE_NAME
 from ....shared.exceptions import BuildError
 from ....shared.settings import Settings
 from ....utils.filesystem_sanitizer import generate_sanitized_path
@@ -65,11 +65,12 @@ class EpubBuilder(BaseBuilder):
 
     def _create_template_env(self, workspace: Workspace) -> Environment:
         """ワークスペースのプロバイダーに基づいてJinja2環境を生成します。"""
-        provider_name = DEFAULT_THEME_NAME
+        default_theme = self.settings.builder.default_theme_name
+        provider_name = default_theme
         try:
             with open(workspace.manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
-            provider_name = manifest.get("provider_name", DEFAULT_THEME_NAME)
+            provider_name = manifest.get("provider_name", default_theme)
             logger.bind(provider_name=provider_name).debug(
                 "プロバイダーのテーマを使用します。"
             )
@@ -81,10 +82,10 @@ class EpubBuilder(BaseBuilder):
         assets_root = Path(__file__).parent.parent.parent.parent / "assets"
         epub_assets_root = assets_root / "epub"
         provider_template_dir = epub_assets_root / provider_name
-        default_template_dir = epub_assets_root / DEFAULT_THEME_NAME
+        default_template_dir = epub_assets_root / default_theme
 
         loaders = []
-        if provider_template_dir.is_dir() and provider_name != DEFAULT_THEME_NAME:
+        if provider_template_dir.is_dir() and provider_name != default_theme:
             loaders.append(FileSystemLoader(str(provider_template_dir)))
         if default_template_dir.is_dir():
             loaders.append(FileSystemLoader(str(default_template_dir)))

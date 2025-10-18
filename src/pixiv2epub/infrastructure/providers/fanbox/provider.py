@@ -58,13 +58,15 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
     def get_provider_name(cls) -> str:
         return "fanbox"
 
-    def get_work(self, work_id: Any) -> Optional[Workspace]:
+    def get_work(self, content_id: Any) -> Optional[Workspace]:
         logger.info("Fanbox投稿の処理を開始")
-        workspace = self.repository.setup_workspace(work_id, self.get_provider_name())
+        workspace = self.repository.setup_workspace(
+            content_id, self.get_provider_name()
+        )
 
         try:
             # 1. データの取得
-            post_data_dict = self.fetcher.fetch_post_data(work_id)
+            post_data_dict = self.fetcher.fetch_post_data(content_id)
 
             # 2. 更新のチェック
             update_required, new_timestamp = self.processor.check_for_updates(
@@ -86,7 +88,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
                 source_metadata={
-                    "post_id": work_id,
+                    "post_id": content_id,
                     "creator_id": metadata.identifier.creator_id,
                 },
                 content_hash=new_timestamp,
@@ -100,7 +102,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
         except (RequestException, ApiError) as e:
             raise ApiError(
-                f"投稿ID {work_id} のデータ取得に失敗: {e}",
+                f"投稿ID {content_id} のデータ取得に失敗: {e}",
                 self.get_provider_name(),
             ) from e
 
@@ -159,9 +161,9 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         log.bind(count=len(post_ids)).info("投稿IDの取得が完了しました。")
         return post_ids
 
-    def get_creator_works(self, creator_id: Any) -> List[Workspace]:
+    def get_creator_works(self, collection_id: Any) -> List[Workspace]:
         """クリエイターの全投稿をダウンロードし、Workspaceのリストを返す。"""
-        post_ids = self._fetch_all_creator_post_ids(creator_id)
+        post_ids = self._fetch_all_creator_post_ids(collection_id)
         workspaces = []
         total = len(post_ids)
         for i, post_id in enumerate(post_ids, 1):

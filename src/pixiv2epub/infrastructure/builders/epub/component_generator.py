@@ -80,9 +80,9 @@ class EpubComponentGenerator:
         """本文の各ページをXHTMLに変換します。"""
         pages = []
         for i, page_info in enumerate(page_infos, 1):
-            raw_content_path = self.workspace.source_path / page_info.body.lstrip("./")
             try:
-                content = raw_content_path.read_text(encoding="utf-8")
+                # Workspaceのヘルパーメソッドを使用してコンテンツを取得
+                content = self.workspace.get_page_content(page_info.body)
 
                 # 中間ファイル用の画像パスを、最終的なEPUB内のパスに置換する
                 content = content.replace("../assets/images/", "../images/")

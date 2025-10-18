@@ -18,9 +18,6 @@ DETAIL_FILE_NAME = "detail.json"
 # これにより、同じ作品からは常に同じIDが生成される
 NAMESPACE_UUID = uuid.UUID("c22d7879-055f-4203-be9b-7f11e9f23a85")
 
-# EPUBテーマ（テンプレート）のデフォルト名
-DEFAULT_THEME_NAME = "default"
-
 
 # --- 画像ファイル名関連 ---
 # 表紙画像のファイル名の基本部分（拡張子なし）

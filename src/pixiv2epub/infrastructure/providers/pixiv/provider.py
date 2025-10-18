@@ -57,13 +57,17 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
     def get_provider_name(cls) -> str:
         return "pixiv"
 
-    def get_work(self, work_id: Any) -> Optional[Workspace]:
+    def get_work(self, content_id: Any) -> Optional[Workspace]:
         logger.info("小説の処理を開始")
-        workspace = self.repository.setup_workspace(work_id, self.get_provider_name())
+        workspace = self.repository.setup_workspace(
+            content_id, self.get_provider_name()
+        )
 
         try:
             # 1. データの取得
-            raw_webview_data, raw_detail_data = self.fetcher.fetch_novel_data(work_id)
+            raw_webview_data, raw_detail_data = self.fetcher.fetch_novel_data(
+                content_id
+            )
 
             # 2. 更新のチェック
             update_required, new_hash = self.processor.check_for_updates(
@@ -84,7 +88,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={"novel_id": work_id},
+                source_metadata={"novel_id": content_id},
                 content_hash=new_hash,
             )
             self.repository.persist_metadata(workspace, metadata, manifest)
@@ -96,19 +100,19 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
         except (PixivError, ApiError) as e:
             raise ApiError(
-                f"小説ID {work_id} のデータ取得に失敗: {e}",
+                f"小説ID {content_id} のデータ取得に失敗: {e}",
                 self.get_provider_name(),
             ) from e
         except (ValidationError, KeyError, TypeError) as e:
             raise DataProcessingError(
-                f"小説ID {work_id} のデータ解析に失敗: {e}",
+                f"小説ID {content_id} のデータ解析に失敗: {e}",
                 self.get_provider_name(),
             ) from e
 
-    def get_multiple_works(self, series_id: Any) -> List[Workspace]:
+    def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
         logger.info("シリーズの処理を開始")
         try:
-            series_data = self.get_series_info(series_id)
+            series_data = self.get_series_info(collection_id)
             novel_ids = [novel.id for novel in series_data.novels]
 
             if not novel_ids:
@@ -137,7 +141,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             return downloaded_workspaces
         except Exception as e:
             raise ApiError(
-                f"シリーズID {series_id} の処理中にエラーが発生: {e}",
+                f"シリーズID {collection_id} の処理中にエラーが発生: {e}",
                 self.get_provider_name(),
             ) from e
 
@@ -151,10 +155,10 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 self.get_provider_name(),
             ) from e
 
-    def get_creator_works(self, user_id: Any) -> List[Workspace]:
+    def get_creator_works(self, collection_id: Any) -> List[Workspace]:
         logger.info("ユーザーの全作品の処理を開始")
         try:
-            single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
+            single_ids, series_ids = self._fetch_all_user_novel_ids(collection_id)
             logger.bind(
                 series_count=len(series_ids), single_work_count=len(single_ids)
             ).info("ユーザー作品の取得結果")
@@ -190,7 +194,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             return downloaded_workspaces
         except Exception as e:
             raise ApiError(
-                f"ユーザーID {user_id} の作品処理中にエラーが発生: {e}",
+                f"ユーザーID {collection_id} の作品処理中にエラーが発生: {e}",
                 self.get_provider_name(),
             ) from e
 
