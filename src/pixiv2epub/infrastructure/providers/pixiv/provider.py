@@ -33,7 +33,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         self.api_client = PixivApiClient(
             breaker=self.breaker,
             provider_name=self.get_provider_name(),
-            refresh_token=settings.providers.pixiv.refresh_token,
+            auth_settings=settings.providers.pixiv,
             api_delay=settings.downloader.api_delay,
             api_retries=settings.downloader.api_retries,
         )

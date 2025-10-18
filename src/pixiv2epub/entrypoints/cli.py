@@ -1,21 +1,32 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
 import asyncio
 from pathlib import Path
-from typing import List, Literal, Optional
+from typing import Any, List, Literal, Optional, Tuple
 
 import typer
 from dotenv import find_dotenv, set_key
 from loguru import logger
+from loguru._logger import Logger as LoguruLogger  # 正しい Logger 型をインポート
 from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
+from ..domain.interfaces import (
+    ICreatorProvider,
+    IMultiWorkProvider,
+    IProvider,
+    IWorkProvider,
+)
 from ..domain.orchestrator import DownloadBuildOrchestrator
 from ..infrastructure.builders.epub.builder import EpubBuilder
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
 from ..models.workspace import Workspace
 from ..shared.constants import MANIFEST_FILE_NAME
+from ..shared.enums import (
+    ContentType,
+    Provider as ProviderEnum,
+)
 from ..shared.exceptions import (
     AuthenticationError,
     Pixiv2EpubError,
@@ -56,8 +67,7 @@ class AppState:
                     log_level=log_level,
                     require_auth=require_auth,
                 )
-                if require_auth:
-                    self.provider_factory = ProviderFactory(self._settings)
+                self.provider_factory = ProviderFactory(self._settings)
             except SettingsError as e:
                 logger.bind(error=str(e)).error("❌ 設定エラーが発生しました。")
                 logger.info(
@@ -123,14 +133,16 @@ def main_callback(
     setup_logging(log_level, serialize_to_file=log_file)
     ctx.obj = AppState()
 
-    # コマンドに応じて設定の初期化を制御
-    if ctx.invoked_subcommand not in ("auth",):
+    if ctx.invoked_subcommand == "auth":
+        ctx.obj.initialize_settings(config, log_level, require_auth=False)
+    elif ctx.invoked_subcommand is not None:
         require_auth = ctx.invoked_subcommand != "build"
         ctx.obj.initialize_settings(config, log_level, require_auth=require_auth)
 
 
 @app.command()
 def auth(
+    ctx: typer.Context,
     service: Annotated[
         Literal["pixiv", "fanbox"],
         typer.Argument(
@@ -151,9 +163,13 @@ def auth(
     )
 
     try:
+        app_state: AppState = ctx.obj
         if service == "pixiv":
             logger.info("Pixiv認証を開始します...")
-            refresh_token = get_pixiv_refresh_token(save_session_path=session_path)
+            refresh_token = get_pixiv_refresh_token(
+                save_session_path=session_path,
+                settings=app_state.settings.providers.pixiv,
+            )
             set_key(
                 str(env_path),
                 "PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN",
@@ -162,6 +178,7 @@ def auth(
             logger.bind(env_path=str(env_path.resolve())).success(
                 "Pixiv認証成功！ リフレッシュトークンを保存しました。"
             )
+
         elif service == "fanbox":
             logger.info("FANBOX認証を開始します...")
             sessid = asyncio.run(get_fanbox_sessid(session_path))
@@ -174,12 +191,10 @@ def auth(
         raise typer.Exit(code=1)
 
 
-def _execute_command(
-    app_state: AppState,
-    input_str: str,
-    mode: Literal["run", "download"],
-):
-    """CLIのrun/downloadコマンド共通実行ロジック"""
+def _parse_input_and_create_provider(
+    app_state: AppState, input_str: str
+) -> Tuple[IProvider, ProviderEnum, ContentType, Any, LoguruLogger]:
+    """入力文字列を解析し、対応するプロバイダを生成して返す。"""
     if not app_state.provider_factory:
         raise RuntimeError("ProviderFactoryが初期化されていません。")
 
@@ -189,48 +204,57 @@ def _execute_command(
         provider=provider_enum.name,
         content_type=content_type_enum.name,
         target_id=target_id,
-        mode=mode,
     )
+    return provider, provider_enum, content_type_enum, target_id, log
 
-    if mode == "run":
-        log.info("ダウンロードとビルド処理を開始")
-        builder = EpubBuilder(settings=app_state.settings)
-        orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
-        if content_type_enum.name == "WORK":
-            orchestrator.process_work(target_id)
-        elif content_type_enum.name == "SERIES":
-            orchestrator.process_series(target_id)
-        elif content_type_enum.name == "CREATOR":
-            orchestrator.process_creator(target_id)
-        log.success("✅ すべての処理が完了しました。")
-    elif mode == "download":
-        log.info("ダウンロード処理のみを開始")
-        from ..domain.interfaces import (
-            ICreatorProvider,
-            IMultiWorkProvider,
-            IWorkProvider,
+
+def _handle_run(app_state: AppState, target_input: str):
+    """ダウンロードとビルド処理を実行します。"""
+    provider, _, content_type_enum, target_id, log = _parse_input_and_create_provider(
+        app_state, target_input
+    )
+    log.info("ダウンロードとビルド処理を開始")
+
+    builder = EpubBuilder(settings=app_state.settings)
+    orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
+
+    if content_type_enum == ContentType.WORK:
+        orchestrator.process_work(target_id)
+    elif content_type_enum == ContentType.SERIES:
+        orchestrator.process_series(target_id)
+    elif content_type_enum == ContentType.CREATOR:
+        orchestrator.process_creator(target_id)
+
+    log.success("✅ すべての処理が完了しました。")
+
+
+def _handle_download(app_state: AppState, target_input: str):
+    """ダウンロード処理のみを実行します。"""
+    provider, _, content_type_enum, target_id, log = _parse_input_and_create_provider(
+        app_state, target_input
+    )
+    log.info("ダウンロード処理のみを開始")
+
+    workspaces: List[Workspace] = []
+    if content_type_enum == ContentType.WORK and isinstance(provider, IWorkProvider):
+        ws = provider.get_work(target_id)
+        if ws:
+            workspaces.append(ws)
+    elif content_type_enum == ContentType.SERIES and isinstance(
+        provider, IMultiWorkProvider
+    ):
+        workspaces = provider.get_multiple_works(target_id)
+    elif content_type_enum == ContentType.CREATOR and isinstance(
+        provider, ICreatorProvider
+    ):
+        workspaces = provider.get_creator_works(target_id)
+    else:
+        raise TypeError(
+            f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
         )
 
-        workspaces: List[Workspace] = []
-        if content_type_enum.name == "WORK" and isinstance(provider, IWorkProvider):
-            ws = provider.get_work(target_id)
-            if ws:
-                workspaces.append(ws)
-        elif content_type_enum.name == "SERIES" and isinstance(
-            provider, IMultiWorkProvider
-        ):
-            workspaces = provider.get_multiple_works(target_id)
-        elif content_type_enum.name == "CREATOR" and isinstance(
-            provider, ICreatorProvider
-        ):
-            workspaces = provider.get_creator_works(target_id)
-        else:
-            raise TypeError(
-                f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
-            )
-
-        for ws in workspaces:
-            logger.bind(workspace_path=str(ws.root_path)).success("ダウンロード完了")
+    for ws in workspaces:
+        logger.bind(workspace_path=str(ws.root_path)).success("ダウンロード完了")
 
 
 @app.command()
@@ -245,7 +269,7 @@ def run(
     ],
 ):
     """指定されたURLまたはIDの作品をダウンロードし、EPUBをビルドします。"""
-    _execute_command(ctx.obj, target_input, "run")
+    _handle_run(ctx.obj, target_input)
 
 
 @app.command()
@@ -260,7 +284,7 @@ def download(
     ],
 ):
     """作品データをワークスペースにダウンロードするだけで終了します。"""
-    _execute_command(ctx.obj, target_input, "download")
+    _handle_download(ctx.obj, target_input)
 
 
 @app.command()
@@ -319,9 +343,9 @@ def build(
                 "❌ ビルドに失敗しました。",
                 exc_info=app_state.settings.log_level == "DEBUG",
             )
-    logger.info("---")
+        logger.info("---")
     logger.bind(success_count=success_count, total=total).info(
-        "✨ 全てのビルド処理が完了しました。"
+        "✨ 全てのビルd処理が完了しました。"
     )
 
 

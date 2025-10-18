@@ -28,7 +28,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         self.api_client = FanboxApiClient(
             breaker=self.breaker,
             provider_name=self.get_provider_name(),
-            sessid=settings.providers.fanbox.sessid,
+            auth_settings=settings.providers.fanbox,
             api_delay=settings.downloader.api_delay,
             api_retries=settings.downloader.api_retries,
         )
@@ -198,4 +198,4 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                         "投稿の処理に失敗しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
-            return workspaces
+        return workspaces

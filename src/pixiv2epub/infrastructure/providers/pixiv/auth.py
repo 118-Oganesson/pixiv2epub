@@ -13,16 +13,7 @@ from loguru import logger
 from playwright.sync_api import Request, TimeoutError, sync_playwright
 
 from ....shared.exceptions import AuthenticationError
-
-# 定数を専用ファイルからインポートするように変更
-from .constants import (
-    AUTH_TOKEN_URL,
-    CLIENT_ID,
-    CLIENT_SECRET,
-    LOGIN_URL,
-    REDIRECT_URI,
-    USER_AGENT,
-)
+from ....shared.settings import PixivAuthSettings
 
 
 def _s256(data: bytes) -> str:
@@ -37,7 +28,10 @@ def _oauth_pkce() -> Tuple[str, str]:
     return code_verifier, code_challenge
 
 
-def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
+def _login_and_get_code(
+    save_session_path: Path,
+    settings: PixivAuthSettings,
+) -> Tuple[str, str]:
     """Playwright を使用してブラウザでログインし、認可コードを取得する"""
     code_verifier, code_challenge = _oauth_pkce()
     login_params = {
@@ -66,7 +60,7 @@ def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
         )
 
         page.on("request", handle_request)
-        login_page_url = f"{LOGIN_URL}?{urlencode(login_params)}"
+        login_page_url = f"{settings.login_url}?{urlencode(login_params)}"
         page.goto(login_page_url)
 
         try:
@@ -98,19 +92,27 @@ def _login_and_get_code(save_session_path: Path) -> Tuple[str, str]:
     return code, code_verifier
 
 
-def _get_refresh_token(code: str, code_verifier: str) -> str:
+def _get_refresh_token(
+    code: str,
+    code_verifier: str,
+    settings: PixivAuthSettings, 
+) -> str:
     """認可コードを使用してリフレッシュトークンを取得する"""
     data = {
-        "client_id": CLIENT_ID,
-        "client_secret": CLIENT_SECRET,
+        "client_id": settings.client_id.get_secret_value(),
+        "client_secret": settings.client_secret.get_secret_value(),
         "code": code,
         "code_verifier": code_verifier,
         "grant_type": "authorization_code",
         "include_policy": "true",
-        "redirect_uri": REDIRECT_URI,
+        "redirect_uri": settings.redirect_uri,
     }
-    headers = {"User-Agent": USER_AGENT, "App-OS-Version": "14.6", "App-OS": "ios"}
-    response = requests.post(AUTH_TOKEN_URL, data=data, headers=headers)
+    headers = {
+        "User-Agent": settings.user_agent, 
+        "App-OS-Version": "14.6",
+        "App-OS": "ios",
+    }
+    response = requests.post(settings.auth_token_url, data=data, headers=headers)
 
     response_data = response.json()
     if "refresh_token" not in response_data:
@@ -123,13 +125,16 @@ def _get_refresh_token(code: str, code_verifier: str) -> str:
     return refresh_token
 
 
-def get_pixiv_refresh_token(save_session_path: Path) -> str:
+def get_pixiv_refresh_token(
+    save_session_path: Path,
+    settings: PixivAuthSettings, 
+) -> str:
     """
     一連の認証フローを実行し、Pixivのリフレッシュトークンを取得する。
     """
     try:
-        auth_code, verifier = _login_and_get_code(save_session_path)
-        refresh_token = _get_refresh_token(auth_code, verifier)
+        auth_code, verifier = _login_and_get_code(save_session_path, settings)
+        refresh_token = _get_refresh_token(auth_code, verifier, settings)
         return refresh_token
     except Exception as e:
         logger.error("認証中に予期せぬエラーが発生しました: {}", e)

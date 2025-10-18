@@ -7,13 +7,11 @@ from typing import Dict, Optional, Type
 import cloudscraper
 from loguru import logger
 from pybreaker import CircuitBreaker
-from pydantic import SecretStr
 from requests.exceptions import RequestException
 
 from ....shared.exceptions import ApiError, AuthenticationError
+from ....shared.settings import FanboxAuthSettings
 from ..base_client import BaseApiClient
-
-from .constants import BASE_URL
 
 
 class FanboxApiClient(BaseApiClient):
@@ -23,17 +21,20 @@ class FanboxApiClient(BaseApiClient):
         self,
         breaker: CircuitBreaker,
         provider_name: str,
-        sessid: SecretStr,
+        auth_settings: FanboxAuthSettings,
         api_delay: float = 1.0,
         api_retries: int = 3,
     ):
         super().__init__(breaker, provider_name, api_delay, api_retries)
-        sessid_value = sessid.get_secret_value() if sessid else None
+        sessid_value = (
+            auth_settings.sessid.get_secret_value() if auth_settings.sessid else None
+        )
         if not sessid_value:
             raise AuthenticationError(
                 "設定に有効なFANBOXのsessidが見つかりません。", provider_name
             )
 
+        self.base_url = auth_settings.base_url
         self.session = cloudscraper.create_scraper()
         self.session.headers.update(
             {
@@ -50,7 +51,7 @@ class FanboxApiClient(BaseApiClient):
 
     def _get_json(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
         """GETリクエストを送信し、JSONレスポンスを返します。"""
-        url = BASE_URL + endpoint
+        url = self.base_url + endpoint
         response = self.session.get(url, params=params)
         response.raise_for_status()
         return response.json()

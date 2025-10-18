@@ -5,9 +5,9 @@ from typing import Dict, Type
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
 from pybreaker import CircuitBreaker
-from pydantic import SecretStr
 
 from ....shared.exceptions import AuthenticationError
+from ....shared.settings import PixivAuthSettings
 from ..base_client import BaseApiClient
 
 
@@ -18,12 +18,16 @@ class PixivApiClient(BaseApiClient):
         self,
         breaker: CircuitBreaker,
         provider_name: str,
-        refresh_token: SecretStr,
+        auth_settings: PixivAuthSettings,
         api_delay: float = 1.0,
         api_retries: int = 3,
     ):
         super().__init__(breaker, provider_name, api_delay, api_retries)
-        token_value = refresh_token.get_secret_value() if refresh_token else None
+        token_value = (
+            auth_settings.refresh_token.get_secret_value()
+            if auth_settings.refresh_token
+            else None
+        )
         if not token_value:
             raise AuthenticationError(
                 "設定に有効なPixivのrefresh_tokenが見つかりません。", provider_name

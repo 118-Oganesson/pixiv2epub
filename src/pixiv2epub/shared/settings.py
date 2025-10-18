@@ -68,6 +68,29 @@ class PixivAuthSettings(BaseModel):
     refresh_token: Optional[SecretStr] = Field(
         None, description="Pixiv APIのリフレッシュトークン。"
     )
+    client_id: SecretStr = Field(
+        default=SecretStr("MOBrBDS8blbauoSck0ZfDbtuzpyT"),
+        description="Pixiv APIのクライアントID。",
+    )
+    client_secret: SecretStr = Field(
+        default=SecretStr("lsACyCD94FhDUtGTXi3QzcFE2uU1hqtDaKeqrdwj"),
+        description="Pixiv APIのクライアントシークレット。",
+    )
+    user_agent: str = Field(
+        "PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)",
+        description="APIリクエストに使用するユーザーエージェント。",
+    )
+    login_url: str = Field(
+        "https://app-api.pixiv.net/web/v1/login", description="ログインページのURL。"
+    )
+    auth_token_url: str = Field(
+        "https://oauth.secure.pixiv.net/auth/token",
+        description="認証トークン取得エンドポイント。",
+    )
+    redirect_uri: str = Field(
+        "https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback",
+        description="OAuthリダイレクトURI。",
+    )
 
     @field_validator("refresh_token")
     @classmethod
@@ -90,6 +113,10 @@ class FanboxAuthSettings(BaseModel):
 
     sessid: Optional[SecretStr] = Field(
         None, description="FANBOXにログインした際のFANBOXSESSIDクッキー。"
+    )
+
+    base_url: str = Field(
+        "https://api.fanbox.cc/", description="Fanbox APIのベースURL。"
     )
 
     @field_validator("sessid")

@@ -1,22 +1,21 @@
 // FILE: src/pixiv2epub/assets/gui/injector.js
 
 (() => {
+    const STATUS_SUCCESS = 'success';
+    const Z_INDEX = '9999';
+
     // UIの状態を管理し、必要な時だけDOM操作を行う関数
     const managePixiv2EpubUI = () => {
         // --- 1. 現在のURLから「要求されるUIの状態」を決定する ---
         const url = window.location.href;
         let requiredState = { type: 'none', url: null, buttonText: null };
 
-        const novelRegex = /pixiv\.net\/novel\/show\.php\?id=\d+/;
-        const seriesRegex = /pixiv\.net\/novel\/series\/\d+/;
-        const userRegex = /pixiv\.net\/users\/\d+/;
-
-        if (novelRegex.test(url)) {
-            requiredState = { type: 'novel', url: url, buttonText: 'この小説をEPUB化' };
-        } else if (seriesRegex.test(url)) {
-            requiredState = { type: 'series', url: url, buttonText: 'このシリーズをEPUB化' };
-        } else if (userRegex.test(url) && (url.includes('/novels') || !url.match(/\/(artworks|bookmarks|following)/))) {
-            requiredState = { type: 'user', url: url, buttonText: 'このユーザーの全作品をEPUB化' };
+        if (window.location.host.includes('pixiv.net')) {
+            requiredState = {
+                type: 'pixiv',
+                url: url,
+                buttonText: 'このページをEPUB化'
+            };
         }
 
         // --- 2. DOMから「現在のUIの状態」を取得する ---
@@ -25,6 +24,11 @@
 
         // --- 3. 要求される状態と現在の状態が同じなら、何もしない ---
         if (requiredState.type === currentType) {
+            const button = document.getElementById('pixiv2epub-run-button');
+            // ボタンが無効（処理中でない）かつ、URLが古い場合のみ更新
+            if (button && !button.disabled && container.dataset.currentUrl !== requiredState.url) {
+                container.dataset.currentUrl = requiredState.url;
+            }
             return;
         }
 
@@ -42,7 +46,7 @@
         const newContainer = document.createElement('div');
         newContainer.id = 'pixiv2epub-gui-container';
         newContainer.dataset.pageType = requiredState.type; // 新しい状態をDOMに保存
-
+        newContainer.dataset.currentUrl = requiredState.url;
         const button = document.createElement('button');
         button.id = 'pixiv2epub-run-button';
         button.textContent = requiredState.buttonText;
@@ -50,9 +54,9 @@
         const statusPanel = document.createElement('div');
         statusPanel.id = 'pixiv2epub-status-panel';
 
-        // スタイリング (変更なし)
+        // スタイリング
         Object.assign(newContainer.style, {
-            position: 'fixed', bottom: '20px', right: '20px', zIndex: '9999',
+            position: 'fixed', bottom: '20px', right: '20px', zIndex: Z_INDEX,
             backgroundColor: 'rgba(240, 248, 255, 0.95)', border: '1px solid #0073ff',
             borderRadius: '8px', padding: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
             fontFamily: '"Helvetica Neue", Arial, sans-serif', fontSize: '14px', color: '#333',
@@ -68,7 +72,7 @@
             backgroundColor: '#eee', display: 'none', wordWrap: 'break-word'
         });
 
-        // イベントリスナ (変更なし)
+        // イベントリスナ
         button.addEventListener('click', async () => {
             button.disabled = true;
             button.textContent = '処理中...';
@@ -78,13 +82,15 @@
             statusPanel.style.backgroundColor = '#e0e0e0';
 
             try {
-                const result = await window.pixiv2epub_run(requiredState.url);
+                const urlToProcess = newContainer.dataset.currentUrl;
+                const result = await window.pixiv2epub_run(urlToProcess);
 
-                if (result.status === 'success') {
+                if (result.status === STATUS_SUCCESS) {
                     statusPanel.textContent = `成功: ${result.message}`;
                     statusPanel.style.color = '#1a7431';
                     statusPanel.style.backgroundColor = '#d4edda';
                 } else {
+                    // バックエンドからのエラーメッセージ (例: "無効なURLです") をそのまま表示
                     statusPanel.textContent = `失敗: ${result.message}`;
                     statusPanel.style.color = '#721c24';
                     statusPanel.style.backgroundColor = '#f8d7da';
