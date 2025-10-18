@@ -1,22 +1,63 @@
-// FILE: src/pixiv2epub/assets/gui/injector.js
+// FILE: src/pixiv2epub/entrypoints/gui/assets/injector.js
 
 (() => {
     const STATUS_SUCCESS = 'success';
     const STATUS_ERROR = 'error';
     const Z_INDEX = '9999';
 
+    /**
+     * サポートするプロバイダとURLパターン、UIテキストを定義する設定。
+     * バックエンドの url_parser.py のロジックを模倣しています。
+     */
+    const PROVIDER_CONFIG = [
+        // Fanbox (パターンが重複しないよう、より具体的なものを先に定義)
+        {
+            name: 'fanbox-work',
+            // fanbox.cc/@creator/posts/123 や creator.fanbox.cc/posts/123
+            regex: /fanbox\.cc\/(?:@[\w\-]+\/)?posts\/\d+/,
+            buttonText: 'この投稿をEPUB化'
+        },
+        {
+            name: 'fanbox-creator',
+            // fanbox.cc/@creator や creator.fanbox.cc (投稿ページを除く)
+            regex: /(?:www\.)?fanbox\.cc\/@([\w\-]+)(?!\/posts)|([\w\-]+)\.fanbox\.cc(?!\/posts)/,
+            buttonText: 'この作者をEPUB化'
+        },
+        // Pixiv
+        {
+            name: 'pixiv-work',
+            regex: /pixiv\.net\/novel\/show\.php\?id=\d+/,
+            buttonText: 'この小説をEPUB化'
+        },
+        {
+            name: 'pixiv-series',
+            regex: /pixiv\.net\/novel\/series\/\d+/,
+            buttonText: 'このシリーズをEPUB化'
+        },
+        {
+            name: 'pixiv-creator',
+            // /users/123/novels や /users/123/artworks も含めて /users/123 で判定
+            regex: /pixiv\.net\/users\/\d+/,
+            buttonText: 'この作者をEPUB化'
+        }
+    ];
+
     // UIの状態を管理し、必要な時だけDOM操作を行う関数
     const managePixiv2EpubUI = () => {
         // --- 1. 現在のURLから「要求されるUIの状態」を決定する ---
         const url = window.location.href;
+
         let requiredState = { type: 'none', url: null, buttonText: null };
 
-        if (window.location.host.includes('pixiv.net')) {
-            requiredState = {
-                type: 'pixiv',
-                url: url,
-                buttonText: 'このページをEPUB化'
-            };
+        for (const config of PROVIDER_CONFIG) {
+            if (config.regex.test(url)) {
+                requiredState = {
+                    type: config.name,
+                    url: url,
+                    buttonText: config.buttonText
+                };
+                break;
+            }
         }
 
         // --- 2. DOMから「現在のUIの状態」を取得する ---
@@ -84,6 +125,7 @@
 
             try {
                 const urlToProcess = newContainer.dataset.currentUrl;
+                // バックエンド(GuiManager)はURLに基づいてプロバイダを自動判別する
                 const result = await window.pixiv2epub_run(urlToProcess);
 
                 if (result.status === STATUS_SUCCESS) {
@@ -122,6 +164,7 @@
             // DOMの変更後、URLが更新されるのを少し待ってからUIを管理する
             setTimeout(managePixiv2EpubUI, 100);
         });
+
         observer.observe(document.body, { childList: true, subtree: true });
     });
 })();

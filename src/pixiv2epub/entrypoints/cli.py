@@ -350,8 +350,17 @@ def build(
 
 
 @app.command()
-def gui(ctx: typer.Context):
-    """ブラウザを起動し、Pixivページ上で直接操作するGUIモードを開始します。"""
+def gui(
+    ctx: typer.Context,
+    service: Annotated[
+        Literal["pixiv", "fanbox"],
+        typer.Argument(
+            help="最初に開くサービスを選択します ('pixiv' または 'fanbox')。",
+            case_sensitive=False,
+        ),
+    ] = "pixiv",
+):
+    """ブラウザを起動し、PixivやFanboxページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
     app_instance = app_state.app
 
@@ -360,9 +369,15 @@ def gui(ctx: typer.Context):
         "GUIセッションのデータを保存/読込します。"
     )
     if not session_path.exists():
-        logger.info(
-            "初回起動時、またはセッションが切れた場合はPixivへのログインが必要です。"
-        )
+        logger.info("初回起動時、またはセッションが切れた場合はログインが必要です。")
+
+    # サービスに基づいて開始URLを決定
+    if service == "fanbox":
+        start_url = "https://www.fanbox.cc/"
+        service_name = "Fanbox"
+    else:
+        start_url = "https://www.pixiv.net/"
+        service_name = "Pixiv"
 
     try:
         with sync_playwright() as p:
@@ -375,8 +390,8 @@ def gui(ctx: typer.Context):
             gui_manager.setup_bridge()
 
             if page.url == "about:blank":
-                logger.info("Pixivトップページに移動します。")
-                page.goto("https://www.pixiv.net/", wait_until="domcontentloaded")
+                logger.info(f"{service_name}トップページに移動します。")
+                page.goto(start_url, wait_until="domcontentloaded")
             else:
                 logger.info("既存のセッションを再利用します。")
 
