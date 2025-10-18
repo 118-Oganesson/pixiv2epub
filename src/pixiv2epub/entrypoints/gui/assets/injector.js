@@ -2,6 +2,7 @@
 
 (() => {
     const STATUS_SUCCESS = 'success';
+    const STATUS_ERROR = 'error';
     const Z_INDEX = '9999';
 
     // UIの状態を管理し、必要な時だけDOM操作を行う関数
@@ -89,9 +90,9 @@
                     statusPanel.textContent = `成功: ${result.message}`;
                     statusPanel.style.color = '#1a7431';
                     statusPanel.style.backgroundColor = '#d4edda';
-                } else {
+                } else { // result.status === STATUS_ERROR または想定外の値
                     // バックエンドからのエラーメッセージ (例: "無効なURLです") をそのまま表示
-                    statusPanel.textContent = `失敗: ${result.message}`;
+                    statusPanel.textContent = `失敗: ${result.message}`; // 
                     statusPanel.style.color = '#721c24';
                     statusPanel.style.backgroundColor = '#f8d7da';
                 }

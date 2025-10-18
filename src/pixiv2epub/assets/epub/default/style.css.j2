@@ -1,62 +1,9 @@
-/* CSSカスタムプロパティ（変数）を定義 */
-:root {
-    --tag-color: #0073bb;
-    --date-color: #888;
-}
+/* FILE: src/pixiv2epub/assets/epub/default/style.css.j2 */
+/*
+    このファイルはデフォルトテーマ用のスタイルシートです。
+    共通スタイルを _base_style.css.j2 から読み込みます。
+*/
 
-/* 全体の基本設定 */
-body {
-    line-height: 1.7;
-    padding: 1em;
-}
+{% include "_base_style.css.j2" %}
 
-.main-content {
-    max-width: 100%;
-}
-
-/* 作品タイトル */
-h3[epub|type="title"] {
-    text-align: left;
-    margin-top: 0;
-    font-weight: bold;
-}
-
-/* 著者名 */
-.author {
-    text-align: left;
-}
-
-/* カバー画像コンテナ */
-.cover-container {
-    text-align: center;
-    margin: 1.5em 0;
-}
-
-.cover-container img {
-    max-width: 50%;
-    height: auto;
-    border-radius: 10px;
-}
-
-/* 作品説明 */
-.description {
-    text-align: left;
-    margin-bottom: 1.5em;
-}
-
-/* タグ */
-.tags {
-    color: var(--tag-color); 
-    line-height: 1.8;
-}
-
-/* 日付 */
-.date {
-    color: var(--date-color); 
-    text-align: left;
-}
-
-/* ソースURL */
-.source-link {
-    word-wrap: break-word;
-}
+/* デフォルトテーマ固有の追加スタイルがあればここに記述（現在はなし） */

@@ -15,3 +15,10 @@ class ContentType(Enum):
     WORK = auto()  # 単一の作品（小説、投稿など）
     SERIES = auto()  # 作品のシリーズ
     CREATOR = auto()  # クリエイターの全作品
+
+
+class GuiStatus(str, Enum):
+    """GUIのバックエンドとフロントエンド間の通信ステータス"""
+
+    SUCCESS = "success"
+    ERROR = "error"

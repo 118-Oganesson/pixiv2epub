@@ -8,7 +8,7 @@ from playwright.sync_api import Page
 from ...app import Application
 from ...domain.orchestrator import DownloadBuildOrchestrator
 from ...infrastructure.builders.epub.builder import EpubBuilder
-from ...shared.enums import ContentType
+from ...shared.enums import ContentType, GuiStatus
 from ...shared.exceptions import Pixiv2EpubError
 from ...utils.url_parser import parse_content_identifier
 
@@ -59,16 +59,16 @@ class GuiManager:
 
             message = f"{len(result_paths)}件のEPUB生成に成功しました。"
             log.bind(result_count=len(result_paths)).success("タスクが完了しました。")
-            return {"status": "success", "message": message}
+            return {"status": GuiStatus.SUCCESS, "message": message}
 
-        except Pixiv2EpubError as e:
+        except Pixiv2EpubError as e:  # 
             log.bind(error=str(e)).error("GUIタスクの処理中にエラーが発生しました。")
-            return {"status": "error", "message": str(e)}
+            return {"status": GuiStatus.ERROR, "message": str(e)}
         except Exception as e:
             log.bind(error=str(e)).error(
                 "GUIタスクの処理中に予期せぬエラーが発生しました。", exc_info=True
             )
-            return {"status": "error", "message": f"予期せぬエラーが発生しました: {e}"}
+            return {"status": GuiStatus.ERROR, "message": f"予期せぬエラーが発生しました: {e}"}
 
     def setup_bridge(self):
         """Python関数をJavaScriptに公開し、UI注入スクリプトをページに登録します。"""

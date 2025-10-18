@@ -1,27 +1,25 @@
-/* CSSカスタムプロパティ（変数）を定義 */
+/* FILE: src/pixiv2epub/assets/epub/pixiv/style.css.j2 */
+/*
+    このファイルはPixivテーマ用のスタイルシートです。
+    まず共通スタイルを _base_style.css.j2 から読み込み、
+    その後、Pixiv固有のスタイル（シリーズ名、文字数カウントなど）を追加・上書きします。
+*/
+
+/* --- 1. 共通スタイルの読み込み --- */
+{% include "_base_style.css.j2" %}
+
+/* --- 2. Pixiv固有の変数の定義（共通定義を上書き・追加） --- */
 :root {
-    --tag-color: #0073bb;
-    --date-color: #888;
     --series-title-color: #777;
     --char-count-bg: rgba(0, 0, 0, 0.3);
     --char-count-text: white;
 }
 
-/* 全体の基本設定 */
-body {
-    line-height: 1.7;
-    padding: 1em;
-}
-
-.main-content {
-    max-width: 100%;
-}
+/* --- 3. Pixiv固有のスタイル定義 --- */
 
 /* 小説タイトル（シリーズ名を含むブロック全体） */
+/* defaultのh3スタイルをベースにしつつ、line-heightを上書き */
 h3[epub|type="title"] {
-    text-align: left;
-    margin-top: 0;
-    font-weight: bold;
     line-height: 1.2;
 }
 
@@ -30,11 +28,6 @@ h3[epub|type="title"] {
     color: var(--series-title-color); 
     font-size: 0.8em;
     font-weight: normal;
-}
-
-/* 著者名 */
-.author {
-    text-align: left;
 }
 
 /* 3列テーブルレイアウト用のスタイル */
@@ -80,26 +73,4 @@ h3[epub|type="title"] {
     font-size: 0.8em;
     padding: 2px 10px;
     border-radius: 20px;
-}
-
-/* 小説の説明 */
-.description {
-    text-align: left;
-}
-
-/* タグ */
-.tags {
-    color: var(--tag-color);
-    line-height: 1.8;
-}
-
-/* 日付 */
-.date {
-    color: var(--date-color); 
-    text-align: left;
-}
-
-/* ソースURL */
-.source-link {
-    word-wrap: break-word;
 }

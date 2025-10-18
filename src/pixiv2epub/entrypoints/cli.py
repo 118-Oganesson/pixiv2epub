@@ -345,7 +345,7 @@ def build(
             )
         logger.info("---")
     logger.bind(success_count=success_count, total=total).info(
-        "✨ 全てのビルd処理が完了しました。"
+        "✨ 全てのビルド処理が完了しました。"
     )
 
 
