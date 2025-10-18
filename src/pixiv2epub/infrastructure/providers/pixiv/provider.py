@@ -17,6 +17,7 @@ from ....domain.interfaces import (
 )
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
+from ....shared.constants import IMAGES_DIR_NAME
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
 from ...strategies.mappers import PixivMetadataMapper
@@ -128,7 +129,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         self, workspace: Workspace, raw_novel_detail_data: Dict
     ) -> Optional[Path]:
         """注入されたダウンローダーを使い、アセットをダウンロードします。"""
-        image_dir = workspace.assets_path / "images"
+        image_dir = workspace.assets_path / IMAGES_DIR_NAME
         cover_path = self.downloader.download_cover(
             raw_novel_detail_data.get("novel", {}), image_dir=image_dir
         )
@@ -142,7 +143,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         """コンテンツをパースし、画像をダウンロードし、XHTMLを保存します。"""
         novel_data = NovelApiResponse.model_validate(raw_webview_novel_data)
 
-        image_dir = workspace.assets_path / "images"
+        image_dir = workspace.assets_path / IMAGES_DIR_NAME
         image_paths = self.downloader.download_embedded_images(
             novel_data, image_dir=image_dir
         )

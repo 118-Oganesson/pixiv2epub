@@ -9,6 +9,7 @@ from pybreaker import CircuitBreaker
 from ...domain.interfaces import IProvider
 from ...models.domain import NovelMetadata
 from ...models.workspace import Workspace, WorkspaceManifest
+from ...shared.constants import DETAIL_FILE_NAME, MANIFEST_FILE_NAME, IMAGES_DIR_NAME
 from ...shared.settings import Settings
 
 
@@ -43,7 +44,7 @@ class BaseProvider(IProvider):
         workspace = Workspace(id=workspace_id, root_path=workspace_path)
 
         workspace.source_path.mkdir(parents=True, exist_ok=True)
-        (workspace.assets_path / "images").mkdir(parents=True, exist_ok=True)
+        (workspace.assets_path / IMAGES_DIR_NAME).mkdir(parents=True, exist_ok=True)
 
         logger.bind(workspace_path=str(workspace.root_path)).debug(
             "ワークスペースを準備しました。"
@@ -61,16 +62,20 @@ class BaseProvider(IProvider):
         try:
             with open(workspace.manifest_path, "w", encoding="utf-8") as f:
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
-            logger.debug("manifest.json の保存が完了しました。")
+            logger.debug(f"'{MANIFEST_FILE_NAME}' の保存が完了しました。")
         except IOError as e:
-            logger.bind(error=str(e)).error("manifest.json の保存に失敗しました。")
+            logger.bind(error=str(e)).error(
+                f"'{MANIFEST_FILE_NAME}' の保存に失敗しました。"
+            )
 
         # detail.jsonの保存
         try:
             metadata_dict = metadata.model_dump(mode="json")
-            detail_path = workspace.source_path / "detail.json"
+            detail_path = workspace.source_path / DETAIL_FILE_NAME
             with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
-            logger.debug("detail.json の保存が完了しました。")
+            logger.debug(f"'{DETAIL_FILE_NAME}' の保存が完了しました。")
         except IOError as e:
-            logger.bind(error=str(e)).error("detail.json の保存に失敗しました。")
+            logger.bind(error=str(e)).error(
+                f"'{DETAIL_FILE_NAME}' の保存に失敗しました。"
+            )

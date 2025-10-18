@@ -8,7 +8,7 @@ from loguru import logger
 
 from ....models.domain import NovelMetadata
 from ....models.workspace import Workspace
-from ....shared.constants import DEFAULT_THEME_NAME
+from ....shared.constants import DEFAULT_THEME_NAME, MANIFEST_FILE_NAME
 from ....shared.exceptions import BuildError
 from ....shared.settings import Settings
 from ....utils.filesystem_sanitizer import generate_sanitized_path
@@ -65,7 +65,7 @@ class EpubBuilder(BaseBuilder):
 
     def _create_template_env(self, workspace: Workspace) -> Environment:
         """ワークスペースのプロバイダーに基づいてJinja2環境を生成します。"""
-        provider_name = DEFAULT_THEME_NAME  # フォールバック
+        provider_name = DEFAULT_THEME_NAME
         try:
             with open(workspace.manifest_path, "r", encoding="utf-8") as f:
                 manifest = json.load(f)
@@ -75,7 +75,7 @@ class EpubBuilder(BaseBuilder):
             )
         except (IOError, json.JSONDecodeError):
             logger.bind(workspace_path=str(workspace.root_path)).warning(
-                "manifest.jsonが読み取れないため、デフォルトテーマを使用します。"
+                f"'{MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
             )
 
         assets_root = Path(__file__).parent.parent.parent.parent / "assets"

@@ -15,6 +15,7 @@ from ....domain.interfaces import (
 )
 from ....models.fanbox import FanboxPostApiResponse, Post
 from ....models.workspace import Workspace, WorkspaceManifest
+from ....shared.constants import IMAGES_DIR_NAME
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
 from ...strategies.mappers import FanboxMetadataMapper
@@ -101,7 +102,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                     post_data_dict
                 ).body
 
-                image_dir = workspace.assets_path / "images"
+                image_dir = workspace.assets_path / IMAGES_DIR_NAME
                 cover_path = self.downloader.download_cover(
                     post_data, image_dir=image_dir
                 )
