@@ -237,9 +237,9 @@ def _handle_download(app_state: AppState, target_input: str):
 
     workspaces: List[Workspace] = []
     if content_type_enum == ContentType.WORK and isinstance(provider, IWorkProvider):
-        ws = provider.get_work(target_id)
-        if ws:
-            workspaces.append(ws)
+        workspace = provider.get_work(target_id)
+        if workspace:
+            workspaces.append(workspace)
     elif content_type_enum == ContentType.SERIES and isinstance(
         provider, IMultiWorkProvider
     ):
@@ -253,8 +253,8 @@ def _handle_download(app_state: AppState, target_input: str):
             f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
         )
 
-    for ws in workspaces:
-        logger.bind(workspace_path=str(ws.root_path)).success("ダウンロード完了")
+    for workspace in workspaces:
+        logger.bind(workspace_path=str(workspace.root_path)).success("ダウンロード完了")
 
 
 @app.command()

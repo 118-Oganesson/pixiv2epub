@@ -95,17 +95,17 @@ class PixivAuthSettings(BaseModel):
     @field_validator("refresh_token")
     @classmethod
     def validate_token_is_not_placeholder(
-        cls, v: Optional[SecretStr]
+        cls, value: Optional[SecretStr]
     ) -> Optional[SecretStr]:
-        if v is None:
+        if value is None:
             return None
-        secret_value = v.get_secret_value()
+        secret_value = value.get_secret_value()
         if not secret_value or "your_refresh_token_here" in secret_value:
             raise ValueError(
                 "無効なPixivプレースホルダートークンが検出されました。"
                 " 'auth' コマンドを実行するか、設定を更新してください。"
             )
-        return v
+        return value
 
 
 class FanboxAuthSettings(BaseModel):
@@ -122,17 +122,17 @@ class FanboxAuthSettings(BaseModel):
     @field_validator("sessid")
     @classmethod
     def validate_sessid_is_not_placeholder(
-        cls, v: Optional[SecretStr]
+        cls, value: Optional[SecretStr]
     ) -> Optional[SecretStr]:
-        if v is None:
+        if value is None:
             return None
-        secret_value = v.get_secret_value()
+        secret_value = value.get_secret_value()
         if not secret_value or "your_fanbox_sessid_here" in secret_value:
             raise ValueError(
                 "無効なFanboxプレースホルダートークンが検出されました。"
                 " 'auth' コマンドを実行するか、設定を更新してください。"
             )
-        return v
+        return value
 
 
 class ProviderSettings(BaseModel):

@@ -35,27 +35,27 @@ class EpubPackageAssembler:
 
     def archive(self, components: "EpubComponents", output_path: Path):
         """準備されたコンポーネントをZIPファイルに書き込み、EPUBを生成します。"""
-        with zipfile.ZipFile(output_path, "w") as zf:
-            zf.writestr(
+        with zipfile.ZipFile(output_path, "w") as zip_file:
+            zip_file.writestr(
                 MIMETYPE_FILE_NAME, MIMETYPE_STRING, compress_type=zipfile.ZIP_STORED
             )
-            zf.writestr(CONTAINER_XML_PATH, CONTAINER_XML_CONTENT)
-            zf.writestr(ROOT_FILE_PATH, components.content_opf)
-            zf.writestr(NAV_XHTML_PATH, components.nav_xhtml)
+            zip_file.writestr(CONTAINER_XML_PATH, CONTAINER_XML_CONTENT)
+            zip_file.writestr(ROOT_FILE_PATH, components.content_opf)
+            zip_file.writestr(NAV_XHTML_PATH, components.nav_xhtml)
             oebps_prefix = f"{OEBPS_DIR}/"
-            zf.writestr(
+            zip_file.writestr(
                 f"{oebps_prefix}{components.info_page.href}",
                 components.info_page.content,
             )
             if components.cover_page:
-                zf.writestr(
+                zip_file.writestr(
                     f"{oebps_prefix}{components.cover_page.href}",
                     components.cover_page.content,
                 )
             for page in components.final_pages:
-                zf.writestr(f"{oebps_prefix}{page.href}", page.content)
+                zip_file.writestr(f"{oebps_prefix}{page.href}", page.content)
             if components.css_asset:
-                zf.writestr(
+                zip_file.writestr(
                     f"{oebps_prefix}{components.css_asset.href}",
                     components.css_asset.content,
                 )
@@ -66,11 +66,11 @@ class EpubPackageAssembler:
 
             logger.info(f"{len(components.final_images)}件の画像を処理します。")
             for image in components.final_images:
-                self._write_image(zf, image, oebps_prefix)
+                self._write_image(zip_file, image, oebps_prefix)
 
         logger.debug(f"EPUB を生成しました: {output_path}")
 
-    def _write_image(self, zf: zipfile.ZipFile, image: ImageAsset, prefix: str = ""):
+    def _write_image(self, zip_file: zipfile.ZipFile, image: ImageAsset, prefix: str = ""):
         """単一の画像ファイルを読み込み、必要に応じて圧縮してZIPファイルに書き込みます。"""
         try:
             file_bytes = image.path.read_bytes()
@@ -80,6 +80,6 @@ class EpubPackageAssembler:
                 )
                 if result.success and not result.skipped and result.output_bytes:
                     file_bytes = result.output_bytes
-            zf.writestr(f"{prefix}{image.href}", file_bytes)
+            zip_file.writestr(f"{prefix}{image.href}", file_bytes)
         except IOError as e:
             logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")

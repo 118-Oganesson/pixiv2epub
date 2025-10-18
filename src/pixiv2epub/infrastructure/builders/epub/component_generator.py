@@ -252,7 +252,7 @@ class EpubComponentGenerator:
         self, pages: List[PageAsset], info_page: PageAsset, has_cover: bool
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
-        nav_pages = [{"href": p.href, "title": p.title} for p in pages]
+        nav_pages = [{"href": page.href, "title": page.title} for page in pages]
         context = {
             "pages": nav_pages,
             "has_info_page": True,
