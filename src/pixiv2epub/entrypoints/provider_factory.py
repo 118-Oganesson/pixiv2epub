@@ -3,7 +3,7 @@
 from typing import Dict, Type
 from pybreaker import CircuitBreaker
 
-from ..domain.interfaces import IProvider
+from ..domain.interfaces import IProvider, IWorkspaceRepository
 from ..infrastructure.providers.fanbox.provider import FanboxProvider
 from ..infrastructure.providers.pixiv.provider import PixivProvider
 from ..shared.enums import Provider as ProviderEnum
@@ -16,7 +16,20 @@ from ..infrastructure.providers.fanbox.client import FanboxApiClient
 from ..infrastructure.providers.fanbox.downloader import (
     FanboxImageDownloader,
 )
-# ---
+from ..infrastructure.repositories.filesystem import FileSystemWorkspaceRepository
+from ..infrastructure.providers.pixiv.fetcher import PixivFetcher
+from ..infrastructure.providers.pixiv.content_processor import PixivContentProcessor
+from ..infrastructure.providers.fanbox.fetcher import FanboxFetcher
+from ..infrastructure.providers.fanbox.content_processor import FanboxContentProcessor
+from ..infrastructure.strategies.mappers import (
+    PixivMetadataMapper,
+    FanboxMetadataMapper,
+)
+from ..infrastructure.strategies.parsers import PixivTagParser, FanboxBlockParser
+from ..infrastructure.strategies.update_checkers import (
+    ContentHashUpdateStrategy,
+    TimestampUpdateStrategy,
+)
 
 
 class ProviderFactory:
@@ -39,6 +52,11 @@ class ProviderFactory:
             reset_timeout=self._settings.downloader.circuit_breaker.reset_timeout,
         )
 
+        # ワークスペースリポジトリも一度だけ作成する
+        self._repository: IWorkspaceRepository = FileSystemWorkspaceRepository(
+            self._settings.workspace
+        )
+
     def create(self, provider_type: ProviderEnum) -> IProvider:
         """指定された種類のProviderインスタンスを生成し、依存関係を注入して返します。"""
         provider_class = self._providers.get(provider_type)
@@ -50,7 +68,7 @@ class ProviderFactory:
         # --- 依存関係の組み立てロジック ---
         try:
             if provider_type == ProviderEnum.PIXIV:
-                # 1. Pixiv用のApiClientを作成
+                # 1. 依存オブジェクトの作成
                 api_client = PixivApiClient(
                     breaker=self._shared_breaker,
                     provider_name=provider_class.get_provider_name(),
@@ -58,17 +76,26 @@ class ProviderFactory:
                     api_delay=self._settings.downloader.api_delay,
                     api_retries=self._settings.downloader.api_retries,
                 )
-                # 2. Pixiv用のDownloaderを作成
                 downloader = PixivImageDownloader(
                     api_client=api_client,
                     overwrite=self._settings.downloader.overwrite_existing_images,
                 )
-                # 3. Providerに依存を注入して返す
+                fetcher = PixivFetcher(api_client=api_client)
+                processor = PixivContentProcessor(
+                    parser=PixivTagParser(),
+                    mapper=PixivMetadataMapper(),
+                    downloader=downloader,
+                    update_checker=ContentHashUpdateStrategy(),
+                )
+
+                # 2. Providerに依存を注入して返す
                 return provider_class(
                     settings=self._settings,
                     api_client=api_client,
-                    downloader=downloader,
                     breaker=self._shared_breaker,
+                    fetcher=fetcher,
+                    processor=processor,
+                    repository=self._repository,
                 )
 
             elif provider_type == ProviderEnum.FANBOX:
@@ -85,12 +112,26 @@ class ProviderFactory:
                     api_client=api_client,
                     overwrite=self._settings.downloader.overwrite_existing_images,
                 )
-                # 3. Providerに依存を注入して返す
+                # 3. Fanbox用のFetcherとProcessorを作成
+                fetcher = FanboxFetcher(api_client=api_client)
+                processor = FanboxContentProcessor(
+                    parser=FanboxBlockParser(),
+                    mapper=FanboxMetadataMapper(),
+                    downloader=downloader,
+                    update_checker=TimestampUpdateStrategy(
+                        timestamp_key="updatedDatetime"
+                    ),
+                )
+
+                # 4. Providerに依存を注入して返す
                 return provider_class(
                     settings=self._settings,
                     api_client=api_client,
                     downloader=downloader,
                     breaker=self._shared_breaker,
+                    repository=self._repository,
+                    fetcher=fetcher,
+                    processor=processor,
                 )
 
             else:

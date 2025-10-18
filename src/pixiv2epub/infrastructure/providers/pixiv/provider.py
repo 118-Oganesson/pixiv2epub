@@ -1,8 +1,6 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
-import shutil
 from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, List, Optional, Tuple
 
 from loguru import logger
 from pixivpy3 import PixivError
@@ -13,45 +11,47 @@ from ....domain.interfaces import (
     ICreatorProvider,
     IMultiWorkProvider,
     IWorkProvider,
-    IPixivImageDownloader,
+    IWorkspaceRepository,
 )
-from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
+from ....models.pixiv import NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.constants import IMAGES_DIR_NAME
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
-from ...strategies.mappers import PixivMetadataMapper
-from ...strategies.parsers import PixivTagParser
-from ...strategies.update_checkers import ContentHashUpdateStrategy
 from ..base_provider import BaseProvider
 from .client import PixivApiClient
+from .content_processor import PixivContentProcessor
+from .fetcher import PixivFetcher
 
 
 class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorProvider):
-    """Pixivから小説データを取得し、ワークスペースを生成するためのプロバイダ。"""
+    """
+    Pixivから小説データを取得するためのプロバイダ。
+    Fetcher, Processor, Repository に処理を委譲するオーケストレーターとして機能します。
+    """
 
     def __init__(
         self,
         settings: Settings,
         api_client: PixivApiClient,
-        downloader: IPixivImageDownloader,
         breaker: CircuitBreaker,
+        fetcher: PixivFetcher,
+        processor: PixivContentProcessor,
+        repository: IWorkspaceRepository,
     ):
         """
         Args:
             settings (Settings): アプリケーション設定。
             api_client (PixivApiClient): 認証済みのPixiv APIクライアント。
-            downloader (IPixivImageDownloader): Pixiv画像ダウンロード用インターフェース。
             breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
+            fetcher (PixivFetcher): データ取得担当。
+            processor (PixivContentProcessor): データ処理担当。
+            repository (IWorkspaceRepository): ワークスペース永続化担当。
         """
         super().__init__(settings, breaker)
         self.api_client = api_client
-        self.downloader = downloader
-
-        # 戦略オブジェクトのインスタンス化
-        self.update_checker = ContentHashUpdateStrategy()
-        self.parser = PixivTagParser()
-        self.mapper = PixivMetadataMapper()
+        self.fetcher = fetcher
+        self.processor = processor
+        self.repository = repository
 
     @classmethod
     def get_provider_name(cls) -> str:
@@ -59,12 +59,15 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
         logger.info("小説の処理を開始")
-        workspace = self._setup_workspace(work_id)
+        workspace = self.repository.setup_workspace(work_id, self.get_provider_name())
 
         try:
-            # --- ステップ1: APIからデータを取得し、更新が必要かチェック ---
-            raw_webview_novel_data, new_hash, update_required = (
-                self._fetch_and_check_update(work_id, workspace)
+            # 1. データの取得
+            raw_webview_data, raw_detail_data = self.fetcher.fetch_novel_data(work_id)
+
+            # 2. 更新のチェック
+            update_required, new_hash = self.processor.check_for_updates(
+                workspace, raw_webview_data
             )
             if not update_required:
                 logger.bind(workspace_id=workspace.id).info(
@@ -72,29 +75,22 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 )
                 return None
 
-            # --- ステップ2: ワークスペースを準備し、アセットをダウンロード ---
-            raw_novel_detail_data = self.api_client.novel_detail(work_id)
-            cover_path = self._download_assets(workspace, raw_novel_detail_data)
-
-            # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
-            novel_data, image_paths, parsed_text = self._process_and_save_content(
-                workspace, raw_webview_novel_data
+            # 3. コンテンツの処理とワークスペースへの保存
+            metadata = self.processor.process_and_populate_workspace(
+                workspace, raw_webview_data, raw_detail_data
             )
 
-            # --- ステップ4: メタデータを生成し、永続化 ---
-            self._generate_and_persist_metadata(
-                workspace=workspace,
-                work_id=work_id,
-                new_hash=new_hash,
-                novel_data=novel_data,
-                detail_data=raw_novel_detail_data,
-                cover_path=cover_path,
-                image_paths=image_paths,
-                parsed_text=parsed_text,
+            # 4. メタデータとマニフェストの永続化
+            manifest = WorkspaceManifest(
+                provider_name=self.get_provider_name(),
+                created_at_utc=datetime.now(timezone.utc).isoformat(),
+                source_metadata={"novel_id": work_id},
+                content_hash=new_hash,
             )
+            self.repository.persist_metadata(workspace, metadata, manifest)
 
             logger.bind(
-                title=novel_data.title, workspace_path=str(workspace.root_path)
+                title=metadata.title, workspace_path=str(workspace.root_path)
             ).info("小説データ取得完了")
             return workspace
 
@@ -108,92 +104,6 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 f"小説ID {work_id} のデータ解析に失敗: {e}",
                 self.get_provider_name(),
             ) from e
-
-    def _fetch_and_check_update(
-        self, work_id: int, workspace: Workspace
-    ) -> Tuple[Dict, str, bool]:
-        """APIからデータを取得し、更新が必要かチェックします。"""
-        raw_webview_novel_data = self.api_client.webview_novel(work_id)
-        update_required, new_hash = self.update_checker.is_update_required(
-            workspace, raw_webview_novel_data
-        )
-        if update_required:
-            logger.info("コンテンツの更新を検出（または新規ダウンロードです）。")
-            if workspace.source_path.exists():
-                shutil.rmtree(workspace.source_path)
-            workspace.source_path.mkdir(parents=True, exist_ok=True)
-        return raw_webview_novel_data, new_hash, update_required
-
-    def _download_assets(
-        self, workspace: Workspace, raw_novel_detail_data: Dict
-    ) -> Optional[Path]:
-        """注入されたダウンローダーを使い、アセットをダウンロードします。"""
-        image_dir = workspace.assets_path / IMAGES_DIR_NAME
-        cover_path = self.downloader.download_cover(
-            raw_novel_detail_data.get("novel", {}), image_dir=image_dir
-        )
-        return cover_path
-
-    def _process_and_save_content(
-        self,
-        workspace: Workspace,
-        raw_webview_novel_data: Dict,
-    ) -> Tuple[NovelApiResponse, Dict[str, Path], str]:
-        """コンテンツをパースし、画像をダウンロードし、XHTMLを保存します。"""
-        novel_data = NovelApiResponse.model_validate(raw_webview_novel_data)
-
-        image_dir = workspace.assets_path / IMAGES_DIR_NAME
-        image_paths = self.downloader.download_embedded_images(
-            novel_data, image_dir=image_dir
-        )
-
-        parsed_text = self.parser.parse(novel_data.text, image_paths)
-
-        pages = parsed_text.split("[newpage]")
-        for i, page_content in enumerate(pages):
-            filename = workspace.source_path / f"page-{i + 1}.xhtml"
-            try:
-                with open(filename, "w", encoding="utf-8") as f:
-                    f.write(page_content)
-            except IOError as e:
-                logger.bind(page=i + 1, error=str(e)).error(
-                    "ページの保存に失敗しました。"
-                )
-        logger.bind(page_count=len(pages)).debug("ページの保存が完了しました。")
-
-        return novel_data, image_paths, parsed_text
-
-    def _generate_and_persist_metadata(
-        self,
-        workspace: Workspace,
-        work_id: int,
-        new_hash: str,
-        novel_data: NovelApiResponse,
-        detail_data: Dict,
-        cover_path: Optional[Path],
-        image_paths: Dict[str, Path],
-        parsed_text: str,
-    ):
-        """メタデータを生成し、manifest.json と detail.json を保存します。"""
-        parsed_description = self.parser.parse(
-            detail_data.get("novel", {}).get("caption", ""), image_paths
-        )
-
-        metadata = self.mapper.map_to_metadata(
-            workspace=workspace,
-            cover_path=cover_path,
-            novel_data=novel_data,
-            detail_data=detail_data,
-            parsed_text=parsed_text,
-            parsed_description=parsed_description,
-        )
-        manifest = WorkspaceManifest(
-            provider_name=self.get_provider_name(),
-            created_at_utc=datetime.now(timezone.utc).isoformat(),
-            source_metadata={"novel_id": work_id},
-            content_hash=new_hash,
-        )
-        self._persist_metadata(workspace, metadata, manifest)
 
     def get_multiple_works(self, series_id: Any) -> List[Workspace]:
         logger.info("シリーズの処理を開始")

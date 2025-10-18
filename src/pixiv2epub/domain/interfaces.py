@@ -2,8 +2,9 @@
 from pathlib import Path
 from typing import Any, List, Protocol, runtime_checkable, Optional, Dict
 
-from ..models.workspace import Workspace
+from ..models.workspace import Workspace, WorkspaceManifest
 from ..shared.settings import Settings
+from ..models.domain import NovelMetadata
 from ..models.pixiv import NovelApiResponse
 from ..models.fanbox import Post
 
@@ -99,4 +100,22 @@ class IFanboxImageDownloader(Protocol):
         self, post_data: Post, image_dir: Path
     ) -> Dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
+        ...
+
+
+@runtime_checkable
+class IWorkspaceRepository(Protocol):
+    """ワークスペースのファイルシステム操作を抽象化するインターフェース。"""
+
+    def setup_workspace(self, content_id: Any, provider_name: str) -> Workspace:
+        """content_idに基づいた永続的なワークスペースを準備します。"""
+        ...
+
+    def persist_metadata(
+        self,
+        workspace: Workspace,
+        metadata: NovelMetadata,
+        manifest: WorkspaceManifest,
+    ) -> None:
+        """メタデータとマニフェストをワークスペースに永続化します。"""
         ...
