@@ -2,6 +2,8 @@
 """
 Pixiv APIのJSONレスポンスをマッピングするためのPydanticデータモデル。
 このモジュールは外部APIの仕様に依存します。
+このモジュールはインフラストラクチャ層の一部であり、ドメイン層から
+直接インポートしてはいけません。
 """
 
 from typing import Any, Dict, List, Optional

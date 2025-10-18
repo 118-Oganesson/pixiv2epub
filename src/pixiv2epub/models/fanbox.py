@@ -2,6 +2,8 @@
 """
 FANBOX APIのJSONレスポンスをマッピングするためのPydanticデータモデル。
 'article'形式（多様なブロックを含む）と'text'形式の両方に対応しています。
+このモジュールはインフラストラクチャ層の一部であり、ドメイン層から
+直接インポートしてはいけません。
 """
 
 from typing import Any, Dict, List, Literal, Optional, Union, Annotated
