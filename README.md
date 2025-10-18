@@ -1,8 +1,8 @@
-# Pixiv to EPUB Converter
+# Pixiv to EPUB Converter (piep)
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="./pixiv2epub_icon.svg" alt="Pixiv to EPUB Converter Icon" width="250">
+  <img src="./icon/piep.svg" alt="Pixiv to EPUB Converter Icon" width="250">
 </p>
 
 <p align="center">
