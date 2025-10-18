@@ -58,57 +58,56 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         return "pixiv"
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
-        with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("小説の処理を開始")
-            workspace = self._setup_workspace(work_id)
+        logger.info("小説の処理を開始")
+        workspace = self._setup_workspace(work_id)
 
-            try:
-                # --- ステップ1: APIからデータを取得し、更新が必要かチェック ---
-                raw_webview_novel_data, new_hash, update_required = (
-                    self._fetch_and_check_update(work_id, workspace)
+        try:
+            # --- ステップ1: APIからデータを取得し、更新が必要かチェック ---
+            raw_webview_novel_data, new_hash, update_required = (
+                self._fetch_and_check_update(work_id, workspace)
+            )
+            if not update_required:
+                logger.bind(workspace_id=workspace.id).info(
+                    "コンテンツに変更なし、スキップします。"
                 )
-                if not update_required:
-                    logger.bind(workspace_id=workspace.id).info(
-                        "コンテンツに変更なし、スキップします。"
-                    )
-                    return None
+                return None
 
-                # --- ステップ2: ワークスペースを準備し、アセットをダウンロード ---
-                raw_novel_detail_data = self.api_client.novel_detail(work_id)
-                cover_path = self._download_assets(workspace, raw_novel_detail_data)
+            # --- ステップ2: ワークスペースを準備し、アセットをダウンロード ---
+            raw_novel_detail_data = self.api_client.novel_detail(work_id)
+            cover_path = self._download_assets(workspace, raw_novel_detail_data)
 
-                # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
-                novel_data, image_paths, parsed_text = self._process_and_save_content(
-                    workspace, raw_webview_novel_data
-                )
+            # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
+            novel_data, image_paths, parsed_text = self._process_and_save_content(
+                workspace, raw_webview_novel_data
+            )
 
-                # --- ステップ4: メタデータを生成し、永続化 ---
-                self._generate_and_persist_metadata(
-                    workspace=workspace,
-                    work_id=work_id,
-                    new_hash=new_hash,
-                    novel_data=novel_data,
-                    detail_data=raw_novel_detail_data,
-                    cover_path=cover_path,
-                    image_paths=image_paths,
-                    parsed_text=parsed_text,
-                )
+            # --- ステップ4: メタデータを生成し、永続化 ---
+            self._generate_and_persist_metadata(
+                workspace=workspace,
+                work_id=work_id,
+                new_hash=new_hash,
+                novel_data=novel_data,
+                detail_data=raw_novel_detail_data,
+                cover_path=cover_path,
+                image_paths=image_paths,
+                parsed_text=parsed_text,
+            )
 
-                logger.bind(
-                    title=novel_data.title, workspace_path=str(workspace.root_path)
-                ).info("小説データ取得完了")
-                return workspace
+            logger.bind(
+                title=novel_data.title, workspace_path=str(workspace.root_path)
+            ).info("小説データ取得完了")
+            return workspace
 
-            except (PixivError, ApiError) as e:
-                raise ApiError(
-                    f"小説ID {work_id} のデータ取得に失敗: {e}",
-                    self.get_provider_name(),
-                ) from e
-            except (ValidationError, KeyError, TypeError) as e:
-                raise DataProcessingError(
-                    f"小説ID {work_id} のデータ解析に失敗: {e}",
-                    self.get_provider_name(),
-                ) from e
+        except (PixivError, ApiError) as e:
+            raise ApiError(
+                f"小説ID {work_id} のデータ取得に失敗: {e}",
+                self.get_provider_name(),
+            ) from e
+        except (ValidationError, KeyError, TypeError) as e:
+            raise DataProcessingError(
+                f"小説ID {work_id} のデータ解析に失敗: {e}",
+                self.get_provider_name(),
+            ) from e
 
     def _fetch_and_check_update(
         self, work_id: int, workspace: Workspace
@@ -197,45 +196,40 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         self._persist_metadata(workspace, metadata, manifest)
 
     def get_multiple_works(self, series_id: Any) -> List[Workspace]:
-        with logger.contextualize(
-            provider=self.get_provider_name(), series_id=series_id
-        ):
-            logger.info("シリーズの処理を開始")
-            try:
-                series_data = self.get_series_info(series_id)
-                novel_ids = [novel.id for novel in series_data.novels]
+        logger.info("シリーズの処理を開始")
+        try:
+            series_data = self.get_series_info(series_id)
+            novel_ids = [novel.id for novel in series_data.novels]
 
-                if not novel_ids:
-                    logger.info("ダウンロード対象が見つからず処理を終了します。")
-                    return []
+            if not novel_ids:
+                logger.info("ダウンロード対象が見つからず処理を終了します。")
+                return []
 
-                downloaded_workspaces = []
-                total = len(novel_ids)
-                logger.bind(total_novels=total).info(
-                    "シリーズ内の小説ダウンロードを開始"
-                )
+            downloaded_workspaces = []
+            total = len(novel_ids)
+            logger.bind(total_novels=total).info("シリーズ内の小説ダウンロードを開始")
 
-                for i, novel_id in enumerate(novel_ids, 1):
-                    log = logger.bind(current=i, total=total, novel_id=novel_id)
-                    log.info("--- 小説を処理中 ---")
-                    try:
-                        workspace = self.get_work(novel_id)
-                        if workspace:
-                            downloaded_workspaces.append(workspace)
-                    except Exception as e:
-                        log.bind(error=str(e)).error(
-                            "小説のダウンロードに失敗しました。", exc_info=True
-                        )
+            for i, novel_id in enumerate(novel_ids, 1):
+                log = logger.bind(current=i, total=total, novel_id=novel_id)
+                log.info("--- 小説を処理中 ---")
+                try:
+                    workspace = self.get_work(novel_id)
+                    if workspace:
+                        downloaded_workspaces.append(workspace)
+                except Exception as e:
+                    log.bind(error=str(e)).error(
+                        "小説のダウンロードに失敗しました。", exc_info=True
+                    )
 
-                logger.bind(series_title=series_data.novel_series_detail.title).info(
-                    "シリーズのダウンロード完了"
-                )
-                return downloaded_workspaces
-            except Exception as e:
-                raise ApiError(
-                    f"シリーズID {series_id} の処理中にエラーが発生: {e}",
-                    self.get_provider_name(),
-                ) from e
+            logger.bind(series_title=series_data.novel_series_detail.title).info(
+                "シリーズのダウンロード完了"
+            )
+            return downloaded_workspaces
+        except Exception as e:
+            raise ApiError(
+                f"シリーズID {series_id} の処理中にエラーが発生: {e}",
+                self.get_provider_name(),
+            ) from e
 
     def get_series_info(self, series_id: Any) -> NovelSeriesApiResponse:
         try:
@@ -248,50 +242,47 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             ) from e
 
     def get_creator_works(self, user_id: Any) -> List[Workspace]:
-        with logger.contextualize(provider=self.get_provider_name(), user_id=user_id):
-            logger.info("ユーザーの全作品の処理を開始")
-            try:
-                single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
-                logger.bind(
-                    series_count=len(series_ids), single_work_count=len(single_ids)
-                ).info("ユーザー作品の取得結果")
+        logger.info("ユーザーの全作品の処理を開始")
+        try:
+            single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
+            logger.bind(
+                series_count=len(series_ids), single_work_count=len(single_ids)
+            ).info("ユーザー作品の取得結果")
 
-                downloaded_workspaces = []
-                if series_ids:
-                    logger.info("--- シリーズ作品の処理を開始 ---")
-                    for i, s_id in enumerate(series_ids, 1):
-                        log = logger.bind(
-                            current_series=i, total_series=len(series_ids)
+            downloaded_workspaces = []
+            if series_ids:
+                logger.info("--- シリーズ作品の処理を開始 ---")
+                for i, s_id in enumerate(series_ids, 1):
+                    log = logger.bind(current_series=i, total_series=len(series_ids))
+                    log.info("--- シリーズを処理中 ---")
+                    try:
+                        workspaces = self.get_multiple_works(s_id)
+                        downloaded_workspaces.extend(workspaces)
+                    except Exception as e:
+                        log.bind(series_id=s_id, error=str(e)).error(
+                            "シリーズの処理中にエラーが発生しました。",
+                            exc_info=True,
                         )
-                        log.info("--- シリーズを処理中 ---")
-                        try:
-                            workspaces = self.get_multiple_works(s_id)
-                            downloaded_workspaces.extend(workspaces)
-                        except Exception as e:
-                            log.bind(series_id=s_id, error=str(e)).error(
-                                "シリーズの処理中にエラーが発生しました。",
-                                exc_info=True,
-                            )
 
-                if single_ids:
-                    logger.info("--- 単独作品の処理を開始 ---")
-                    for i, n_id in enumerate(single_ids, 1):
-                        log = logger.bind(current_work=i, total_works=len(single_ids))
-                        log.info("--- 単独作品を処理中 ---")
-                        try:
-                            workspace = self.get_work(n_id)
-                            if workspace:
-                                downloaded_workspaces.append(workspace)
-                        except Exception as e:
-                            log.bind(novel_id=n_id, error=str(e)).error(
-                                "小説の処理中にエラーが発生しました。", exc_info=True
-                            )
-                return downloaded_workspaces
-            except Exception as e:
-                raise ApiError(
-                    f"ユーザーID {user_id} の作品処理中にエラーが発生: {e}",
-                    self.get_provider_name(),
-                ) from e
+            if single_ids:
+                logger.info("--- 単独作品の処理を開始 ---")
+                for i, n_id in enumerate(single_ids, 1):
+                    log = logger.bind(current_work=i, total_works=len(single_ids))
+                    log.info("--- 単独作品を処理中 ---")
+                    try:
+                        workspace = self.get_work(n_id)
+                        if workspace:
+                            downloaded_workspaces.append(workspace)
+                    except Exception as e:
+                        log.bind(novel_id=n_id, error=str(e)).error(
+                            "小説の処理中にエラーが発生しました。", exc_info=True
+                        )
+            return downloaded_workspaces
+        except Exception as e:
+            raise ApiError(
+                f"ユーザーID {user_id} の作品処理中にエラーが発生: {e}",
+                self.get_provider_name(),
+            ) from e
 
     def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], List[int]]:
         """指定されたユーザーの全小説IDを取得し、単独作品とシリーズ作品IDに分離します。"""

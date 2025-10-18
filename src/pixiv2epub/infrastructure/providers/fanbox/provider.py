@@ -66,78 +66,73 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             logger.bind(error=str(e)).error("ページの保存に失敗しました。")
 
     def get_work(self, work_id: Any) -> Optional[Workspace]:
-        with logger.contextualize(provider=self.get_provider_name(), work_id=work_id):
-            logger.info("Fanbox投稿の処理を開始")
-            workspace = self._setup_workspace(work_id)
+        logger.info("Fanbox投稿の処理を開始")
+        workspace = self._setup_workspace(work_id)
 
-            try:
-                # --- API呼び出しと更新チェック ---
-                post_data_dict = self.api_client.post_info(work_id)
-                post_data_body = post_data_dict.get("body", {})
+        try:
+            # --- API呼び出しと更新チェック ---
+            post_data_dict = self.api_client.post_info(work_id)
+            post_data_body = post_data_dict.get("body", {})
 
-                update_required, new_timestamp = self.update_checker.is_update_required(
-                    workspace, post_data_body
+            update_required, new_timestamp = self.update_checker.is_update_required(
+                workspace, post_data_body
+            )
+
+            if not update_required:
+                logger.bind(workspace_id=workspace.id).info(
+                    "コンテンツに変更なし、スキップします。"
                 )
+                return None
 
-                if not update_required:
-                    logger.bind(workspace_id=workspace.id).info(
-                        "コンテンツに変更なし、スキップします。"
-                    )
-                    return None
+            logger.info("コンテンツの更新を検出、ダウンロードを続行します。")
+            if workspace.source_path.exists():
+                shutil.rmtree(workspace.source_path)
+            workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-                logger.info("コンテンツの更新を検出、ダウンロードを続行します。")
-                if workspace.source_path.exists():
-                    shutil.rmtree(workspace.source_path)
-                workspace.source_path.mkdir(parents=True, exist_ok=True)
+        except (RequestException, ApiError) as e:
+            raise ApiError(
+                f"投稿ID {work_id} のデータ取得に失敗: {e}",
+                self.get_provider_name(),
+            ) from e
 
-            except (RequestException, ApiError) as e:
-                raise ApiError(
-                    f"投稿ID {work_id} のデータ取得に失敗: {e}",
-                    self.get_provider_name(),
-                ) from e
+        try:
+            # --- ダウンロード後のデータ処理 ---
+            post_data: Post = FanboxPostApiResponse.model_validate(post_data_dict).body
 
-            try:
-                # --- ダウンロード後のデータ処理 ---
-                post_data: Post = FanboxPostApiResponse.model_validate(
-                    post_data_dict
-                ).body
+            image_dir = workspace.assets_path / IMAGES_DIR_NAME
+            cover_path = self.downloader.download_cover(post_data, image_dir=image_dir)
+            image_paths = self.downloader.download_embedded_images(
+                post_data, image_dir=image_dir
+            )
 
-                image_dir = workspace.assets_path / IMAGES_DIR_NAME
-                cover_path = self.downloader.download_cover(
-                    post_data, image_dir=image_dir
-                )
-                image_paths = self.downloader.download_embedded_images(
-                    post_data, image_dir=image_dir
-                )
+            parsed_html = self.parser.parse(post_data.body, image_paths)
+            self._save_page(workspace, parsed_html)
 
-                parsed_html = self.parser.parse(post_data.body, image_paths)
-                self._save_page(workspace, parsed_html)
+            metadata = self.mapper.map_to_metadata(
+                workspace=workspace, cover_path=cover_path, post_data=post_data
+            )
 
-                metadata = self.mapper.map_to_metadata(
-                    workspace=workspace, cover_path=cover_path, post_data=post_data
-                )
+            manifest = WorkspaceManifest(
+                provider_name=self.get_provider_name(),
+                created_at_utc=datetime.now(timezone.utc).isoformat(),
+                source_metadata={
+                    "post_id": work_id,
+                    "creator_id": post_data.creator_id,
+                },
+                content_hash=new_timestamp,
+            )
+            self._persist_metadata(workspace, metadata, manifest)
 
-                manifest = WorkspaceManifest(
-                    provider_name=self.get_provider_name(),
-                    created_at_utc=datetime.now(timezone.utc).isoformat(),
-                    source_metadata={
-                        "post_id": work_id,
-                        "creator_id": post_data.creator_id,
-                    },
-                    content_hash=new_timestamp,
-                )
-                self._persist_metadata(workspace, metadata, manifest)
+            logger.bind(
+                title=post_data.title, workspace_path=str(workspace.root_path)
+            ).info("投稿データ取得完了")
+            return workspace
 
-                logger.bind(
-                    title=post_data.title, workspace_path=str(workspace.root_path)
-                ).info("投稿データ取得完了")
-                return workspace
-
-            except (ValidationError, KeyError, TypeError) as e:
-                raise DataProcessingError(
-                    f"投稿ID {work_id} のデータ解析に失敗: {e}",
-                    self.get_provider_name(),
-                ) from e
+        except (ValidationError, KeyError, TypeError) as e:
+            raise DataProcessingError(
+                f"投稿ID {work_id} のデータ解析に失敗: {e}",
+                self.get_provider_name(),
+            ) from e
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
         """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""
@@ -196,22 +191,19 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
         """クリエイターの全投稿をダウンロードし、Workspaceのリストを返す。"""
-        with logger.contextualize(
-            provider=self.get_provider_name(), creator_id=creator_id
-        ):
-            post_ids = self._fetch_all_creator_post_ids(creator_id)
-            workspaces = []
-            total = len(post_ids)
-            for i, post_id in enumerate(post_ids, 1):
-                log = logger.bind(current=i, total=total, post_id=post_id)
-                log.info("--- 投稿を処理中 ---")
-                try:
-                    workspace = self.get_work(post_id)
-                    if workspace:
-                        workspaces.append(workspace)
-                except Exception as e:
-                    log.bind(error=str(e)).error(
-                        "投稿の処理に失敗しました。",
-                        exc_info=self.settings.log_level == "DEBUG",
-                    )
-            return workspaces
+        post_ids = self._fetch_all_creator_post_ids(creator_id)
+        workspaces = []
+        total = len(post_ids)
+        for i, post_id in enumerate(post_ids, 1):
+            log = logger.bind(current=i, total=total, post_id=post_id)
+            log.info("--- 投稿を処理中 ---")
+            try:
+                workspace = self.get_work(post_id)
+                if workspace:
+                    workspaces.append(workspace)
+            except Exception as e:
+                log.bind(error=str(e)).error(
+                    "投稿の処理に失敗しました。",
+                    exc_info=self.settings.log_level == "DEBUG",
+                )
+        return workspaces

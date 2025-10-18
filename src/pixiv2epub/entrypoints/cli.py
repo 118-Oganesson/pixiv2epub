@@ -210,51 +210,74 @@ def _parse_input_and_create_provider(
 
 def _handle_run(app_state: AppState, target_input: str):
     """ダウンロードとビルド処理を実行します。"""
-    provider, _, content_type_enum, target_id, log = _parse_input_and_create_provider(
-        app_state, target_input
-    )
-    log.info("ダウンロードとビルド処理を開始")
+    # 1. まずコンテキスト情報（IDやプロバイダ）をパースします
+    try:
+        provider, provider_enum, content_type_enum, target_id, _ = (
+            _parse_input_and_create_provider(app_state, target_input)
+        )
+    except Exception as e:
+        logger.error(f"入力の解析に失敗しました: {e}", exc_info=True)
+        return
 
-    builder = EpubBuilder(settings=app_state.settings)
-    orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
+    # 2. 処理全体を with logger.contextualize で囲みます
+    with logger.contextualize(
+        provider=provider_enum.name,
+        content_type=content_type_enum.name,
+        target_id=str(target_id),
+    ):
+        logger.info("ダウンロードとビルド処理を開始")
 
-    if content_type_enum == ContentType.WORK:
-        orchestrator.process_work(target_id)
-    elif content_type_enum == ContentType.SERIES:
-        orchestrator.process_series(target_id)
-    elif content_type_enum == ContentType.CREATOR:
-        orchestrator.process_creator(target_id)
+        builder = EpubBuilder(settings=app_state.settings)
+        orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
 
-    log.success("✅ すべての処理が完了しました。")
+        if content_type_enum == ContentType.WORK:
+            orchestrator.process_work(target_id)
+        elif content_type_enum == ContentType.SERIES:
+            orchestrator.process_series(target_id)
+        elif content_type_enum == ContentType.CREATOR:
+            orchestrator.process_creator(target_id)
+
+        logger.success("✅ すべての処理が完了しました。")
 
 
 def _handle_download(app_state: AppState, target_input: str):
     """ダウンロード処理のみを実行します。"""
-    provider, _, content_type_enum, target_id, log = _parse_input_and_create_provider(
-        app_state, target_input
-    )
-    log.info("ダウンロード処理のみを開始")
-
-    workspaces: List[Workspace] = []
-    if content_type_enum == ContentType.WORK and isinstance(provider, IWorkProvider):
-        workspace = provider.get_work(target_id)
-        if workspace:
-            workspaces.append(workspace)
-    elif content_type_enum == ContentType.SERIES and isinstance(
-        provider, IMultiWorkProvider
-    ):
-        workspaces = provider.get_multiple_works(target_id)
-    elif content_type_enum == ContentType.CREATOR and isinstance(
-        provider, ICreatorProvider
-    ):
-        workspaces = provider.get_creator_works(target_id)
-    else:
-        raise TypeError(
-            f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
+    # 1. コンテキスト情報をパース
+    try:
+        provider, provider_enum, content_type_enum, target_id, _ = (
+            _parse_input_and_create_provider(app_state, target_input)
         )
+    except Exception as e:
+        logger.error(f"入力の解析に失敗しました: {e}", exc_info=True)
+        return
 
-    for workspace in workspaces:
-        logger.bind(workspace_path=str(workspace.root_path)).success("ダウンロード完了")
+    # 2. 処理全体を with logger.contextualize で囲む
+    with logger.contextualize(
+        provider=provider_enum.name,
+        content_type=content_type_enum.name,
+        target_id=str(target_id),
+    ):
+        logger.info("ダウンロード処理のみを開始")
+
+        workspaces: List[Workspace] = []
+        if content_type_enum == ContentType.WORK and isinstance(
+            provider, IWorkProvider
+        ):
+            workspace = provider.get_work(target_id)
+            if workspace:
+                workspaces.append(workspace)
+        elif content_type_enum == ContentType.SERIES and isinstance(
+            provider, IMultiWorkProvider
+        ):
+            workspaces = provider.get_multiple_works(target_id)
+        elif content_type_enum == ContentType.CREATOR and isinstance(
+            provider, ICreatorProvider
+        ):
+            workspaces = provider.get_creator_works(target_id)
+        else:
+            raise TypeError(
+                f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
+            )
 
 
 @app.command()
