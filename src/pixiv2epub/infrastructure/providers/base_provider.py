@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base_provider.py
 import json
 from dataclasses import asdict
-from typing import Any, Optional
+from typing import Any
 
 from loguru import logger
 from pybreaker import CircuitBreaker
@@ -15,26 +15,23 @@ from ...shared.settings import Settings
 class BaseProvider(IProvider):
     """プロバイダーの共通ワークフローを管理する抽象基底クラス。"""
 
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, breaker: CircuitBreaker):
         """
         Args:
             settings (Settings): アプリケーション設定。
+            breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
         """
         self.settings = settings
         self.workspace_dir = settings.workspace.root_directory
-        self._breaker: Optional[CircuitBreaker] = None
+        self._breaker: CircuitBreaker = breaker
+
         logger.bind(provider_name=self.__class__.__name__).info(
             "プロバイダーを初期化しました。"
         )
 
     @property
     def breaker(self) -> CircuitBreaker:
-        """サーキットブレーカーのインスタンスを遅延初期化して返します。"""
-        if self._breaker is None:
-            self._breaker = CircuitBreaker(
-                fail_max=self.settings.downloader.circuit_breaker.fail_max,
-                reset_timeout=self.settings.downloader.circuit_breaker.reset_timeout,
-            )
+        """サーキットブレーカーのインスタンスを返します。"""
         return self._breaker
 
     def _setup_workspace(self, content_id: Any) -> Workspace:

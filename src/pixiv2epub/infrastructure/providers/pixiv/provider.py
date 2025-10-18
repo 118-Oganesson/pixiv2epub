@@ -7,11 +7,13 @@ from typing import Any, Dict, List, Optional, Tuple
 from loguru import logger
 from pixivpy3 import PixivError
 from pydantic import ValidationError
+from pybreaker import CircuitBreaker
 
 from ....domain.interfaces import (
     ICreatorProvider,
     IMultiWorkProvider,
     IWorkProvider,
+    IPixivImageDownloader,
 )
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
@@ -22,21 +24,30 @@ from ...strategies.parsers import PixivTagParser
 from ...strategies.update_checkers import ContentHashUpdateStrategy
 from ..base_provider import BaseProvider
 from .client import PixivApiClient
-from .downloader import ImageDownloader
 
 
 class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorProvider):
     """Pixivから小説データを取得し、ワークスペースを生成するためのプロバイダ。"""
 
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
-        self.api_client = PixivApiClient(
-            breaker=self.breaker,
-            provider_name=self.get_provider_name(),
-            auth_settings=settings.providers.pixiv,
-            api_delay=settings.downloader.api_delay,
-            api_retries=settings.downloader.api_retries,
-        )
+    def __init__(
+        self,
+        settings: Settings,
+        api_client: PixivApiClient,
+        downloader: IPixivImageDownloader,
+        breaker: CircuitBreaker,
+    ):
+        """
+        Args:
+            settings (Settings): アプリケーション設定。
+            api_client (PixivApiClient): 認証済みのPixiv APIクライアント。
+            downloader (IPixivImageDownloader): Pixiv画像ダウンロード用インターフェース。
+            breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
+        """
+        super().__init__(settings, breaker)
+        self.api_client = api_client
+        self.downloader = downloader
+
+        # 戦略オブジェクトのインスタンス化
         self.update_checker = ContentHashUpdateStrategy()
         self.parser = PixivTagParser()
         self.mapper = PixivMetadataMapper()
@@ -63,13 +74,11 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
                 # --- ステップ2: ワークスペースを準備し、アセットをダウンロード ---
                 raw_novel_detail_data = self.api_client.novel_detail(work_id)
-                downloader, cover_path = self._download_assets(
-                    workspace, raw_novel_detail_data
-                )
+                cover_path = self._download_assets(workspace, raw_novel_detail_data)
 
                 # --- ステップ3: コンテンツを処理し、ワークスペースに保存 ---
                 novel_data, image_paths, parsed_text = self._process_and_save_content(
-                    workspace, raw_webview_novel_data, downloader
+                    workspace, raw_webview_novel_data
                 )
 
                 # --- ステップ4: メタデータを生成し、永続化 ---
@@ -103,6 +112,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
     def _fetch_and_check_update(
         self, work_id: int, workspace: Workspace
     ) -> Tuple[Dict, str, bool]:
+        """APIからデータを取得し、更新が必要かチェックします。"""
         raw_webview_novel_data = self.api_client.webview_novel(work_id)
         update_required, new_hash = self.update_checker.is_update_required(
             workspace, raw_webview_novel_data
@@ -116,23 +126,27 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
 
     def _download_assets(
         self, workspace: Workspace, raw_novel_detail_data: Dict
-    ) -> Tuple[ImageDownloader, Optional[Path]]:
-        downloader = ImageDownloader(
-            self.api_client,
-            workspace.assets_path / "images",
-            self.settings.downloader.overwrite_existing_images,
+    ) -> Optional[Path]:
+        """注入されたダウンローダーを使い、アセットをダウンロードします。"""
+        image_dir = workspace.assets_path / "images"
+        cover_path = self.downloader.download_cover(
+            raw_novel_detail_data.get("novel", {}), image_dir=image_dir
         )
-        cover_path = downloader.download_cover(raw_novel_detail_data.get("novel", {}))
-        return downloader, cover_path
+        return cover_path
 
     def _process_and_save_content(
         self,
         workspace: Workspace,
         raw_webview_novel_data: Dict,
-        downloader: ImageDownloader,
     ) -> Tuple[NovelApiResponse, Dict[str, Path], str]:
+        """コンテンツをパースし、画像をダウンロードし、XHTMLを保存します。"""
         novel_data = NovelApiResponse.model_validate(raw_webview_novel_data)
-        image_paths = downloader.download_embedded_images(novel_data)
+
+        image_dir = workspace.assets_path / "images"
+        image_paths = self.downloader.download_embedded_images(
+            novel_data, image_dir=image_dir
+        )
+
         parsed_text = self.parser.parse(novel_data.text, image_paths)
 
         pages = parsed_text.split("[newpage]")
@@ -160,6 +174,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         image_paths: Dict[str, Path],
         parsed_text: str,
     ):
+        """メタデータを生成し、manifest.json と detail.json を保存します。"""
         parsed_description = self.parser.parse(
             detail_data.get("novel", {}).get("caption", ""), image_paths
         )
@@ -278,6 +293,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                 ) from e
 
     def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], List[int]]:
+        """指定されたユーザーの全小説IDを取得し、単独作品とシリーズ作品IDに分離します。"""
         single_ids, series_ids = [], set()
         next_url = None
         while True:

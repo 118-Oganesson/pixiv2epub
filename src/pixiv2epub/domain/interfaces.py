@@ -1,9 +1,11 @@
 # FILE: src/pixiv2epub/domain/interfaces.py
 from pathlib import Path
-from typing import Any, List, Protocol, runtime_checkable
+from typing import Any, List, Protocol, runtime_checkable, Optional, Dict
 
 from ..models.workspace import Workspace
 from ..shared.settings import Settings
+from ..models.pixiv import NovelApiResponse
+from ..models.fanbox import Post
 
 
 class IBuilder(Protocol):
@@ -67,4 +69,34 @@ class ICreatorProvider(IProvider, Protocol):
 
     def get_creator_works(self, creator_id: Any) -> List[Workspace]:
         """特定のクリエイターが投稿したすべての作品を取得し、Workspaceのリストを返します。"""
+        ...
+
+
+@runtime_checkable
+class IPixivImageDownloader(Protocol):
+    """Pixivの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
+
+    def download_cover(self, novel_detail: dict, image_dir: Path) -> Optional[Path]:
+        """小説の表紙画像をダウンロードします。"""
+        ...
+
+    def download_embedded_images(
+        self, novel_data: NovelApiResponse, image_dir: Path
+    ) -> Dict[str, Path]:
+        """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
+        ...
+
+
+@runtime_checkable
+class IFanboxImageDownloader(Protocol):
+    """Fanboxの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
+
+    def download_cover(self, post_data: Post, image_dir: Path) -> Optional[Path]:
+        """投稿のカバー画像をダウンロードします。"""
+        ...
+
+    def download_embedded_images(
+        self, post_data: Post, image_dir: Path
+    ) -> Dict[str, Path]:
+        """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         ...

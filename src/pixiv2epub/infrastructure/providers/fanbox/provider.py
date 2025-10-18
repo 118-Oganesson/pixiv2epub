@@ -5,10 +5,15 @@ from typing import Any, List, Optional
 
 from loguru import logger
 from pydantic import ValidationError
+from pybreaker import CircuitBreaker
 from requests.exceptions import RequestException
 
-from ....domain.interfaces import ICreatorProvider, IWorkProvider
-from ....models.fanbox import FanboxPostApiResponse
+from ....domain.interfaces import (
+    ICreatorProvider,
+    IWorkProvider,
+    IFanboxImageDownloader,
+)
+from ....models.fanbox import FanboxPostApiResponse, Post
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.exceptions import ApiError, DataProcessingError
 from ....shared.settings import Settings
@@ -17,22 +22,30 @@ from ...strategies.parsers import FanboxBlockParser
 from ...strategies.update_checkers import TimestampUpdateStrategy
 from ..base_provider import BaseProvider
 from .client import FanboxApiClient
-from .downloader import FanboxImageDownloader
 
 
 class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
     """Fanboxから投稿データを取得し、ワークスペースを生成するためのプロバイダ。"""
 
-    def __init__(self, settings: Settings):
-        super().__init__(settings)
-        self.api_client = FanboxApiClient(
-            breaker=self.breaker,
-            provider_name=self.get_provider_name(),
-            auth_settings=settings.providers.fanbox,
-            api_delay=settings.downloader.api_delay,
-            api_retries=settings.downloader.api_retries,
-        )
-        # Fanbox用の戦略オブジェクトをインスタンス化
+    def __init__(
+        self,
+        settings: Settings,
+        api_client: FanboxApiClient,
+        downloader: IFanboxImageDownloader,
+        breaker: CircuitBreaker,
+    ):
+        """
+        Args:
+            settings (Settings): アプリケーション設定。
+            api_client (FanboxApiClient): 認証済みのFanbox APIクライアント。
+            downloader (IFanboxImageDownloader): Fanbox画像ダウンロード用インターフェース。
+            breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
+        """
+        super().__init__(settings, breaker)
+        self.api_client = api_client
+        self.downloader = downloader
+
+        # 戦略オブジェクトのインスタンス化
         self.update_checker = TimestampUpdateStrategy(timestamp_key="updatedDatetime")
         self.parser = FanboxBlockParser()
         self.mapper = FanboxMetadataMapper()
@@ -42,6 +55,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         return "fanbox"
 
     def _save_page(self, workspace: Workspace, parsed_html: str):
+        """パースされた単一のXHTMLページを保存します。"""
         filename = workspace.source_path / "page-1.xhtml"
         try:
             with open(filename, "w", encoding="utf-8") as f:
@@ -56,7 +70,7 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
             workspace = self._setup_workspace(work_id)
 
             try:
-                # --- API呼び出しと画像ダウンロード ---
+                # --- API呼び出しと更新チェック ---
                 post_data_dict = self.api_client.post_info(work_id)
                 post_data_body = post_data_dict.get("body", {})
 
@@ -75,12 +89,6 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                     shutil.rmtree(workspace.source_path)
                 workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-                downloader = FanboxImageDownloader(
-                    api_client=self.api_client,
-                    image_dir=workspace.assets_path / "images",
-                    overwrite=self.settings.downloader.overwrite_existing_images,
-                )
-
             except (RequestException, ApiError) as e:
                 raise ApiError(
                     f"投稿ID {work_id} のデータ取得に失敗: {e}",
@@ -89,10 +97,17 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
 
             try:
                 # --- ダウンロード後のデータ処理 ---
-                post_data = FanboxPostApiResponse.model_validate(post_data_dict).body
+                post_data: Post = FanboxPostApiResponse.model_validate(
+                    post_data_dict
+                ).body
 
-                cover_path = downloader.download_cover(post_data)
-                image_paths = downloader.download_embedded_images(post_data)
+                image_dir = workspace.assets_path / "images"
+                cover_path = self.downloader.download_cover(
+                    post_data, image_dir=image_dir
+                )
+                image_paths = self.downloader.download_embedded_images(
+                    post_data, image_dir=image_dir
+                )
 
                 parsed_html = self.parser.parse(post_data.body, image_paths)
                 self._save_page(workspace, parsed_html)
@@ -198,4 +213,4 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
                         "投稿の処理に失敗しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
-        return workspaces
+            return workspaces
