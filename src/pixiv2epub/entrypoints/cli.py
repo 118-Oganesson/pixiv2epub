@@ -1,32 +1,21 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
 import asyncio
 from pathlib import Path
-from typing import Any, List, Literal, Optional, Tuple
+from typing import List, Optional
 
 import typer
 from dotenv import find_dotenv, set_key
 from loguru import logger
-from loguru._logger import Logger as LoguruLogger  # 正しい Logger 型をインポート
 from playwright.sync_api import sync_playwright
 from typing_extensions import Annotated
 
 from ..app import Application
-from ..domain.interfaces import (
-    ICreatorProvider,
-    IMultiWorkProvider,
-    IProvider,
-    IWorkProvider,
-)
 from ..domain.orchestrator import DownloadBuildOrchestrator
 from ..infrastructure.builders.epub.builder import EpubBuilder
 from ..infrastructure.providers.fanbox.auth import get_fanbox_sessid
 from ..infrastructure.providers.pixiv.auth import get_pixiv_refresh_token
 from ..models.workspace import Workspace
 from ..shared.constants import MANIFEST_FILE_NAME
-from ..shared.enums import (
-    ContentType,
-    Provider as ProviderEnum,
-)
 from ..shared.exceptions import (
     AuthenticationError,
     Pixiv2EpubError,
@@ -34,10 +23,9 @@ from ..shared.exceptions import (
 )
 from ..shared.settings import Settings
 from ..utils.logging import setup_logging
-from ..utils.url_parser import parse_content_identifier
+from .constants import DEFAULT_ENV_FILENAME, DEFAULT_GUI_SESSION_PATH
 from .gui.manager import GuiManager
 from .provider_factory import ProviderFactory
-from .constants import DEFAULT_ENV_FILENAME, DEFAULT_GUI_SESSION_PATH
 
 app = typer.Typer(
     help="PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
@@ -144,7 +132,7 @@ def main_callback(
 def auth(
     ctx: typer.Context,
     service: Annotated[
-        Literal["pixiv", "fanbox"],
+        str,
         typer.Argument(
             help="認証するサービスを選択します ('pixiv' または 'fanbox')。",
             case_sensitive=False,
@@ -191,93 +179,39 @@ def auth(
         raise typer.Exit(code=1)
 
 
-def _parse_input_and_create_provider(
-    app_state: AppState, input_str: str
-) -> Tuple[IProvider, ProviderEnum, ContentType, Any, LoguruLogger]:
-    """入力文字列を解析し、対応するプロバイダを生成して返す。"""
-    if not app_state.provider_factory:
-        raise RuntimeError("ProviderFactoryが初期化されていません。")
-
-    provider_enum, content_type_enum, target_id = parse_content_identifier(input_str)
-    provider = app_state.provider_factory.create(provider_enum)
-    log = logger.bind(
-        provider=provider_enum.name,
-        content_type=content_type_enum.name,
-        target_id=target_id,
-    )
-    return provider, provider_enum, content_type_enum, target_id, log
-
-
 def _handle_run(app_state: AppState, target_input: str):
     """ダウンロードとビルド処理を実行します。"""
-    # 1. まずコンテキスト情報（IDやプロバイダ）をパースします
     try:
-        provider, provider_enum, content_type_enum, target_id, _ = (
-            _parse_input_and_create_provider(app_state, target_input)
-        )
-    except Exception as e:
-        logger.error(f"入力の解析に失敗しました: {e}", exc_info=True)
-        return
-
-    # 2. 処理全体を with logger.contextualize で囲みます
-    with logger.contextualize(
-        provider=provider_enum.name,
-        content_type=content_type_enum.name,
-        target_id=str(target_id),
-    ):
-        logger.info("ダウンロードとビルド処理を開始")
+        if not app_state.provider_factory:
+            raise RuntimeError("ProviderFactoryが初期化されていません。")
 
         builder = EpubBuilder(settings=app_state.settings)
-        orchestrator = DownloadBuildOrchestrator(provider, builder, app_state.settings)
-
-        if content_type_enum == ContentType.WORK:
-            orchestrator.process_work(target_id)
-        elif content_type_enum == ContentType.SERIES:
-            orchestrator.process_series(target_id)
-        elif content_type_enum == ContentType.CREATOR:
-            orchestrator.process_creator(target_id)
-
+        orchestrator = DownloadBuildOrchestrator(
+            builder=builder,
+            settings=app_state.settings,
+            provider_factory=app_state.provider_factory,
+        )
+        orchestrator.run_from_input(target_input)
         logger.success("✅ すべての処理が完了しました。")
+    except Exception as e:
+        logger.error(f"処理中にエラーが発生しました: {e}", exc_info=True)
 
 
 def _handle_download(app_state: AppState, target_input: str):
     """ダウンロード処理のみを実行します。"""
-    # 1. コンテキスト情報をパース
     try:
-        provider, provider_enum, content_type_enum, target_id, _ = (
-            _parse_input_and_create_provider(app_state, target_input)
+        if not app_state.provider_factory:
+            raise RuntimeError("ProviderFactoryが初期化されていません。")
+
+        builder = EpubBuilder(settings=app_state.settings)
+        orchestrator = DownloadBuildOrchestrator(
+            builder=builder,
+            settings=app_state.settings,
+            provider_factory=app_state.provider_factory,
         )
+        orchestrator.run_from_input(target_input, download_only=True)
     except Exception as e:
-        logger.error(f"入力の解析に失敗しました: {e}", exc_info=True)
-        return
-
-    # 2. 処理全体を with logger.contextualize で囲む
-    with logger.contextualize(
-        provider=provider_enum.name,
-        content_type=content_type_enum.name,
-        target_id=str(target_id),
-    ):
-        logger.info("ダウンロード処理のみを開始")
-
-        workspaces: List[Workspace] = []
-        if content_type_enum == ContentType.WORK and isinstance(
-            provider, IWorkProvider
-        ):
-            workspace = provider.get_work(target_id)
-            if workspace:
-                workspaces.append(workspace)
-        elif content_type_enum == ContentType.SERIES and isinstance(
-            provider, IMultiWorkProvider
-        ):
-            workspaces = provider.get_multiple_works(target_id)
-        elif content_type_enum == ContentType.CREATOR and isinstance(
-            provider, ICreatorProvider
-        ):
-            workspaces = provider.get_creator_works(target_id)
-        else:
-            raise TypeError(
-                f"現在のProviderは {content_type_enum.name} のダウンロードをサポートしていません。"
-            )
+        logger.error(f"ダウンロード処理中にエラーが発生しました: {e}", exc_info=True)
 
 
 @app.command()
@@ -376,7 +310,7 @@ def build(
 def gui(
     ctx: typer.Context,
     service: Annotated[
-        Literal["pixiv", "fanbox"],
+        str,
         typer.Argument(
             help="最初に開くサービスを選択します ('pixiv' または 'fanbox')。",
             case_sensitive=False,

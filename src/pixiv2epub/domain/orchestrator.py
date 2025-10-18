@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/domain/orchestrator.py
 import shutil
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Callable
 
 from loguru import logger
 
@@ -10,27 +10,63 @@ from ..domain.interfaces import (
     ICreatorProvider,
     IMultiWorkProvider,
     IProvider,
+    IProviderFactory,
     IWorkProvider,
 )
 from ..models.workspace import Workspace
+from ..shared.enums import ContentType
 from ..shared.exceptions import BuildError, ContentNotFoundError, ProviderError
 from ..shared.settings import Settings
+from ..utils.url_parser import parse_content_identifier
 
 
 class DownloadBuildOrchestrator:
     """
     データ取得(Provider)と成果物生成(Builder)のワークフローを調整する責務を持つ。
+    アプリケーションの主要なユースケースを実装します。
     """
 
     def __init__(
         self,
-        provider: IProvider,
         builder: IBuilder,
         settings: Settings,
+        provider_factory: IProviderFactory,
     ):
-        self.provider = provider
         self.builder = builder
         self.settings = settings
+        self.provider_factory = provider_factory
+
+    def run_from_input(self, input_str: str, download_only: bool = False) -> List[Path]:
+        """
+        単一の入力（URLやID）から適切な処理を判断し、実行する。
+        """
+        provider_enum, content_type, target_id = parse_content_identifier(input_str)
+        provider = self.provider_factory.create(provider_enum)
+
+        with logger.contextualize(
+            provider=provider_enum.name,
+            content_type=content_type.name,
+            target_id=str(target_id),
+        ):
+            if download_only:
+                logger.info("ダウンロード処理のみを開始")
+                workspaces = self._download(provider, content_type, target_id)
+                logger.bind(download_count=len(workspaces)).success(
+                    "ダウンロード処理が完了しました。"
+                )
+                return []  # ダウンロードのみなので出力パスは返さない
+            else:
+                logger.info("ダウンロードとビルド処理を開始")
+                if content_type == ContentType.WORK:
+                    path = self._process_work(provider, target_id)
+                    return [path] if path else []
+                elif content_type == ContentType.SERIES:
+                    return self._process_series(provider, target_id)
+                elif content_type == ContentType.CREATOR:
+                    return self._process_creator(provider, target_id)
+                else:
+                    logger.error(f"未対応のコンテンツタイプです: {content_type}")
+                    return []
 
     def _is_cleanup_enabled(self) -> bool:
         """クリーンアップが有効かどうかを判定する。"""
@@ -46,17 +82,17 @@ class DownloadBuildOrchestrator:
             except OSError as e:
                 log.bind(error=str(e)).error("ワークスペースのクリーンアップ失敗")
 
-    def process_work(self, work_id: Any) -> Optional[Path]:
+    def _process_work(self, provider: IProvider, work_id: Any) -> Optional[Path]:
         """単一の作品をダウンロードし、ビルドします。"""
         workspace: Optional[Workspace] = None
         try:
             logger.info("単一作品の処理を開始")
-            if not isinstance(self.provider, IWorkProvider):
+            if not isinstance(provider, IWorkProvider):
                 raise TypeError(
                     "現在のプロバイダは単一作品の取得をサポートしていません。"
                 )
 
-            workspace = self.provider.get_work(work_id)
+            workspace = provider.get_work(work_id)
 
             if workspace is None:
                 logger.info("コンテンツ更新なし、ビルドをスキップ")
@@ -71,10 +107,13 @@ class DownloadBuildOrchestrator:
                 self._handle_cleanup(workspace)
 
     def _process_collection(
-        self, collection_id: Any, fetch_func, collection_type: str
+        self,
+        collection_id: Any,
+        fetch_func: Callable[[Any], List[Workspace]],
+        collection_type: str,
     ) -> List[Path]:
         """作品群を処理するための共通ロジック。"""
-        logger.info("コレクション処理を開始")
+        logger.info(f"{collection_type} の処理を開始")
 
         workspaces: List[Workspace] = fetch_func(collection_id)
 
@@ -112,24 +151,47 @@ class DownloadBuildOrchestrator:
                     self._handle_cleanup(workspace)
 
         logger.bind(success_count=len(output_paths), total_works=total).success(
-            "コレクション処理完了"
+            f"{collection_type} の処理完了"
         )
         return output_paths
 
-    def process_series(self, series_id: Any) -> List[Path]:
+    def _process_series(self, provider: IProvider, series_id: Any) -> List[Path]:
         """シリーズ作品をダウンロードし、ビルドします。"""
-        if not isinstance(self.provider, IMultiWorkProvider):
+        if not isinstance(provider, IMultiWorkProvider):
             raise TypeError("現在のプロバイダはシリーズの取得をサポートしていません。")
         return self._process_collection(
-            series_id, self.provider.get_multiple_works, "Series"
+            series_id, provider.get_multiple_works, "Series"
         )
 
-    def process_creator(self, creator_id: Any) -> List[Path]:
+    def _process_creator(self, provider: IProvider, creator_id: Any) -> List[Path]:
         """クリエイターの全作品をダウンロードし、ビルドします。"""
-        if not isinstance(self.provider, ICreatorProvider):
+        if not isinstance(provider, ICreatorProvider):
             raise TypeError(
                 "現在のプロバイダはクリエイター作品の取得をサポートしていません。"
             )
         return self._process_collection(
-            creator_id, self.provider.get_creator_works, "Creator"
+            creator_id, provider.get_creator_works, "Creator"
         )
+
+    def _download(
+        self, provider: IProvider, content_type: ContentType, target_id: Any
+    ) -> List[Workspace]:
+        """ダウンロード処理のみを実行します。"""
+        workspaces: List[Workspace] = []
+        if content_type == ContentType.WORK and isinstance(provider, IWorkProvider):
+            workspace = provider.get_work(target_id)
+            if workspace:
+                workspaces.append(workspace)
+        elif content_type == ContentType.SERIES and isinstance(
+            provider, IMultiWorkProvider
+        ):
+            workspaces = provider.get_multiple_works(target_id)
+        elif content_type == ContentType.CREATOR and isinstance(
+            provider, ICreatorProvider
+        ):
+            workspaces = provider.get_creator_works(target_id)
+        else:
+            raise TypeError(
+                f"現在のProviderは {content_type.name} のダウンロードをサポートしていません。"
+            )
+        return workspaces

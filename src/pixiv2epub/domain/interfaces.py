@@ -7,6 +7,7 @@ from ..shared.settings import Settings
 from ..models.domain import NovelMetadata
 from ..models.pixiv import NovelApiResponse
 from ..models.fanbox import Post
+from ..shared.enums import Provider as ProviderEnum
 
 
 class IBuilder(Protocol):
@@ -118,4 +119,13 @@ class IWorkspaceRepository(Protocol):
         manifest: WorkspaceManifest,
     ) -> None:
         """メタデータとマニフェストをワークスペースに永続化します。"""
+        ...
+
+
+@runtime_checkable
+class IProviderFactory(Protocol):
+    """Providerインスタンスを生成するためのファクトリのインターフェース。"""
+
+    def create(self, provider_type: ProviderEnum) -> IProvider:
+        """指定された種類のProviderインスタンスを生成し、依存関係を注入して返します。"""
         ...

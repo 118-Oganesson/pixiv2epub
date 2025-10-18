@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/entrypoints/gui/manager.py
 from pathlib import Path
-from typing import List
 
 from loguru import logger
 from playwright.sync_api import Page
@@ -8,10 +7,8 @@ from playwright.sync_api import Page
 from ...app import Application
 from ...domain.orchestrator import DownloadBuildOrchestrator
 from ...infrastructure.builders.epub.builder import EpubBuilder
-from ...shared.enums import ContentType, GuiStatus
+from ...shared.enums import GuiStatus
 from ...shared.exceptions import Pixiv2EpubError
-from ...utils.url_parser import parse_content_identifier
-
 from ..provider_factory import ProviderFactory
 
 
@@ -28,47 +25,29 @@ class GuiManager:
         log = logger.bind(url=url)
         log.info("ブラウザからタスク実行リクエストを受け取りました。")
         try:
-            provider_enum, content_type_enum, target_id = parse_content_identifier(url)
-
-            log.bind(
-                provider=provider_enum.name,
-                content_type=content_type_enum.name,
-                target_id=target_id,
-            ).info("処理を開始します。")
-
-            provider = self.provider_factory.create(provider_enum)
             builder = EpubBuilder(self.app.settings)
-
             orchestrator = DownloadBuildOrchestrator(
-                provider, builder, self.app.settings
+                builder=builder,
+                settings=self.app.settings,
+                provider_factory=self.provider_factory,
             )
-
-            result_paths: List[Path] = []
-            if content_type_enum == ContentType.WORK:
-                result = orchestrator.process_work(target_id)
-                if result:
-                    result_paths.append(result)
-            elif content_type_enum == ContentType.SERIES:
-                result_paths = orchestrator.process_series(target_id)
-            elif content_type_enum == ContentType.CREATOR:
-                result_paths = orchestrator.process_creator(target_id)
-            else:
-                raise ValueError(
-                    f"サポートされていないコンテンツタイプです: {content_type_enum}"
-                )
+            result_paths = orchestrator.run_from_input(url)
 
             message = f"{len(result_paths)}件のEPUB生成に成功しました。"
             log.bind(result_count=len(result_paths)).success("タスクが完了しました。")
             return {"status": GuiStatus.SUCCESS, "message": message}
 
-        except Pixiv2EpubError as e:  # 
+        except Pixiv2EpubError as e:
             log.bind(error=str(e)).error("GUIタスクの処理中にエラーが発生しました。")
             return {"status": GuiStatus.ERROR, "message": str(e)}
         except Exception as e:
             log.bind(error=str(e)).error(
                 "GUIタスクの処理中に予期せぬエラーが発生しました。", exc_info=True
             )
-            return {"status": GuiStatus.ERROR, "message": f"予期せぬエラーが発生しました: {e}"}
+            return {
+                "status": GuiStatus.ERROR,
+                "message": f"予期せぬエラーが発生しました: {e}",
+            }
 
     def setup_bridge(self):
         """Python関数をJavaScriptに公開し、UI注入スクリプトをページに登録します。"""
