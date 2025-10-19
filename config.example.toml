@@ -1,87 +1,83 @@
 # pixiv2epub カスタム設定ファイル
-# このファイルを 'config.toml' などの名前でコピーし、
-# 'pixiv2epub run <URL> -c config.toml' のように指定して使用します。
+# このファイルを 'config.toml' などにコピーして使用します。
+# 例: pixiv2epub run <URL> -c config.toml
 
 # --- ダウンローダー設定 ---
 [downloader]
-# API呼び出し間の待機時間（秒）。値を大きくするとサーバーへの負荷が減ります。
+# API呼び出し間の待機時間（秒）
 api_delay = 1.0
-# API呼び出しが失敗した際のリトライ回数。
+# API呼び出し失敗時のリトライ回数
 api_retries = 3
-# 既に存在する画像を上書きしてダウンロードするかどうか。
+# 既存画像を上書きして再ダウンロードするか
 overwrite_existing_images = false
 
 # --- サーキットブレーカー設定 ---
-# 外部APIが不安定な場合に、無駄なリクエストを防ぐための設定です。
 [downloader.circuit_breaker]
-# 何回連続でAPI呼び出しが失敗したら、一時的にそのAPIへのアクセスを遮断するか。
+# 連続失敗回数の閾値
 fail_max = 5
-# アクセスを遮断してから、復旧を試みるまでの待機時間（秒）。
+# 遮断後の再試行までの待機時間（秒）
 reset_timeout = 60
-
 
 # --- ビルダー設定 ---
 [builder]
-# EPUBファイルの出力先ディレクトリ。
+# EPUB出力先ディレクトリ
 output_directory = "./epubs"
-# 中間ファイル（ワークスペース）をビルド後に削除するかどうか。
+# ビルド後にワークスペースを削除するか
 cleanup_after_build = true
-# ファイル/ディレクトリ名の最大長（文字数）。長すぎる場合は自動的に切り詰められます。
+# ファイル名の最大長（長すぎる場合は切り詰め）
 max_filename_length = 50
-
 
 # --- ファイル名テンプレート ---
 # 利用可能な変数:
-#   {title}:        小説のタイトル
-#   {id}:           小説のID
-#   {author_name}:  作者名
-#   {author_id}:    作者のID
-#   {series_title}: シリーズのタイトル (シリーズ作品の場合)
-#   {series_id}:    シリーズのID (シリーズ作品の場合)
+#   {title}:        作品タイトル
+#   {id}:           作品ID (Pixiv小説ID or Fanbox投稿ID)
+#   {author_name}:  作者/クリエイター名
+#   {author_id}:    作者/クリエイターID
+#   {series_title}: シリーズタイトル (Pixivのみ)
+#   {series_id}:    シリーズID (Pixivのみ)
 
-# 単発作品のファイル名テンプレート。
+# 単発作品
 filename_template = "{author_name}/{title}.epub"
-# シリーズ作品のファイル名テンプレート。
+# シリーズ作品
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
-
 
 # --- 画像圧縮設定 ---
 [compression]
-# 画像圧縮を有効にするか。 (true / false)
-# pngquant, jpegoptim, cwebp コマンドがシステムにインストールされている必要があります。
+# 圧縮を有効にするか (true/false)
 enabled = true
-# 圧縮後のファイルが元より大きい場合に圧縮をスキップするか。
+# 圧縮後に元より大きければスキップ
 skip_if_larger = true
-# 並列で圧縮処理を行うワーカーの最大数。
+# 並列圧縮処理のワーカー数
 max_workers = 4
 
-[compression.pngquant] # PNG
+[compression.pngquant]
 colors = 256
 quality = "65-90"
 speed = 3
 strip = true
 
-[compression.jpegoptim] # JPEG
+[compression.jpegoptim]
 max_quality = 85
 strip_all = true
 progressive = true
 preserve_timestamp = true
 
-[compression.cwebp] # WEBP
+[compression.cwebp]
 quality = 75
 lossless = false
 metadata = "none"
 
-
 # --- ワークスペース設定 ---
 [workspace]
-# 中間ファイルを保存するルートディレクトリ。
+# 中間ファイル保存ディレクトリ
 root_directory = "./.workspace"
 
+# --- 認証設定 (通常は .env ファイル推奨) ---
+# .env が存在する場合、以下より優先されます。
+# セキュリティのため、認証情報は .env に保存してください。
 
-# --- 認証設定 (通常は .env ファイルで管理) ---
-# [providers]
 # [providers.pixiv]
 # refresh_token = "your_refresh_token_here"
+
 # [providers.fanbox]
 # sessid = "your_fanbox_sessid_here"
