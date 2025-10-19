@@ -2,7 +2,7 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="./icon/piep.svg" alt="Pixiv/Fanbox to EPUB Converter Icon" width="250">
+  <img src="./icon/piep.svg" alt="Pixiv/Fanbox to EPUB Converter Icon" >
 </p>
 
 <p align="center">
