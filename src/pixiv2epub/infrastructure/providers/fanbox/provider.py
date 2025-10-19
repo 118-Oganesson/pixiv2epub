@@ -1,19 +1,15 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/provider.py
-from datetime import datetime, timezone
-from typing import Any, List, Optional
+from typing import Any, List
 
 from loguru import logger
 from pybreaker import CircuitBreaker
-from requests.exceptions import RequestException
 
 from ....domain.interfaces import (
     ICreatorProvider,
-    IFanboxImageDownloader,
     IWorkProvider,
     IWorkspaceRepository,
 )
-from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import ApiError
+from ....models.workspace import Workspace
 from ....shared.settings import Settings
 from ..base_provider import BaseProvider
 from .client import FanboxApiClient
@@ -24,14 +20,14 @@ from .fetcher import FanboxFetcher
 class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
     """
     Fanboxから投稿データを取得するためのプロバイダ。
-    Fetcher, Processor, Repository に処理を委譲するオーケストレーターとして機能します。
+    共通のワークフローはBaseProviderに委譲し、自身は依存関係の構築と
+    作者作品取得など、Fanbox固有のロジックに責任を持つ。
     """
 
     def __init__(
         self,
         settings: Settings,
         api_client: FanboxApiClient,
-        downloader: IFanboxImageDownloader,
         breaker: CircuitBreaker,
         repository: IWorkspaceRepository,
         fetcher: FanboxFetcher,
@@ -41,70 +37,23 @@ class FanboxProvider(BaseProvider, IWorkProvider, ICreatorProvider):
         Args:
             settings (Settings): アプリケーション設定。
             api_client (FanboxApiClient): 認証済みのFanbox APIクライアント。
-            downloader (IFanboxImageDownloader): Fanbox画像ダウンロード用インターフェース。
             breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
             repository (IWorkspaceRepository): ワークスペース永続化担当。
             fetcher (FanboxFetcher): データ取得担当。
             processor (FanboxContentProcessor): データ処理担当。
         """
-        super().__init__(settings, breaker)
+        super().__init__(
+            settings=settings,
+            breaker=breaker,
+            fetcher=fetcher,
+            processor=processor,
+            repository=repository,
+        )
         self.api_client = api_client
-        self.downloader = downloader
-        self.repository = repository
-        self.fetcher = fetcher
-        self.processor = processor
 
     @classmethod
     def get_provider_name(cls) -> str:
         return "fanbox"
-
-    def get_work(self, content_id: Any) -> Optional[Workspace]:
-        logger.info("Fanbox投稿の処理を開始")
-        workspace = self.repository.setup_workspace(
-            content_id, self.get_provider_name()
-        )
-
-        try:
-            # 1. データの取得
-            post_data_dict = self.fetcher.fetch_post_data(content_id)
-
-            # 2. 更新のチェック
-            update_required, new_timestamp = self.processor.check_for_updates(
-                workspace, post_data_dict
-            )
-            if not update_required:
-                logger.bind(workspace_id=workspace.id).info(
-                    "コンテンツに変更なし、スキップします。"
-                )
-                return None
-
-            # 3. コンテンツの処理とワークスペースへの保存
-            metadata = self.processor.process_and_populate_workspace(
-                workspace, post_data_dict
-            )
-
-            # 4. メタデータとマニフェストの永続化
-            manifest = WorkspaceManifest(
-                provider_name=self.get_provider_name(),
-                created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={
-                    "post_id": content_id,
-                    "creator_id": metadata.identifier.creator_id,
-                },
-                content_hash=new_timestamp,
-            )
-            self.repository.persist_metadata(workspace, metadata, manifest)
-
-            logger.bind(
-                title=metadata.title, workspace_path=str(workspace.root_path)
-            ).info("投稿データ取得完了")
-            return workspace
-
-        except (RequestException, ApiError) as e:
-            raise ApiError(
-                f"投稿ID {content_id} のデータ取得に失敗: {e}",
-                self.get_provider_name(),
-            ) from e
 
     def _fetch_all_creator_post_ids(self, creator_id: Any) -> List[str]:
         """ページネーションを利用して、クリエイターの全投稿IDを取得する。"""

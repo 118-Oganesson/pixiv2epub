@@ -6,7 +6,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from ....domain.interfaces import IFanboxImageDownloader
-from ....models.domain import NovelMetadata
+from ....models.domain import FetchedData, NovelMetadata
 from ....models.fanbox import FanboxPostApiResponse, Post
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
@@ -53,12 +53,13 @@ class FanboxContentProcessor:
         return update_required, new_timestamp
 
     def process_and_populate_workspace(
-        self, workspace: Workspace, raw_post_data: Dict
+        self, workspace: Workspace, fetched_data: FetchedData
     ) -> NovelMetadata:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
         最終的なメタデータを生成して返します。
         """
+        raw_post_data = fetched_data.primary_data
         try:
             post_data: Post = FanboxPostApiResponse.model_validate(raw_post_data).body
 

@@ -9,9 +9,17 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
+
+
+# --- Fetcher関連 ---
+class FetchedData(BaseModel):
+    """FetcherがAPIから取得した生データを格納するための統一コンテナ。"""
+
+    primary_data: Dict[str, Any]
+    secondary_data: Optional[Dict[str, Any]] = None
 
 
 # --- 画像圧縮関連 ---

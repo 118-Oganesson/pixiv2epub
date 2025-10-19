@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
-from datetime import datetime, timezone
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Tuple
 
 from loguru import logger
 from pixivpy3 import PixivError
@@ -14,8 +13,8 @@ from ....domain.interfaces import (
     IWorkspaceRepository,
 )
 from ....models.pixiv import NovelSeriesApiResponse
-from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.exceptions import ApiError, DataProcessingError
+from ....models.workspace import Workspace
+from ....shared.exceptions import ApiError
 from ....shared.settings import Settings
 from ..base_provider import BaseProvider
 from .client import PixivApiClient
@@ -26,7 +25,8 @@ from .fetcher import PixivFetcher
 class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorProvider):
     """
     Pixivから小説データを取得するためのプロバイダ。
-    Fetcher, Processor, Repository に処理を委譲するオーケストレーターとして機能します。
+    共通のワークフローはBaseProviderに委譲し、自身は依存関係の構築と
+    シリーズや作者作品取得など、Pixiv固有のロジックに責任を持つ。
     """
 
     def __init__(
@@ -47,67 +47,18 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
             processor (PixivContentProcessor): データ処理担当。
             repository (IWorkspaceRepository): ワークスペース永続化担当。
         """
-        super().__init__(settings, breaker)
-        self.api_client = api_client
-        self.fetcher = fetcher
-        self.processor = processor
-        self.repository = repository
+        super().__init__(
+            settings=settings,
+            breaker=breaker,
+            fetcher=fetcher,
+            processor=processor,
+            repository=repository,
+        )
+        self.api_client = api_client  # get_multiple_works など、get_work以外で必要
 
     @classmethod
     def get_provider_name(cls) -> str:
         return "pixiv"
-
-    def get_work(self, content_id: Any) -> Optional[Workspace]:
-        logger.info("小説の処理を開始")
-        workspace = self.repository.setup_workspace(
-            content_id, self.get_provider_name()
-        )
-
-        try:
-            # 1. データの取得
-            raw_webview_data, raw_detail_data = self.fetcher.fetch_novel_data(
-                content_id
-            )
-
-            # 2. 更新のチェック
-            update_required, new_hash = self.processor.check_for_updates(
-                workspace, raw_webview_data
-            )
-            if not update_required:
-                logger.bind(workspace_id=workspace.id).info(
-                    "コンテンツに変更なし、スキップします。"
-                )
-                return None
-
-            # 3. コンテンツの処理とワークスペースへの保存
-            metadata = self.processor.process_and_populate_workspace(
-                workspace, raw_webview_data, raw_detail_data
-            )
-
-            # 4. メタデータとマニフェストの永続化
-            manifest = WorkspaceManifest(
-                provider_name=self.get_provider_name(),
-                created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={"novel_id": content_id},
-                content_hash=new_hash,
-            )
-            self.repository.persist_metadata(workspace, metadata, manifest)
-
-            logger.bind(
-                title=metadata.title, workspace_path=str(workspace.root_path)
-            ).info("小説データ取得完了")
-            return workspace
-
-        except (PixivError, ApiError) as e:
-            raise ApiError(
-                f"小説ID {content_id} のデータ取得に失敗: {e}",
-                self.get_provider_name(),
-            ) from e
-        except (ValidationError, KeyError, TypeError) as e:
-            raise DataProcessingError(
-                f"小説ID {content_id} のデータ解析に失敗: {e}",
-                self.get_provider_name(),
-            ) from e
 
     def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
         logger.info("シリーズの処理を開始")
@@ -132,7 +83,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                         downloaded_workspaces.append(workspace)
                 except Exception as e:
                     log.bind(error=str(e)).error(
-                        "小説のダウンロードに失敗しました。", exc_info=True
+                        "小説のダウンロードに失敗しました。",
+                        exc_info=self.settings.log_level == "DEBUG",
                     )
 
             logger.bind(series_title=series_data.novel_series_detail.title).info(
@@ -149,7 +101,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
         try:
             series_data_dict = self.api_client.novel_series(series_id)
             return NovelSeriesApiResponse.model_validate(series_data_dict)
-        except PixivError as e:
+        except (PixivError, ValidationError) as e:
             raise ApiError(
                 f"シリーズID {series_id} のメタデータ取得に失敗: {e}",
                 self.get_provider_name(),
@@ -175,7 +127,7 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                     except Exception as e:
                         log.bind(series_id=s_id, error=str(e)).error(
                             "シリーズの処理中にエラーが発生しました。",
-                            exc_info=True,
+                            exc_info=self.settings.log_level == "DEBUG",
                         )
 
             if single_ids:
@@ -189,7 +141,8 @@ class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorPro
                             downloaded_workspaces.append(workspace)
                     except Exception as e:
                         log.bind(novel_id=n_id, error=str(e)).error(
-                            "小説の処理中にエラーが発生しました。", exc_info=True
+                            "小説の処理中にエラーが発生しました。",
+                            exc_info=self.settings.log_level == "DEBUG",
                         )
             return downloaded_workspaces
         except Exception as e:

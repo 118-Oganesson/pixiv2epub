@@ -6,10 +6,11 @@ from typing import Dict, Optional, Tuple
 from loguru import logger
 
 from ....domain.interfaces import IPixivImageDownloader
-from ....models.domain import NovelMetadata
+from ....models.domain import FetchedData, NovelMetadata
 from ....models.pixiv import NovelApiResponse
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
+from ....shared.exceptions import DataProcessingError
 from ...strategies.interfaces import IContentParser, IMetadataMapper
 from ...strategies.update_checkers import IUpdateCheckStrategy
 
@@ -48,13 +49,20 @@ class PixivContentProcessor:
     def process_and_populate_workspace(
         self,
         workspace: Workspace,
-        raw_webview_novel_data: Dict,
-        raw_novel_detail_data: Dict,
+        fetched_data: FetchedData,
     ) -> NovelMetadata:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
         最終的なメタデータを生成して返します。
         """
+        if fetched_data.secondary_data is None:
+            raise DataProcessingError(
+                "Pixivの処理には詳細データ(secondary_data)が必要です。", "pixiv"
+            )
+
+        raw_webview_novel_data = fetched_data.primary_data
+        raw_novel_detail_data = fetched_data.secondary_data
+
         # 1. アセットのダウンロード
         cover_path = self._download_assets(workspace, raw_novel_detail_data)
 
