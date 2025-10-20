@@ -25,8 +25,6 @@ from .downloader import FanboxImageDownloader
 class FanboxProvider(IProvider):
     """
     Fanboxから投稿データを取得するための、自己完結した高性能プロバイダ。
-    Fetcher, Processor, Downloaderの責務を内部に統合し、
-    APIコールを最適化するロジックを実装しています。
     """
 
     def __init__(

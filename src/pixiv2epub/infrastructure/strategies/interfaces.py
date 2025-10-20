@@ -1,23 +1,10 @@
 # FILE: src/pixiv2epub/infrastructure/providers/strategies/interfaces.py
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from ...models.domain import NovelMetadata
 from ...models.workspace import Workspace
-
-
-class IUpdateCheckStrategy(ABC):
-    """
-    コンテンツの更新が必要かどうかを判断するための戦略インターフェース。
-    """
-
-    @abstractmethod
-    def is_update_required(
-        self, workspace: Workspace, api_response: Dict
-    ) -> Tuple[bool, str]:
-        """更新が必要か判断し、(更新フラグ, 新コンテンツ識別子) を返す。"""
-        raise NotImplementedError
 
 
 class IContentParser(ABC):

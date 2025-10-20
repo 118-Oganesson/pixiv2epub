@@ -8,20 +8,8 @@ from ..domain.interfaces import IProvider, IWorkspaceRepository
 from ..infrastructure.providers.fanbox.client import FanboxApiClient
 from ..infrastructure.providers.fanbox.provider import FanboxProvider
 from ..infrastructure.providers.pixiv.client import PixivApiClient
-from ..infrastructure.providers.pixiv.content_processor import PixivContentProcessor
-from ..infrastructure.providers.pixiv.downloader import (
-    ImageDownloader as PixivImageDownloader,
-)
-from ..infrastructure.providers.pixiv.fetcher import PixivFetcher
 from ..infrastructure.providers.pixiv.provider import PixivProvider
 from ..infrastructure.repositories.filesystem import FileSystemWorkspaceRepository
-from ..infrastructure.strategies.mappers import (
-    PixivMetadataMapper,
-)
-from ..infrastructure.strategies.parsers import PixivTagParser
-from ..infrastructure.strategies.update_checkers import (
-    ContentHashUpdateStrategy,
-)
 from ..shared.enums import Provider as ProviderEnum
 from ..shared.settings import Settings
 
@@ -51,7 +39,7 @@ class ProviderFactory:
         }
 
     def _build_pixiv_provider(self) -> IProvider:
-        """PixivProviderとその依存関係を構築します。"""
+        """PixivProviderとその最小限の依存関係を構築します。"""
         provider_name = PixivProvider.get_provider_name()
 
         # 1. 依存オブジェクトの作成
@@ -62,25 +50,11 @@ class ProviderFactory:
             api_delay=self._settings.downloader.api_delay,
             api_retries=self._settings.downloader.api_retries,
         )
-        downloader = PixivImageDownloader(
-            api_client=api_client,
-            overwrite=self._settings.downloader.overwrite_existing_images,
-        )
-        fetcher = PixivFetcher(api_client=api_client)
-        processor = PixivContentProcessor(
-            parser=PixivTagParser(),
-            mapper=PixivMetadataMapper(),
-            downloader=downloader,
-            update_checker=ContentHashUpdateStrategy(),
-        )
 
         # 2. Providerに依存を注入して返す
         return PixivProvider(
             settings=self._settings,
             api_client=api_client,
-            breaker=self._shared_breaker,
-            fetcher=fetcher,
-            processor=processor,
             repository=self._repository,
         )
 
@@ -98,7 +72,6 @@ class ProviderFactory:
         )
 
         # 2. Providerに依存を注入して返す
-        # Fetcher, Processor, DownloaderロジックはProvider内部でカプセル化される
         return FanboxProvider(
             settings=self._settings,
             api_client=api_client,

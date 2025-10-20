@@ -1,153 +1,315 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/provider.py
-from typing import Any, List, Tuple
+import hashlib
+import json
+import shutil
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
+import canonicaljson
 from loguru import logger
-from pixivpy3 import PixivError
 from pydantic import ValidationError
-from pybreaker import CircuitBreaker
+from pixivpy3 import PixivError
 
-from ....domain.interfaces import (
-    ICreatorProvider,
-    IMultiWorkProvider,
-    IWorkProvider,
-    IWorkspaceRepository,
-)
-from ....models.pixiv import NovelSeriesApiResponse
-from ....models.workspace import Workspace
-from ....shared.exceptions import ApiError
+from ....domain.interfaces import IProvider, IWorkspaceRepository
+from ....models.domain import NovelMetadata
+from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
+from ....models.workspace import Workspace, WorkspaceManifest
+from ....shared.constants import IMAGES_DIR_NAME, MANIFEST_FILE_NAME
+from ....shared.enums import ContentType
+from ....shared.exceptions import ApiError, DataProcessingError, ProviderError
 from ....shared.settings import Settings
-from ..base_provider import BaseProvider
+from ...strategies.mappers import PixivMetadataMapper
+from ...strategies.parsers import PixivTagParser
 from .client import PixivApiClient
-from .content_processor import PixivContentProcessor
-from .fetcher import PixivFetcher
+from .downloader import ImageDownloader as PixivImageDownloader
 
 
-class PixivProvider(BaseProvider, IWorkProvider, IMultiWorkProvider, ICreatorProvider):
+def _extract_critical_data_for_hash(raw_data: Dict[str, Any]) -> Dict[str, Any]:
+    """EPUB生成に不可欠なデータのみを抽出する。"""
+    return {
+        "title": raw_data.get("title"),
+        "seriesId": raw_data.get("seriesId"),
+        "seriesTitle": raw_data.get("seriesTitle"),
+        "userId": raw_data.get("userId"),
+        "coverUrl": raw_data.get("coverUrl"),
+        "tags": raw_data.get("tags"),
+        "caption": raw_data.get("caption"),
+        "text": raw_data.get("text"),
+        "illusts": raw_data.get("illusts"),
+        "images": raw_data.get("images"),
+        "cdate": raw_data.get("cdate"),
+    }
+
+
+def _generate_content_hash(raw_json_data: Dict[str, Any]) -> str:
+    """JSON辞書からSHA-256ハッシュを計算する。"""
+    critical_data = _extract_critical_data_for_hash(raw_json_data)
+    canonical_bytes = canonicaljson.encode_canonical_json(critical_data)
+    return hashlib.sha256(canonical_bytes).hexdigest()
+
+
+class PixivProvider(IProvider):
     """
-    Pixivから小説データを取得するためのプロバイダ。
-    共通のワークフローはBaseProviderに委譲し、自身は依存関係の構築と
-    シリーズや作者作品取得など、Pixiv固有のロジックに責任を持つ。
+    Pixivから小説データを取得するための、自己完結した高性能プロバイダ。
     """
 
     def __init__(
         self,
         settings: Settings,
         api_client: PixivApiClient,
-        breaker: CircuitBreaker,
-        fetcher: PixivFetcher,
-        processor: PixivContentProcessor,
         repository: IWorkspaceRepository,
     ):
-        """
-        Args:
-            settings (Settings): アプリケーション設定。
-            api_client (PixivApiClient): 認証済みのPixiv APIクライアント。
-            breaker (CircuitBreaker): 共有サーキットブレーカーインスタンス。
-            fetcher (PixivFetcher): データ取得担当。
-            processor (PixivContentProcessor): データ処理担当。
-            repository (IWorkspaceRepository): ワークスペース永続化担当。
-        """
-        super().__init__(
-            settings=settings,
-            breaker=breaker,
-            fetcher=fetcher,
-            processor=processor,
-            repository=repository,
+        self.settings = settings
+        self.api_client = api_client
+        self.repository = repository
+
+        # 内部で利用するコンポーネントをインスタンス化
+        self._downloader = PixivImageDownloader(
+            api_client=self.api_client,
+            overwrite=self.settings.downloader.overwrite_existing_images,
         )
-        self.api_client = api_client  # get_multiple_works など、get_work以外で必要
+        self._parser = PixivTagParser()
+        self._mapper = PixivMetadataMapper()
 
     @classmethod
     def get_provider_name(cls) -> str:
         return "pixiv"
 
-    def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
-        logger.info("シリーズの処理を開始")
+    def get_works(self, identifier: Any, content_type: ContentType) -> List[Workspace]:
+        """
+        IProviderインターフェースの統一エントリーポイント。
+        コンテンツ種別に応じて適切な内部メソッドに処理を委譲します。
+        """
         try:
-            series_data = self.get_series_info(collection_id)
-            novel_ids = [novel.id for novel in series_data.novels]
+            if content_type == ContentType.WORK:
+                workspace = self._get_single_work(int(identifier))
+                return [workspace] if workspace else []
+            elif content_type == ContentType.SERIES:
+                return self._get_multiple_works(int(identifier))
+            elif content_type == ContentType.CREATOR:
+                return self._get_creator_works(int(identifier))
+            else:
+                raise ProviderError(
+                    f"Pixiv provider does not support content type: {content_type.name}",
+                    self.get_provider_name(),
+                )
+        except (ApiError, DataProcessingError) as e:
+            # 処理中のエラーを捕捉し、Orchestratorに伝播させる
+            logger.error(f"処理に失敗しました: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"予期せぬエラーが発生しました: {e}", exc_info=True)
+            raise ProviderError(f"予期せぬエラー: {e}", self.get_provider_name()) from e
 
-            if not novel_ids:
-                logger.info("ダウンロード対象が見つからず処理を終了します。")
-                return []
+    def _get_single_work(self, novel_id: int) -> Optional[Workspace]:
+        """
+        単一の小説を取得し、Workspaceを生成します。
+        ハッシュチェックを行い、更新がある場合のみ詳細データを取得・処理します。
+        """
 
-            downloaded_workspaces = []
-            total = len(novel_ids)
-            logger.bind(total_novels=total).info("シリーズ内の小説ダウンロードを開始")
+        # 1. ハッシュチェック用の基本データ（webview）をまず取得
+        raw_webview_novel_data = self.api_client.webview_novel(novel_id)
 
-            for i, novel_id in enumerate(novel_ids, 1):
-                log = logger.bind(current=i, total=total, novel_id=novel_id)
-                log.info("--- 小説を処理中 ---")
+        # 2. 事前更新チェック
+        workspace_path = self.repository.get_workspace_path(
+            novel_id, self.get_provider_name()
+        )
+        manifest_path = workspace_path / MANIFEST_FILE_NAME
+
+        update_required, new_hash = self._perform_hash_check(
+            manifest_path, raw_webview_novel_data
+        )
+
+        if not update_required:
+            logger.bind(novel_id=novel_id).info(
+                "コンテンツに変更なし、スキップします。"
+            )
+            return None
+
+        # 3. 更新がある場合のみ、詳細データ取得とワークスペースセットアップを実行
+        logger.bind(novel_id=novel_id).info(
+            "コンテンツの更新を検出、処理を続行します。"
+        )
+        raw_novel_detail_data = self.api_client.novel_detail(novel_id)
+
+        workspace = self.repository.setup_workspace(novel_id, self.get_provider_name())
+        if workspace.source_path.exists():
+            shutil.rmtree(workspace.source_path)
+        workspace.source_path.mkdir(parents=True, exist_ok=True)
+
+        # 4. ワークスペースにコンテンツを処理・格納 (旧Processorの役割)
+        fetched_data = {
+            "primary_data": raw_webview_novel_data,
+            "secondary_data": raw_novel_detail_data,
+        }
+        metadata = self._process_and_populate_workspace(workspace, fetched_data)
+
+        # 5. メタデータとマニフェストを永続化
+        manifest = WorkspaceManifest(
+            provider_name=self.get_provider_name(),
+            created_at_utc=datetime.now(timezone.utc).isoformat(),
+            source_metadata={"id": novel_id},
+            content_hash=new_hash,
+        )
+        self.repository.persist_metadata(workspace, metadata, manifest)
+
+        logger.bind(title=metadata.title).success("作品データの処理が完了しました。")
+        return workspace
+
+    def _get_multiple_works(self, series_id: int) -> List[Workspace]:
+        """シリーズ作品をダウンロードし、ビルドします。"""
+        logger.info("シリーズの処理を開始")
+        series_data = self.get_series_info(series_id)
+        novel_ids = [novel.id for novel in series_data.novels]
+
+        if not novel_ids:
+            logger.info("ダウンロード対象が見つからず処理を終了します。")
+            return []
+
+        downloaded_workspaces = []
+        total = len(novel_ids)
+        logger.bind(total_novels=total).info("シリーズ内の小説ダウンロードを開始")
+
+        for i, novel_id in enumerate(novel_ids, 1):
+            log = logger.bind(current=i, total=total, novel_id=novel_id)
+            log.info("--- 小説を処理中 ---")
+            try:
+                workspace = self._get_single_work(novel_id)
+                if workspace:
+                    downloaded_workspaces.append(workspace)
+            except Exception as e:
+                log.bind(error=str(e)).error(
+                    "小説のダウンロードに失敗しました。",
+                    exc_info=self.settings.log_level == "DEBUG",
+                )
+
+        logger.bind(series_title=series_data.novel_series_detail.title).info(
+            "シリーズのダウンロード完了"
+        )
+        return downloaded_workspaces
+
+    def _get_creator_works(self, user_id: int) -> List[Workspace]:
+        """クリエイターの全作品をダウンロードし、ビルドします。"""
+        logger.info("ユーザーの全作品の処理を開始")
+        single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
+
+        logger.bind(
+            series_count=len(series_ids), single_work_count=len(single_ids)
+        ).info("ユーザー作品の取得結果")
+
+        downloaded_workspaces = []
+        if series_ids:
+            logger.info("--- シリーズ作品の処理を開始 ---")
+            for i, s_id in enumerate(series_ids, 1):
+                log = logger.bind(current_series=i, total_series=len(series_ids))
+                log.info(f"--- シリーズ {s_id} を処理中 ---")
                 try:
-                    workspace = self.get_work(novel_id)
-                    if workspace:
-                        downloaded_workspaces.append(workspace)
+                    workspaces = self._get_multiple_works(s_id)
+                    downloaded_workspaces.extend(workspaces)
                 except Exception as e:
-                    log.bind(error=str(e)).error(
-                        "小説のダウンロードに失敗しました。",
+                    log.bind(series_id=s_id, error=str(e)).error(
+                        "シリーズの処理中にエラーが発生しました。",
                         exc_info=self.settings.log_level == "DEBUG",
                     )
 
-            logger.bind(series_title=series_data.novel_series_detail.title).info(
-                "シリーズのダウンロード完了"
-            )
-            return downloaded_workspaces
-        except Exception as e:
-            raise ApiError(
-                f"シリーズID {collection_id} の処理中にエラーが発生: {e}",
-                self.get_provider_name(),
-            ) from e
+        if single_ids:
+            logger.info("--- 単独作品の処理を開始 ---")
+            for i, n_id in enumerate(single_ids, 1):
+                log = logger.bind(current_work=i, total_works=len(single_ids))
+                log.info(f"--- 単独作品 {n_id} を処理中 ---")
+                try:
+                    workspace = self._get_single_work(n_id)
+                    if workspace:
+                        downloaded_workspaces.append(workspace)
+                except Exception as e:
+                    log.bind(novel_id=n_id, error=str(e)).error(
+                        "小説の処理中にエラーが発生しました。",
+                        exc_info=self.settings.log_level == "DEBUG",
+                    )
+
+        return downloaded_workspaces
+
+    def _perform_hash_check(
+        self, manifest_path: Path, api_response: Dict
+    ) -> Tuple[bool, str]:
+        """
+        コンテンツのハッシュ値を比較して更新を判断します。
+        (旧 ContentHashUpdateStrategy のロジック)
+        """
+        new_hash = _generate_content_hash(api_response)
+        if not manifest_path.is_file():
+            return True, new_hash
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as f:
+                old_hash = json.load(f).get("content_hash")
+            if old_hash and old_hash == new_hash:
+                return False, new_hash
+        except (json.JSONDecodeError, IOError):
+            return True, new_hash
+        return True, new_hash
+
+    def _process_and_populate_workspace(
+        self,
+        workspace: Workspace,
+        fetched_data: Dict[str, Dict],
+    ) -> NovelMetadata:
+        """
+        コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
+        最終的なメタデータを生成して返します。(旧 PixivContentProcessor のロジック)
+        """
+        raw_webview_novel_data = fetched_data["primary_data"]
+        raw_novel_detail_data = fetched_data["secondary_data"]
+
+        # 1. アセットのダウンロード
+        image_dir = workspace.assets_path / IMAGES_DIR_NAME
+        cover_path = self._downloader.download_cover(
+            raw_novel_detail_data.get("novel", {}), image_dir=image_dir
+        )
+
+        # 2. コンテンツの解析と保存
+        novel_data = NovelApiResponse.model_validate(raw_webview_novel_data)
+
+        image_paths = self._downloader.download_embedded_images(
+            novel_data, image_dir=image_dir
+        )
+
+        parsed_text = self._parser.parse(novel_data.text, image_paths)
+        pages = parsed_text.split("[newpage]")
+        for i, page_content in enumerate(pages):
+            filename = workspace.source_path / f"page-{i + 1}.xhtml"
+            try:
+                filename.write_text(page_content, encoding="utf-8")
+            except IOError as e:
+                logger.bind(page=i + 1, error=str(e)).error(
+                    "ページの保存に失敗しました。"
+                )
+        logger.bind(page_count=len(pages)).debug("ページの保存が完了しました。")
+
+        # 3. メタデータのマッピング
+        parsed_description = self._parser.parse(
+            raw_novel_detail_data.get("novel", {}).get("caption", ""), image_paths
+        )
+        metadata = self._mapper.map_to_metadata(
+            workspace=workspace,
+            cover_path=cover_path,
+            novel_data=novel_data,
+            detail_data=raw_novel_detail_data,
+            parsed_text=parsed_text,
+            parsed_description=parsed_description,
+        )
+        return metadata
+
+    # --- Pixiv固有のヘルパーメソッド ---
 
     def get_series_info(self, series_id: Any) -> NovelSeriesApiResponse:
+        """シリーズ詳細情報を取得します。"""
         try:
             series_data_dict = self.api_client.novel_series(series_id)
             return NovelSeriesApiResponse.model_validate(series_data_dict)
         except (PixivError, ValidationError) as e:
             raise ApiError(
                 f"シリーズID {series_id} のメタデータ取得に失敗: {e}",
-                self.get_provider_name(),
-            ) from e
-
-    def get_creator_works(self, collection_id: Any) -> List[Workspace]:
-        logger.info("ユーザーの全作品の処理を開始")
-        try:
-            single_ids, series_ids = self._fetch_all_user_novel_ids(collection_id)
-            logger.bind(
-                series_count=len(series_ids), single_work_count=len(single_ids)
-            ).info("ユーザー作品の取得結果")
-
-            downloaded_workspaces = []
-            if series_ids:
-                logger.info("--- シリーズ作品の処理を開始 ---")
-                for i, s_id in enumerate(series_ids, 1):
-                    log = logger.bind(current_series=i, total_series=len(series_ids))
-                    log.info("--- シリーズを処理中 ---")
-                    try:
-                        workspaces = self.get_multiple_works(s_id)
-                        downloaded_workspaces.extend(workspaces)
-                    except Exception as e:
-                        log.bind(series_id=s_id, error=str(e)).error(
-                            "シリーズの処理中にエラーが発生しました。",
-                            exc_info=self.settings.log_level == "DEBUG",
-                        )
-
-            if single_ids:
-                logger.info("--- 単独作品の処理を開始 ---")
-                for i, n_id in enumerate(single_ids, 1):
-                    log = logger.bind(current_work=i, total_works=len(single_ids))
-                    log.info("--- 単独作品を処理中 ---")
-                    try:
-                        workspace = self.get_work(n_id)
-                        if workspace:
-                            downloaded_workspaces.append(workspace)
-                    except Exception as e:
-                        log.bind(novel_id=n_id, error=str(e)).error(
-                            "小説の処理中にエラーが発生しました。",
-                            exc_info=self.settings.log_level == "DEBUG",
-                        )
-            return downloaded_workspaces
-        except Exception as e:
-            raise ApiError(
-                f"ユーザーID {collection_id} の作品処理中にエラーが発生: {e}",
                 self.get_provider_name(),
             ) from e
 
