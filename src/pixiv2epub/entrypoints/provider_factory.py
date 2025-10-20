@@ -6,9 +6,6 @@ from pybreaker import CircuitBreaker
 
 from ..domain.interfaces import IProvider, IWorkspaceRepository
 from ..infrastructure.providers.fanbox.client import FanboxApiClient
-from ..infrastructure.providers.fanbox.content_processor import FanboxContentProcessor
-from ..infrastructure.providers.fanbox.downloader import FanboxImageDownloader
-from ..infrastructure.providers.fanbox.fetcher import FanboxFetcher
 from ..infrastructure.providers.fanbox.provider import FanboxProvider
 from ..infrastructure.providers.pixiv.client import PixivApiClient
 from ..infrastructure.providers.pixiv.content_processor import PixivContentProcessor
@@ -19,13 +16,11 @@ from ..infrastructure.providers.pixiv.fetcher import PixivFetcher
 from ..infrastructure.providers.pixiv.provider import PixivProvider
 from ..infrastructure.repositories.filesystem import FileSystemWorkspaceRepository
 from ..infrastructure.strategies.mappers import (
-    FanboxMetadataMapper,
     PixivMetadataMapper,
 )
-from ..infrastructure.strategies.parsers import FanboxBlockParser, PixivTagParser
+from ..infrastructure.strategies.parsers import PixivTagParser
 from ..infrastructure.strategies.update_checkers import (
     ContentHashUpdateStrategy,
-    TimestampUpdateStrategy,
 )
 from ..shared.enums import Provider as ProviderEnum
 from ..shared.settings import Settings
@@ -90,7 +85,7 @@ class ProviderFactory:
         )
 
     def _build_fanbox_provider(self) -> IProvider:
-        """FanboxProviderとその依存関係を構築します。"""
+        """FanboxProviderとその最小限の依存関係を構築します。"""
         provider_name = FanboxProvider.get_provider_name()
 
         # 1. Fanbox用のApiClientを作成
@@ -101,28 +96,13 @@ class ProviderFactory:
             api_delay=self._settings.downloader.api_delay,
             api_retries=self._settings.downloader.api_retries,
         )
-        # 2. Fanbox用のDownloaderを作成
-        downloader = FanboxImageDownloader(
-            api_client=api_client,
-            overwrite=self._settings.downloader.overwrite_existing_images,
-        )
-        # 3. Fanbox用のFetcherとProcessorを作成
-        fetcher = FanboxFetcher(api_client=api_client)
-        processor = FanboxContentProcessor(
-            parser=FanboxBlockParser(),
-            mapper=FanboxMetadataMapper(),
-            downloader=downloader,
-            update_checker=TimestampUpdateStrategy(timestamp_key="updatedDatetime"),
-        )
 
-        # 4. Providerに依存を注入して返す
+        # 2. Providerに依存を注入して返す
+        # Fetcher, Processor, DownloaderロジックはProvider内部でカプセル化される
         return FanboxProvider(
             settings=self._settings,
             api_client=api_client,
-            breaker=self._shared_breaker,
             repository=self._repository,
-            fetcher=fetcher,
-            processor=processor,
         )
 
     def create(self, provider_type: ProviderEnum) -> IProvider:

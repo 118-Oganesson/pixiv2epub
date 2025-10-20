@@ -2,6 +2,7 @@
 import json
 from dataclasses import asdict
 from typing import Any
+from pathlib import Path
 
 from loguru import logger
 
@@ -41,6 +42,11 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
             "ワークスペースを準備しました。"
         )
         return workspace
+
+    def get_workspace_path(self, content_id: Any, provider_name: str) -> Path:
+        """ワークスペースのルートパスを計算して返します（ディレクトリ作成は行いません）。"""
+        workspace_id = f"{provider_name}_{content_id}"
+        return self.workspace_dir / workspace_id
 
     def persist_metadata(
         self,

@@ -8,6 +8,7 @@ from ..models.domain import NovelMetadata
 from ..models.pixiv import NovelApiResponse
 from ..models.fanbox import Post
 from ..shared.enums import Provider as ProviderEnum
+from ..shared.enums import ContentType
 
 
 class IBuilder(Protocol):
@@ -32,45 +33,19 @@ class IProvider(Protocol):
 
     settings: Settings
 
-    def __init__(self, settings: Settings):
-        """
-        プロバイダの初期化。
-
-        Args:
-            settings (Settings): アプリケーション全体の設定情報。
-        """
-        ...
+    def __init__(self, settings: Settings): ...
 
     @classmethod
     def get_provider_name(cls) -> str:
         """プロバイダの名前を返すクラスメソッド。"""
         ...
 
-
-@runtime_checkable
-class IWorkProvider(IProvider, Protocol):
-    """単一の作品を取得するためのインターフェース"""
-
-    def get_work(self, content_id: Any) -> Workspace | None:
-        """単一の作品を取得し、Workspaceを生成して返します。更新がない場合はNoneを返します。"""
-        ...
-
-
-@runtime_checkable
-class IMultiWorkProvider(IProvider, Protocol):
-    """作品群（シリーズ）を取得するためのインターフェース"""
-
-    def get_multiple_works(self, collection_id: Any) -> List[Workspace]:
-        """コレクション（シリーズなど）に含まれるすべての作品を取得し、Workspaceのリストを返します。"""
-        ...
-
-
-@runtime_checkable
-class ICreatorProvider(IProvider, Protocol):
-    """クリエイターの全作品を取得するためのインターフェース"""
-
-    def get_creator_works(self, collection_id: Any) -> List[Workspace]:
-        """特定のクリエイターが投稿したすべての作品を取得し、Workspaceのリストを返します。"""
+    def get_works(self, identifier: Any, content_type: ContentType) -> List[Workspace]:
+        """
+        指定された識別子とコンテンツ種別に基づいて作品を取得し、
+        処理済みのWorkspaceのリストを返します。
+        更新がない、または処理対象が存在しない場合は空のリストを返します。
+        """
         ...
 
 
@@ -110,6 +85,13 @@ class IWorkspaceRepository(Protocol):
 
     def setup_workspace(self, content_id: Any, provider_name: str) -> Workspace:
         """content_idに基づいた永続的なワークスペースを準備します。"""
+        ...
+
+    def get_workspace_path(self, content_id: Any, provider_name: str) -> Path:
+        """
+        content_idに基づいて永続的なワークスペースのルートパスを計算して返します。
+        このメソッドはファイルシステムへの書き込みを行いません。
+        """
         ...
 
     def persist_metadata(
