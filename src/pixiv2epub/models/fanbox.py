@@ -24,7 +24,7 @@ class FanboxUser(FanboxBaseModel):
 
     user_id: str = Field(..., alias="userId")
     name: str
-    icon_url: HttpUrl = Field(..., alias="iconUrl")
+    icon_url: Optional[HttpUrl] = Field(None, alias="iconUrl")
 
 
 # --- "article" 形式の本文ブロック定義 ---
@@ -194,7 +194,7 @@ class Post(FanboxBaseModel):
     creator_id: str = Field(..., alias="creatorId")
     cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
     tags: List[str]
-    body: Union[PostBodyArticle, PostBodyText]
+    body: Optional[Union[PostBodyArticle, PostBodyText]] = None
     type: str
 
 
