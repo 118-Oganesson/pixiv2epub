@@ -148,7 +148,7 @@ class FanboxProvider(IProvider):
                     "id": post_id,
                     "creatorId": post_data_model.body.creator_id,
                 },
-                content_hash=post_data_model.body.updated_datetime,  # content_hashにタイムスタンプを保存
+                content_etag=post_data_model.body.updated_datetime,
             )
             self.repository.persist_metadata(workspace, metadata, manifest)
 
@@ -210,8 +210,8 @@ class FanboxProvider(IProvider):
         try:
             with manifest_path.open("r", encoding="utf-8") as f:
                 manifest_data = json.load(f)
-            # content_hash フィールドにタイムスタンプが格納されていると仮定
-            local_timestamp = manifest_data.get("content_hash")
+            # content_etag フィールドにタイムスタンプが格納されている
+            local_timestamp = manifest_data.get("content_etag")
             return not (local_timestamp and local_timestamp == api_timestamp)
         except (json.JSONDecodeError, IOError):
             return True  # マニフェストが壊れている = 要更新
@@ -220,7 +220,6 @@ class FanboxProvider(IProvider):
         """
         投稿が有料かつ本文が取得できない（アクセス不能）状態でないかを確認します。
         """
-        # A post is inaccessible if it requires a fee and its body is missing.
         return not (post.fee_required > 0 and post.body is None)
 
     def _process_and_populate_workspace(

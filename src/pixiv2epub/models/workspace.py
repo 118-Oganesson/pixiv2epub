@@ -84,5 +84,5 @@ class WorkspaceManifest:
     provider_name: str
     created_at_utc: str
     source_metadata: Dict[str, Any]
-    content_hash: Optional[str] = None
+    content_etag: Optional[str] = None
     workspace_schema_version: str = "1.0"

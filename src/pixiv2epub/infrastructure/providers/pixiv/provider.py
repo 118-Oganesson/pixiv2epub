@@ -138,7 +138,7 @@ class PixivProvider(IProvider):
             shutil.rmtree(workspace.source_path)
         workspace.source_path.mkdir(parents=True, exist_ok=True)
 
-        # 4. ワークスペースにコンテンツを処理・格納 (旧Processorの役割)
+        # 4. ワークスペースにコンテンツを処理・格納
         fetched_data = {
             "primary_data": raw_webview_novel_data,
             "secondary_data": raw_novel_detail_data,
@@ -150,7 +150,7 @@ class PixivProvider(IProvider):
             provider_name=self.get_provider_name(),
             created_at_utc=datetime.now(timezone.utc).isoformat(),
             source_metadata={"id": novel_id},
-            content_hash=new_hash,
+            content_etag=new_hash,
         )
         self.repository.persist_metadata(workspace, metadata, manifest)
 
@@ -235,14 +235,13 @@ class PixivProvider(IProvider):
     ) -> Tuple[bool, str]:
         """
         コンテンツのハッシュ値を比較して更新を判断します。
-        (旧 ContentHashUpdateStrategy のロジック)
         """
         new_hash = _generate_content_hash(api_response)
         if not manifest_path.is_file():
             return True, new_hash
         try:
             with open(manifest_path, "r", encoding="utf-8") as f:
-                old_hash = json.load(f).get("content_hash")
+                old_hash = json.load(f).get("content_etag")
             if old_hash and old_hash == new_hash:
                 return False, new_hash
         except (json.JSONDecodeError, IOError):
@@ -256,7 +255,7 @@ class PixivProvider(IProvider):
     ) -> NovelMetadata:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
-        最終的なメタデータを生成して返します。(旧 PixivContentProcessor のロジック)
+        最終的なメタデータを生成して返します。
         """
         raw_webview_novel_data = fetched_data["primary_data"]
         raw_novel_detail_data = fetched_data["secondary_data"]
