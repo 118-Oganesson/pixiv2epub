@@ -17,13 +17,10 @@ from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME
-from ..providers.pixiv.constants import PIXIV_NOVEL_URL
+from ..providers.pixiv.constants import PIXIV_NOVEL_URL, PIXIV_EPOCH
+from ..providers.fanbox.constants import FANBOX_EPOCH
 from .interfaces import IMetadataMapper
 from .parsers import PixivTagParser
-
-# --- Tag URI 用の定数 ---
-PIXIV_EPOCH = "2007-09-10"
-FANBOX_EPOCH = "2018-04-26"
 
 
 def get_media_type_from_filename(filename: str) -> str:
@@ -50,6 +47,23 @@ class PixivMetadataMapper(IMetadataMapper):
         cover_path: Optional[Path],
         **kwargs: Any,
     ) -> UnifiedContentManifest:
+        """
+        Pixiv API レスポンスを UCM (Unified Content Manifest) にマッピングします。
+
+        Args:
+            workspace: 対象のワークスペース。
+            cover_path: ダウンロードされたカバー画像のパス (存在する場合)。
+            **kwargs:
+                novel_data (NovelApiResponse): `webview_novel` API のレスポンス。
+                detail_data (Dict): `novel_detail` API のレスポンス。
+                parsed_text (str): [newpage] で分割可能なパース済み本文HTML。
+                parsed_description (str): パース済みの作品概要 (HTML)。
+                                          このメソッドに渡される前に、
+                                          PixivタグがHTMLに変換済みである必要があります。
+
+        Returns:
+            UnifiedContentManifest: 標準化されたメタデータマニフェスト。
+        """
         novel_data: NovelApiResponse = kwargs["novel_data"]
         detail_data: Dict = kwargs["detail_data"]
         parsed_text: str = kwargs["parsed_text"]
@@ -161,6 +175,20 @@ class FanboxMetadataMapper(IMetadataMapper):
         cover_path: Optional[Path],
         **kwargs: Any,
     ) -> UnifiedContentManifest:
+        """
+        Fanbox API レスポンス (Post オブジェクト) を UCM (Unified Content Manifest) にマッピングします。
+
+        Args:
+            workspace: 対象のワークスペース。
+            cover_path: ダウンロードされたカバー画像のパス (存在する場合)。
+            **kwargs:
+                post_data (Post): `post.info` API から取得したPydanticモデル。
+                                  このメソッドは、このオブジェクト内の `excerpt` を
+                                  description として独自にエスケープ処理します。
+
+        Returns:
+            UnifiedContentManifest: 標準化されたメタデータマニフェスト。
+        """
         post_data: Post = kwargs["post_data"]
 
         # --- 1. IDとURLの定義 ---

@@ -1,5 +1,4 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
-import uuid
 from typing import Dict, List, Optional
 
 from jinja2 import Environment
@@ -12,7 +11,6 @@ from ....models.domain import (
     UnifiedContentManifest,
 )
 from ....models.workspace import Workspace
-from ....shared.constants import NAMESPACE_UUID
 
 
 class EpubComponentGenerator:
@@ -127,20 +125,11 @@ class EpubComponentGenerator:
                 break
 
         context = {
-            "title": core.name,
+            "manifest": self.manifest,
             "css_path": css_path,
-            "novel": {
-                "title": core.name,
-                "author": core.author.name,
-                "series_title": core.isPartOf.name if core.isPartOf else None,
-                "series_order": core.isPartOf.order if core.isPartOf else None,
-                "description": core.description,
-                "tags": core.keywords,
-                "source_url": str(core.mainEntityOfPage),
-                "formatted_date": formatted_date,
-                "text_length": text_length,
-                "cover_href": f"../{cover_asset.href}" if cover_asset else None,
-            },
+            "formatted_date": formatted_date,
+            "text_length": text_length,
+            "cover_href": f"../{cover_asset.href}" if cover_asset else None,
         }
         content_bytes = self._render_template("info_page.xhtml.j2", context)
         return PageAsset(
@@ -225,33 +214,13 @@ class EpubComponentGenerator:
 
         core = self.manifest.core
 
-        # UCM の @id (tag: URI) を UUID に変換して使用
-        deterministic_uuid = uuid.uuid5(NAMESPACE_UUID, core.id)
-
         # content_id は tag: URI の末尾の部分
         content_id_str = core.id.split(":")[-1]
 
-        # コンテキストに渡すメタデータを UCM.core から構築
-        metadata_as_dict = {
-            "title": core.name,
-            "author": {
-                "name": core.author.name,
-                "id": core.author.identifier.split(":")[-1],
-            },
-            "series": {
-                "title": core.isPartOf.name,
-                "id": core.isPartOf.identifier.split(":")[-1],
-                "order": core.isPartOf.order,
-            }
-            if core.isPartOf
-            else None,
-            "description": core.description,
-            "tags": core.keywords,
-            "identifier": {
-                "uuid": f"urn:uuid:{deterministic_uuid}",
-                "novel_id": content_id_str if "pixiv.net" in core.id else None,
-                "post_id": content_id_str if "fanbox.cc" in core.id else None,
-            },
+        # テンプレートが期待する provider_ids を作成
+        provider_ids = {
+            "novel_id": content_id_str if "pixiv.net" in core.id else None,
+            "post_id": content_id_str if "fanbox.cc" in core.id else None,
         }
 
         modified_time_dt = core.dateModified or core.datePublished
@@ -259,7 +228,8 @@ class EpubComponentGenerator:
         published_date_str = core.datePublished.isoformat()
 
         context = {
-            "metadata": metadata_as_dict,
+            "manifest": self.manifest,
+            "provider_ids": provider_ids,
             "formatted_date": published_date_str,
             "modified_time": modified_time,
             "manifest_items": manifest_items,

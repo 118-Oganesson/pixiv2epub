@@ -14,17 +14,23 @@ def sanitize_path_part(part: str, max_length: int) -> str:
     sanitized_part = re.sub(INVALID_PATH_CHARS_REGEX, "_", part).strip()
 
     # 文字数がmax_lengthを超える場合は切り詰める
-    if len(sanitized_part) > max_length:
-        # ファイル拡張子を保持するために、拡張子とそれ以外を分離
-        stem, dot, extension = sanitized_part.rpartition(".")
-        if dot:
-            # 拡張子の長さを考慮して、ファイル名の本体（stem）を切り詰める
-            max_stem_length = max_length - len(dot) - len(extension)
-            return f"{stem[:max_stem_length]}.{extension}"
-        else:
-            return sanitized_part[:max_length]
+    if len(sanitized_part) <= max_length:
+        return sanitized_part
 
-    return sanitized_part
+    # pathlibを使用して拡張子を安全に分離
+    p = Path(sanitized_part)
+    stem = p.stem
+    extension = p.suffix  # ".epub" のようにドットを含む
+
+    if extension:
+        # 拡張子の長さを考慮して、ファイル名の本体（stem）を切り詰める
+        max_stem_length = max_length - len(extension)
+        if len(stem) > max_stem_length:
+            stem = stem[:max_stem_length]
+        return f"{stem}{extension}"
+    else:
+        # 拡張子がない場合
+        return sanitized_part[:max_length]
 
 
 def generate_sanitized_path(
