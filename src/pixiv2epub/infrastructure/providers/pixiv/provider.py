@@ -23,6 +23,7 @@ from ...strategies.mappers import PixivMetadataMapper
 from ...strategies.parsers import PixivTagParser
 from .client import PixivApiClient
 from .downloader import ImageDownloader as PixivImageDownloader
+from .constants import PIXIV_EPOCH
 
 
 def _extract_critical_data_for_hash(raw_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -152,11 +153,14 @@ class PixivProvider(IProvider):
         metadata = self._process_and_populate_workspace(workspace, fetched_data)
 
         # 5. メタデータとマニフェストを永続化
+        source_identifier = f"tag:pixiv.net,{PIXIV_EPOCH}:novel:{novel_id}"
+
         manifest = WorkspaceManifest(
             provider_name=self.get_provider_name(),
             created_at_utc=datetime.now(timezone.utc).isoformat(),
-            source_metadata={"id": novel_id},
+            source_identifier=source_identifier,
             content_etag=new_hash,
+            workspace_schema_version="1.0",
         )
         self.repository.persist_metadata(workspace, metadata, manifest)
 

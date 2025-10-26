@@ -1,4 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/provider.py
+
 import json
 import shutil
 from datetime import datetime, timezone
@@ -20,6 +21,7 @@ from ...strategies.mappers import FanboxMetadataMapper
 from ...strategies.parsers import FanboxBlockParser
 from .client import FanboxApiClient
 from .downloader import FanboxImageDownloader
+from .constants import FANBOX_EPOCH
 
 
 class FanboxProvider(IProvider):
@@ -141,14 +143,15 @@ class FanboxProvider(IProvider):
             )
 
             # 6. メタデータとマニフェストを永続化
+            source_identifier = f"tag:fanbox.cc,{FANBOX_EPOCH}:post:{post_id}"
+
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(timezone.utc).isoformat(),
-                source_metadata={
-                    "id": post_id,
-                    "creatorId": post_data_model.body.creator_id,
-                },
+                source_identifier=source_identifier,
                 content_etag=post_data_model.body.updated_datetime,
+                workspace_schema_version="1.0",
+                provider_specific_data={"creatorId": post_data_model.body.creator_id},
             )
             self.repository.persist_metadata(workspace, metadata, manifest)
 
@@ -242,7 +245,10 @@ class FanboxProvider(IProvider):
                 page_path.write_text(parsed_html, encoding="utf-8")
 
             return self._mapper.map_to_metadata(
-                workspace=workspace, cover_path=cover_path, post_data=post_data
+                workspace=workspace,
+                cover_path=cover_path,
+                post_data=post_data,
+                image_paths=image_paths,
             )
         except (ValidationError, KeyError, TypeError) as e:
             raise DataProcessingError(

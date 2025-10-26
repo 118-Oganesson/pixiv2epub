@@ -77,6 +77,7 @@ class WorkspaceManifest:
 
     provider_name: str
     created_at_utc: str
-    source_metadata: Dict[str, Any]
+    source_identifier: str
     content_etag: Optional[str] = None
     workspace_schema_version: str = "1.0"
+    provider_specific_data: Optional[Dict[str, Any]] = None
