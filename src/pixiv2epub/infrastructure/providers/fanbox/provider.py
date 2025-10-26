@@ -9,7 +9,7 @@ from loguru import logger
 from pydantic import ValidationError
 
 from ....domain.interfaces import IProvider, IWorkspaceRepository
-from ....models.domain import NovelMetadata
+from ....models.domain import UnifiedContentManifest
 from ....models.fanbox import FanboxPostApiResponse, Post
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.constants import IMAGES_DIR_NAME, MANIFEST_FILE_NAME
@@ -152,7 +152,7 @@ class FanboxProvider(IProvider):
             )
             self.repository.persist_metadata(workspace, metadata, manifest)
 
-            logger.bind(title=metadata.title).success(
+            logger.bind(title=metadata.core.name).success(
                 "作品データの処理が完了しました。"
             )
             return workspace
@@ -224,10 +224,10 @@ class FanboxProvider(IProvider):
 
     def _process_and_populate_workspace(
         self, workspace: Workspace, post_data: Post
-    ) -> NovelMetadata:
+    ) -> UnifiedContentManifest:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
-        最終的なメタデータを生成して返します。(旧ContentProcessorの役割)
+        最終的なメタデータ(UCM)を生成して返します。
         """
         try:
             image_dir = workspace.assets_path / IMAGES_DIR_NAME

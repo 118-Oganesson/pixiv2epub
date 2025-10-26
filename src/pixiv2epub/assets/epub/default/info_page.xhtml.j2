@@ -1,9 +1,10 @@
+{# FILE: src/pixiv2epub/assets/epub/default/info_page.xhtml.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
 
 <head>
-    <title>{{ novel.title }}</title>
+    <title>{{ manifest.core.name }}</title> {# Use UCM core name #}
     <meta charset="utf-8" />
     {% if css_path %}
     <link rel="stylesheet" type="text/css" href="{{ css_path }}" />{% endif %}
@@ -11,25 +12,25 @@
 
 <body>
     <div class="main-content">
-        <h3 epub:type="title">{{ novel.title }}</h3>
-        <p class="author">作者：{{ novel.author }}</p>
+        <h3 epub:type="title">{{ manifest.core.name }}</h3> {# Use UCM core name #}
+        <p class="author">作者：{{ manifest.core.author.name }}</p> {# Use UCM author name #}
 
-        {% if novel.cover_href %}
+        {% if cover_href %} {# cover_href is passed directly by generator #}
         <div class="cover-container">
-            <img src="{{ novel.cover_href }}" alt="カバー画像" />
+            <img src="{{ cover_href }}" alt="カバー画像" />
         </div>
         {% endif %}
 
-        {% if novel.description %}
-        <div class="description">{{ novel.description | safe }}</div>
+        {% if manifest.core.description %} {# Use UCM description #}
+        <div class="description">{{ manifest.core.description | safe }}</div> {# Assuming description is already HTML escaped/parsed #}
         {% endif %}
 
-        {% if novel.tags %}
-        <p class="tags">{% for tag in novel.tags %}#{{ tag }}{% if not loop.last %} {% endif %}{% endfor %}</p>
+        {% if manifest.core.keywords %} {# Use UCM keywords #}
+        <p class="tags">{% for tag in manifest.core.keywords %}#{{ tag }}{% if not loop.last %} {% endif %}{% endfor %}</p>
         {% endif %}
 
-        <p class="date">{{ novel.formatted_date }}</p>
-        <p class="source-link"><a href="{{ novel.source_url }}">{{ novel.source_url }}</a></p>
+        <p class="date">{{ formatted_date }}</p> {# formatted_date passed by generator #}
+        <p class="source-link"><a href="{{ manifest.core.mainEntityOfPage }}">{{ manifest.core.mainEntityOfPage }}</a></p> {# Use UCM mainEntityOfPage #}
     </div>
 </body>
 

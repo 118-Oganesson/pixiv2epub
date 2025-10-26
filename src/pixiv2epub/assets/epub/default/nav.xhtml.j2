@@ -1,3 +1,4 @@
+{# FILE: src/pixiv2epub/assets/epub/default/nav.xhtml.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja">
@@ -11,8 +12,9 @@
         <h1>目次</h1>
         <ol>
             {% if has_info_page %}
-            <li><a href="text/info.xhtml">作品情報</a></li>
+            <li><a href="text/info.xhtml">{{ info_page_title }}</a></li> {# info_page_title passed by generator #}
             {% endif %}
+            {# pages list (with href and title) passed by generator based on UCM contentStructure #}
             {% for page in pages %}
             <li><a href="{{ page.href }}">{{ page.title }}</a></li>
             {% endfor %}
@@ -21,13 +23,14 @@
     <nav epub:type="landmarks" hidden="">
         <h2>ランドマーク</h2>
         <ol>
-            {% if has_cover %}
+            {% if has_cover %} {# has_cover passed by generator #}
             <li><a epub:type="cover" href="text/cover.xhtml">表紙</a></li>
             {% endif %}
-            {% if has_info_page %}
-            <li><a epub:type="bodymatter" href="text/info.xhtml">作品情報</a></li>
+            {% if has_info_page %} {# has_info_page passed by generator #}
+            <li><a epub:type="bodymatter" href="text/info.xhtml">{{ info_page_title }}</a></li> {# info_page_title
+            passed by generator #}
             {% endif %}
-            {% if pages %}
+            {% if pages %} {# pages list passed by generator #}
             <li><a epub:type="bodymatter" href="{{ pages[0].href }}">本文開始</a></li>
             {% endif %}
         </ol>

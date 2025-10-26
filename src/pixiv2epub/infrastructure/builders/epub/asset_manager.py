@@ -5,7 +5,7 @@ from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from ....models.domain import ImageAsset, NovelMetadata, PageInfo
+from ....models.domain import ImageAsset, UnifiedContentManifest, UCMResource
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
 
@@ -33,19 +33,24 @@ class AssetManager:
     def __init__(
         self,
         workspace: Workspace,
-        metadata: NovelMetadata,
+        manifest: UnifiedContentManifest,
     ):
         self.workspace = workspace
-        self.metadata = metadata
+        self.manifest = manifest
         self.source_dir = workspace.source_path
         self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
 
     def gather_assets(
         self,
-    ) -> Tuple[List[ImageAsset], List[PageInfo], Optional[ImageAsset]]:
+    ) -> Tuple[List[ImageAsset], Optional[ImageAsset]]:
         """アセットを収集、整理し、EPUBに含めるべき最終的なリストを返します。"""
         all_images = self._collect_image_files()
-        cover_image_asset = self._find_cover_image(all_images)
+
+        # UCMの resources から cover_key を見つける
+        cover_key = self.manifest.core.image
+        cover_resource = self.manifest.resources.get(cover_key) if cover_key else None
+
+        cover_image_asset = self._find_cover_image(all_images, cover_resource)
         referenced_filenames = self._extract_referenced_image_filenames()
         final_images = [
             img for img in all_images if img.filename in referenced_filenames
@@ -54,7 +59,7 @@ class AssetManager:
         if cover_image_asset and cover_image_asset.filename not in referenced_filenames:
             final_images.append(cover_image_asset)
 
-        return final_images, self.metadata.pages, cover_image_asset
+        return final_images, cover_image_asset
 
     def _collect_image_files(self) -> List[ImageAsset]:
         """`assets/images`ディレクトリから画像ファイルを収集します。"""
@@ -75,11 +80,16 @@ class AssetManager:
             )
         return image_assets
 
-    def _find_cover_image(self, image_assets: List[ImageAsset]) -> Optional[ImageAsset]:
-        """メタデータで指定されたカバー画像を特定し、`properties`属性を更新します。"""
-        if not self.metadata.cover_path:
+    def _find_cover_image(
+        self, image_assets: List[ImageAsset], cover_resource: Optional[UCMResource]
+    ) -> Optional[ImageAsset]:
+        """UCMで指定されたカバー画像を特定し、`properties`属性を更新します。"""
+        if not cover_resource:
             return None
-        cover_filename = Path(self.metadata.cover_path).name
+
+        # UCMのパス (例: ../assets/images/cover.jpg) からファイル名のみを抽出
+        cover_filename = Path(cover_resource.path).name
+
         for i, asset in enumerate(image_assets):
             if asset.filename == cover_filename:
                 updated_asset = asset.model_copy(update={"properties": "cover-image"})
@@ -103,9 +113,16 @@ class AssetManager:
             # 例: ../assets/images/foo.jpg -> foo.jpg
             filenames.add(Path(p).name)
 
-        for page_info in self.metadata.pages:
-            # page_info.body は "./page-1.xhtml" のような相対パス
-            page_file = self.source_dir / page_info.body.lstrip("./")
+        # manifest.contentStructure からページファイルを反復処理
+        for page_block in self.manifest.contentStructure:
+            resource_key = page_block.source
+            page_resource = self.manifest.resources.get(resource_key)
+            if not page_resource or page_resource.role != "content":
+                continue
+
+            # UCM のリソースパス (例: "./page-1.xhtml") を使用
+            page_file = self.source_dir / page_resource.path.lstrip("./")
+
             if not page_file.is_file():
                 continue
             try:

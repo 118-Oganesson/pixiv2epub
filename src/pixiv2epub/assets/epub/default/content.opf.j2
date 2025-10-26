@@ -1,47 +1,62 @@
+{# FILE: src/pixiv2epub/assets/epub/default/content.opf.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="ja">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <dc:title>{{ metadata.title }}</dc:title>
+        {# UCM Core Metadata #}
+        <dc:title>{{ manifest.core.name }}</dc:title>
         <dc:language>ja</dc:language>
-        <dc:identifier id="bookid">{{ metadata.identifier.uuid }}</dc:identifier>
-        <dc:creator id="author">{{ metadata.author.name }}</dc:creator>
+        <dc:identifier id="bookid">{{ manifest.core.id_ | replace('tag:', 'urn:tag:') }}</dc:identifier> {# Convert tag
+        URI to URN #}
+        <dc:creator id="author">{{ manifest.core.author.name }}</dc:creator>
         <meta refines="#author" property="role" scheme="marc:relators">aut</meta>
-        <dc:date>{{ formatted_date }}</dc:date>
-        <meta property="dcterms:modified">{{ modified_time }}</meta>
+        <dc:date>{{ manifest.core.datePublished.isoformat() }}</dc:date>
+        <meta property="dcterms:modified">{{ (manifest.core.dateModified or manifest.core.datePublished).isoformat() }}
+        </meta>
 
-        {% if metadata.identifier.novel_id -%}
-        <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ metadata.identifier.novel_id }}</dc:identifier>
+        {# Provider Specific Identifiers (derived from tag URI in generator) #}
+        {% if provider_ids.novel_id -%}
+        <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ provider_ids.novel_id }}</dc:identifier>
         {% endif -%}
-        {% if metadata.identifier.post_id -%}
-        <dc:identifier id="fanbox-id">urn:fanbox:post:{{ metadata.identifier.post_id }}</dc:identifier>
+        {% if provider_ids.post_id -%}
+        <dc:identifier id="fanbox-id">urn:fanbox:post:{{ provider_ids.post_id }}</dc:identifier>
         {% endif -%}
 
-        {% if metadata.series -%}
-        <meta property="belongs-to-collection" id="series-title">{{ metadata.series.title }}</meta>
+        {# Series Information #}
+        {% if manifest.core.isPartOf -%}
+        <meta property="belongs-to-collection" id="series-title">{{ manifest.core.isPartOf.name }}</meta>
         <meta refines="#series-title" property="collection-type">series</meta>
-        {% if metadata.series.order -%}
-        <meta refines="#series-title" property="group-position">{{ metadata.series.order }}</meta>
+        {% if manifest.core.isPartOf.order -%}
+        <meta refines="#series-title" property="group-position">{{ manifest.core.isPartOf.order }}</meta>
         {% endif -%}
-        <meta property="meta" scheme="urn:pixiv:series:id">{{ metadata.series.id }}</meta>
+        {# Extract series ID from tag URI if needed, or pass separately #}
+        {% set series_id = manifest.core.isPartOf.identifier.split(':')[-1] %}
+        <meta property="meta"
+            scheme="urn:{{ 'pixiv' if 'pixiv.net' in manifest.core.isPartOf.identifier else 'fanbox' }}:series:id">{{
+        series_id }}</meta>
         {% endif -%}
 
-        {% if metadata.description -%}
-        <dc:description>{{ metadata.description | striptags | replace('\n', ' ') }}</dc:description>
+        {# Description and Tags #}
+        {% if manifest.core.description -%}
+        <dc:description>{{ manifest.core.description | striptags | replace('\n', ' ') }}</dc:description>
         {% endif -%}
-        {% for tag in metadata.tags -%}
+        {% for tag in manifest.core.keywords -%}
         <dc:subject>{{ tag }}</dc:subject>
         {% endfor -%}
+
+        {# Cover Image Reference #}
         {% if cover_image_id -%}
         <meta name="cover" content="{{ cover_image_id }}" />
         {% endif -%}
     </metadata>
     <manifest>
+        {# Manifest Items (Passed from Generator) #}
         {% for item in manifest_items -%}
         <item id="{{ item.id }}" href="{{ item.href }}" media-type="{{ item.media_type }}" {% if item.properties
             %}properties="{{ item.properties }}" {% endif %} />
         {% endfor -%}
     </manifest>
     <spine>
+        {# Spine Items (Passed from Generator) #}
         {% for item in spine_itemrefs -%}
         <itemref idref="{{ item.idref }}" {% if not item.linear %}linear="no" {% endif %} />
         {% endfor -%}

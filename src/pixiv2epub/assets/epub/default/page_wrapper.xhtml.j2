@@ -1,16 +1,17 @@
+{# FILE: src/pixiv2epub/assets/epub/default/page_wrapper.xhtml.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="ja" lang="ja">
 
 <head>
-    <title>{{ title }}</title>
+    <title>{{ title }}</title> {# title passed directly from UCMContentBlock.title #}
     <meta charset="utf-8" />
     {% if css_path %}
     <link rel="stylesheet" type="text/css" href="{{ css_path }}" />{% endif %}
 </head>
 
 <body>
-    {{ content | safe }}
+    {{ content | safe }} {# content passed directly after parsing/loading #}
 </body>
 
 </html>

@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
 import uuid
-from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from jinja2 import Environment
@@ -9,9 +8,8 @@ from loguru import logger
 from ....models.domain import (
     EpubComponents,
     ImageAsset,
-    NovelMetadata,
     PageAsset,
-    PageInfo,
+    UnifiedContentManifest,
 )
 from ....models.workspace import Workspace
 from ....shared.constants import NAMESPACE_UUID
@@ -21,23 +19,25 @@ class EpubComponentGenerator:
     """EPUBの構成要素を生成するクラス。"""
 
     def __init__(
-        self, metadata: NovelMetadata, workspace: Workspace, template_env: Environment
+        self,
+        manifest: UnifiedContentManifest,
+        workspace: Workspace,
+        template_env: Environment,
     ):
-        self.metadata = metadata
+        self.manifest = manifest
         self.workspace = workspace
         self.template_env = template_env
 
     def generate_components(
         self,
         image_assets: List[ImageAsset],
-        page_infos: List[PageInfo],
         cover_asset: Optional[ImageAsset],
     ) -> EpubComponents:
         """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
         css_asset = self._generate_css()
         css_rel_path = f"../{css_asset.href}" if css_asset else None
 
-        final_pages = self._generate_main_pages(page_infos, css_rel_path)
+        final_pages = self._generate_main_pages(css_rel_path)
         info_page = self._generate_info_page(css_rel_path, cover_asset)
         cover_page = self._generate_cover_page(cover_asset)
         content_opf = self._generate_opf(
@@ -74,21 +74,26 @@ class EpubComponentGenerator:
         rendered_str = template.render(context)
         return rendered_str.encode("utf-8")
 
-    def _generate_main_pages(
-        self, page_infos: List[PageInfo], css_path: Optional[str]
-    ) -> List[PageAsset]:
+    def _generate_main_pages(self, css_path: Optional[str]) -> List[PageAsset]:
         """本文の各ページをXHTMLに変換します。"""
         pages = []
-        for i, page_info in enumerate(page_infos, 1):
+        # UCM の contentStructure をループ
+        for i, page_block in enumerate(self.manifest.contentStructure, 1):
             try:
-                # Workspaceのヘルパーメソッドを使用してコンテンツを取得
-                content = self.workspace.get_page_content(page_info.body)
+                resource_key = page_block.source
+                page_resource = self.manifest.resources.get(resource_key)
+                if not page_resource or page_resource.role != "content":
+                    logger.error(f"ページリソース '{resource_key}' が見つかりません。")
+                    continue
+
+                # UCM のリソースパス (例: "./page-1.xhtml") を使用
+                content = self.workspace.get_page_content(page_resource.path)
 
                 # 中間ファイル用の画像パスを、最終的なEPUB内のパスに置換する
                 content = content.replace("../assets/images/", "../images/")
 
                 context = {
-                    "title": page_info.title,
+                    "title": page_block.title,
                     "content": content,
                     "css_path": css_path,
                 }
@@ -98,38 +103,42 @@ class EpubComponentGenerator:
                 pages.append(
                     PageAsset(
                         id=f"page_{i}",
-                        href=f"text/page-{i}.xhtml",
+                        href=f"text/page-{i}.xhtml",  # (リソースパスから導出する方が堅牢)
                         content=page_content_bytes,
-                        title=page_info.title,
+                        title=page_block.title,
                     )
                 )
             except Exception as e:
-                logger.error(f"ページの処理中にエラー: {page_info.title}, {e}")
+                logger.error(f"ページの処理中にエラー: {page_block.title}, {e}")
         return pages
 
     def _generate_info_page(
         self, css_path: Optional[str], cover_asset: Optional[ImageAsset]
     ) -> PageAsset:
         """作品情報ページを生成します。"""
-        formatted_date = self.metadata.published_date.strftime("%Y年%m月%d日 %H:%M")
+        core = self.manifest.core
+        formatted_date = core.datePublished.strftime("%Y年%m月%d日 %H:%M")
+
+        # providerDataから text_length を検索
+        text_length = "N/A"
+        for item in self.manifest.providerData:
+            if item.propertyID.endswith(":textLength"):
+                text_length = item.value
+                break
 
         context = {
-            "title": self.metadata.title,
+            "title": core.name,
             "css_path": css_path,
             "novel": {
-                "title": self.metadata.title,
-                "author": self.metadata.author.name,
-                "series_title": self.metadata.series.title
-                if self.metadata.series
-                else None,
-                "series_order": self.metadata.series.order
-                if self.metadata.series
-                else None,
-                "description": self.metadata.description,
-                "tags": self.metadata.tags,
-                "source_url": self.metadata.original_source,
+                "title": core.name,
+                "author": core.author.name,
+                "series_title": core.isPartOf.name if core.isPartOf else None,
+                "series_order": core.isPartOf.order if core.isPartOf else None,
+                "description": core.description,
+                "tags": core.keywords,
+                "source_url": str(core.mainEntityOfPage),
                 "formatted_date": formatted_date,
-                "text_length": self.metadata.text_length or "N/A",
+                "text_length": text_length,
                 "cover_href": f"../{cover_asset.href}" if cover_asset else None,
             },
         }
@@ -214,29 +223,40 @@ class EpubComponentGenerator:
         for image in images:
             manifest_items.append(image.model_dump())
 
-        provider_name = self.workspace.id.split("_")[0]
-        content_id = self.workspace.id.split("_", 1)[1]
+        core = self.manifest.core
 
-        novel_id = (
-            self.metadata.identifier.novel_id
-            or self.metadata.identifier.post_id
-            or content_id
-        )
+        # UCM の @id (tag: URI) を UUID に変換して使用
+        deterministic_uuid = uuid.uuid5(NAMESPACE_UUID, core.id)
 
-        deterministic_uuid = uuid.uuid5(NAMESPACE_UUID, f"{provider_name}-{novel_id}")
-        self.metadata = self.metadata.model_copy(
-            update={
-                "identifier": self.metadata.identifier.model_copy(
-                    update={"uuid": f"urn:uuid:{deterministic_uuid}"}
-                )
+        # content_id は tag: URI の末尾の部分
+        content_id_str = core.id.split(":")[-1]
+
+        # コンテキストに渡すメタデータを UCM.core から構築
+        metadata_as_dict = {
+            "title": core.name,
+            "author": {
+                "name": core.author.name,
+                "id": core.author.identifier.split(":")[-1],
+            },
+            "series": {
+                "title": core.isPartOf.name,
+                "id": core.isPartOf.identifier.split(":")[-1],
+                "order": core.isPartOf.order,
             }
-        )
-        metadata_as_dict = self.metadata.model_dump(mode="json")
+            if core.isPartOf
+            else None,
+            "description": core.description,
+            "tags": core.keywords,
+            "identifier": {
+                "uuid": f"urn:uuid:{deterministic_uuid}",
+                "novel_id": content_id_str if "pixiv.net" in core.id else None,
+                "post_id": content_id_str if "fanbox.cc" in core.id else None,
+            },
+        }
 
-        modified_time_dt = self.metadata.updated_date or datetime.now(timezone.utc)
+        modified_time_dt = core.dateModified or core.datePublished
         modified_time = modified_time_dt.isoformat()
-
-        published_date_str = self.metadata.published_date.isoformat()
+        published_date_str = core.datePublished.isoformat()
 
         context = {
             "metadata": metadata_as_dict,

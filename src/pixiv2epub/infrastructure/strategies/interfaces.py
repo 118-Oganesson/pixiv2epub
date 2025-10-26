@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from ...models.domain import NovelMetadata
+from ...models.domain import UnifiedContentManifest
 from ...models.workspace import Workspace
 
 
@@ -29,6 +29,6 @@ class IMetadataMapper(ABC):
         workspace: Workspace,
         cover_path: Optional[Path],
         **kwargs: Any,
-    ) -> NovelMetadata:
-        """APIレスポンスを NovelMetadata に変換する。"""
+    ) -> UnifiedContentManifest:
+        """APIレスポンスを UnifiedContentManifest に変換する。"""
         raise NotImplementedError

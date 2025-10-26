@@ -4,7 +4,7 @@ from typing import Any, List, Protocol, runtime_checkable, Optional, Dict
 
 from ..models.workspace import Workspace, WorkspaceManifest
 from ..shared.settings import Settings
-from ..models.domain import NovelMetadata
+from ..models.domain import UnifiedContentManifest
 from ..models.pixiv import NovelApiResponse
 from ..models.fanbox import Post
 from ..shared.enums import Provider as ProviderEnum
@@ -97,7 +97,7 @@ class IWorkspaceRepository(Protocol):
     def persist_metadata(
         self,
         workspace: Workspace,
-        metadata: NovelMetadata,
+        metadata: UnifiedContentManifest,
         manifest: WorkspaceManifest,
     ) -> None:
         """メタデータとマニフェストをワークスペースに永続化します。"""

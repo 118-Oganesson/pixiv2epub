@@ -12,7 +12,7 @@ from pydantic import ValidationError
 from pixivpy3 import PixivError
 
 from ....domain.interfaces import IProvider, IWorkspaceRepository
-from ....models.domain import NovelMetadata
+from ....models.domain import UnifiedContentManifest
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
 from ....shared.constants import IMAGES_DIR_NAME, MANIFEST_FILE_NAME
@@ -27,6 +27,7 @@ from .downloader import ImageDownloader as PixivImageDownloader
 
 def _extract_critical_data_for_hash(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     """EPUB生成に不可欠なデータのみを抽出する。"""
+    # この関数はハッシュ計算に使用されるため、キー名はAPIレスポンスのままとする
     return {
         "title": raw_data.get("title"),
         "seriesId": raw_data.get("seriesId"),
@@ -99,7 +100,8 @@ class PixivProvider(IProvider):
             logger.error(f"処理に失敗しました: {e}")
             raise
         except Exception as e:
-            logger.error(f"予期せぬエラーが発生しました: {e}", exc_info=True)
+            # f-string 補間を避ける
+            logger.error("予期せぬエラーが発生しました。", exc_info=True)
             raise ProviderError(f"予期せぬエラー: {e}", self.get_provider_name()) from e
 
     def _get_single_work(self, novel_id: int) -> Optional[Workspace]:
@@ -154,7 +156,9 @@ class PixivProvider(IProvider):
         )
         self.repository.persist_metadata(workspace, metadata, manifest)
 
-        logger.bind(title=metadata.title).success("作品データの処理が完了しました。")
+        logger.bind(title=metadata.core.name).success(
+            "作品データの処理が完了しました。"
+        )
         return workspace
 
     def _get_multiple_works(self, series_id: int) -> List[Workspace]:
@@ -252,10 +256,10 @@ class PixivProvider(IProvider):
         self,
         workspace: Workspace,
         fetched_data: Dict[str, Dict],
-    ) -> NovelMetadata:
+    ) -> UnifiedContentManifest:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
-        最終的なメタデータを生成して返します。
+        最終的なメタデータ(UCM)を生成して返します。
         """
         raw_webview_novel_data = fetched_data["primary_data"]
         raw_novel_detail_data = fetched_data["secondary_data"]
@@ -289,6 +293,8 @@ class PixivProvider(IProvider):
         parsed_description = self._parser.parse(
             raw_novel_detail_data.get("novel", {}).get("caption", ""), image_paths
         )
+
+        # マッパーが UCM を返す
         metadata = self._mapper.map_to_metadata(
             workspace=workspace,
             cover_path=cover_path,
@@ -296,6 +302,7 @@ class PixivProvider(IProvider):
             detail_data=raw_novel_detail_data,
             parsed_text=parsed_text,
             parsed_description=parsed_description,
+            # image_paths=image_paths, # マッパーに渡す必要があれば追加
         )
         return metadata
 

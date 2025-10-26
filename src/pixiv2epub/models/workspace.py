@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from ..shared.constants import DETAIL_FILE_NAME, MANIFEST_FILE_NAME
-from ..models.domain import NovelMetadata
+from ..models.domain import UnifiedContentManifest
 
 
 @dataclass(frozen=True)
@@ -42,21 +42,15 @@ class Workspace:
             )
         return cls(id=path.name, root_path=path.resolve())
 
-    def load_metadata(self) -> NovelMetadata:
+    def load_metadata(self) -> UnifiedContentManifest:
         """
-        ワークスペースからdetail.jsonを読み込み、NovelMetadataを返します。
+        ワークスペースからdetail.jsonを読み込み、UnifiedContentManifestを返します。
 
         Raises:
             FileNotFoundError: メタデータファイルが見つからない場合。
         """
         detail_path = self.source_path / DETAIL_FILE_NAME
-        if not detail_path.is_file():
-            raise FileNotFoundError(
-                f"メタデータファイルが見つかりません: {detail_path}"
-            )
-        return NovelMetadata.model_validate_json(
-            detail_path.read_text(encoding="utf-8")
-        )
+        return UnifiedContentManifest.load(detail_path)
 
     def get_page_content(self, page_body_path: str) -> str:
         """
@@ -69,7 +63,7 @@ class Workspace:
             FileNotFoundError: ページファイルが見つからない場合。
 
         Returns:
-            str: ページのHTMLコンテンツ。
+             str: ページのHTMLコンテンツ。
         """
         page_file = self.source_path / page_body_path.lstrip("./")
         if not page_file.is_file():

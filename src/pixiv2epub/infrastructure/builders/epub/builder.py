@@ -6,7 +6,7 @@ from pathlib import Path
 from jinja2 import ChoiceLoader, Environment, FileSystemLoader
 from loguru import logger
 
-from ....models.domain import NovelMetadata
+from ....models.domain import UnifiedContentManifest
 from ....models.workspace import Workspace
 from ....shared.constants import MANIFEST_FILE_NAME
 from ....shared.exceptions import BuildError
@@ -34,8 +34,8 @@ class EpubBuilder(BaseBuilder):
 
     def build(self, workspace: Workspace) -> Path:
         """EPUBファイルを生成するメインの実行メソッド。"""
-        metadata = self._load_metadata(workspace)
-        output_path = self._determine_output_path(metadata)
+        manifest = self._load_metadata(workspace)
+        output_path = self._determine_output_path(manifest)
 
         log = logger.bind(workspace_id=workspace.id, output_path=str(output_path))
         log.info("EPUB作成処理を開始")
@@ -46,13 +46,13 @@ class EpubBuilder(BaseBuilder):
         try:
             # テンプレートエンジンとジェネレータを動的に初期化
             template_env = self._create_template_env(workspace)
-            asset_manager = AssetManager(workspace, metadata)
-            generator = EpubComponentGenerator(metadata, workspace, template_env)
+            asset_manager = AssetManager(workspace, manifest)
+            generator = EpubComponentGenerator(manifest, workspace, template_env)
 
-            final_images, raw_pages_info, cover_asset = asset_manager.gather_assets()
+            final_images, cover_asset = asset_manager.gather_assets()
+
             components = generator.generate_components(
                 final_images,
-                raw_pages_info,
                 cover_asset,
             )
             self.archiver.archive(components, output_path)
@@ -69,8 +69,8 @@ class EpubBuilder(BaseBuilder):
         provider_name = default_theme
         try:
             with open(workspace.manifest_path, "r", encoding="utf-8") as f:
-                manifest = json.load(f)
-            provider_name = manifest.get("provider_name", default_theme)
+                manifest_data = json.load(f)
+            provider_name = manifest_data.get("provider_name", default_theme)
             logger.bind(provider_name=provider_name).debug(
                 "プロバイダーのテーマを使用します。"
             )
@@ -97,20 +97,29 @@ class EpubBuilder(BaseBuilder):
         loader = ChoiceLoader(loaders)
         return Environment(loader=loader, autoescape=True)
 
-    def _determine_output_path(self, metadata: NovelMetadata) -> Path:
+    def _determine_output_path(self, manifest: UnifiedContentManifest) -> Path:
         """メタデータと設定に基づき、最終的な出力ファイルパスを決定します。"""
-        if metadata.series and self.settings.builder.series_filename_template:
+        core = manifest.core
+
+        if core.isPartOf and self.settings.builder.series_filename_template:
             template = self.settings.builder.series_filename_template
         else:
             template = self.settings.builder.filename_template
 
+        # tag: URI からIDを抽出
+        content_id = core.id.split(":")[-1]
+        author_id = core.author.identifier.split(":")[-1]
+        series_id_str = str(
+            core.isPartOf.identifier.split(":")[-1] if core.isPartOf else "0"
+        )
+
         template_vars = {
-            "title": metadata.title or "untitled",
-            "id": metadata.identifier.novel_id or metadata.identifier.post_id or "0",
-            "author_name": metadata.author.name or "unknown_author",
-            "author_id": str(metadata.author.id or "0"),
-            "series_title": metadata.series.title if metadata.series else "",
-            "series_id": str(metadata.series.id if metadata.series else "0"),
+            "title": core.name or "untitled",
+            "id": content_id,
+            "author_name": core.author.name or "unknown_author",
+            "author_id": author_id or "0",
+            "series_title": core.isPartOf.name if core.isPartOf else "",
+            "series_id": series_id_str,
         }
 
         safe_relative_path = generate_sanitized_path(

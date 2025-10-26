@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from loguru import logger
 
-from ...models.domain import NovelMetadata
+from ...models.domain import UnifiedContentManifest
 from ...models.workspace import Workspace
 from ...shared.exceptions import BuildError
 from ...shared.settings import Settings
@@ -26,11 +26,11 @@ class BaseBuilder(ABC):
 
     def _load_metadata(
         self, workspace: Workspace, custom_metadata: Dict[str, Any] | None = None
-    ) -> NovelMetadata:
+    ) -> UnifiedContentManifest:
         """ビルド対象のメタデータを読み込みます。"""
         if custom_metadata:
             logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
-            return NovelMetadata.model_validate(custom_metadata)
+            return UnifiedContentManifest.model_validate(custom_metadata)
 
         try:
             return workspace.load_metadata()

@@ -1,15 +1,13 @@
 # FILE: src/pixiv2epub/models/domain.py
 """
 アプリケーションのドメイン（関心領域）における中心的なデータモデルを定義します。
-これらのモデルは、EPUBのビルドなど、プロバイダーに依存しない内部処理で使用されます。
-外部APIの仕様変更からアプリケーションのコアロジックを保護する役割も担います。
-このモジュールは、外部APIの仕様から独立している必要があります。
+Unified Content Manifest (UCM) を中心とします。
 """
 
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -69,53 +67,80 @@ class EpubComponents(BaseModel):
     content_opf: bytes
     nav_xhtml: bytes
 
+# --- UCM (Unified Content Manifest) モデル ---
+# detail.json の新しいスキーマ
 
-# --- ドメインメタデータ (detail.json) 関連 ---
-class Author(BaseModel):
-    """小説の作者情報を格納します。"""
+class UCMBaseModel(BaseModel):
+    # エイリアス名とフィールド名の両方で値を受け付ける
+    model_config = ConfigDict(populate_by_name=True)
 
+class UCMCoreAuthor(UCMBaseModel):
+    """schema.org/Person に準拠した著者情報"""
+    type_: str = Field("Person", alias="@type")
     name: str
-    id: Optional[int] = None
+    identifier: str # 例: "tag:pixiv.net,2007-09-10:user:87654321"
 
+class UCMCoreSeries(UCMBaseModel):
+    """schema.org/CreativeWorkSeries に準拠したシリーズ情報"""
+    type_: str = Field("CreativeWorkSeries", alias="@type")
+    name: str
+    identifier: str # 例: "tag:pixiv.net,2007-09-10:series:112233"
+    order: Optional[int] = None # シリーズ内の順序
 
-class PageInfo(BaseModel):
-    """`detail.json`内の各ページ（章）の情報を格納します。"""
-
-    title: str
-    body: str
-
-
-class SeriesInfo(BaseModel):
-    """小説のシリーズ情報を格納します。"""
-
-    id: int
-    title: str
-    order: Optional[int] = None
-
-
-class Identifier(BaseModel):
-    """作品のユニークIDを格納するモデル。"""
-
-    novel_id: Optional[int] = Field(None, alias="novel_id")
-    post_id: Optional[str] = Field(None, alias="post_id")
-    creator_id: Optional[str] = Field(None, alias="creator_id")
-    uuid: Optional[str] = None
-
-
-class NovelMetadata(BaseModel):
-    """`detail.json`に記載された小説のメタデータ全体を格納します。"""
-
-    model_config = ConfigDict(frozen=True)
-
-    title: str
-    author: Author
-    series: Optional[SeriesInfo]
+class UCMCoreMetadata(UCMBaseModel):
+    """コンテンツの核となるメタデータ (JSON-LD準拠)"""
+    context_: Dict[str, str] = Field(..., alias="@context")
+    type_: str = Field(..., alias="@type") # 例: "BlogPosting", "Article"
+    id_: str = Field(..., alias="@id") # 正規ID (tag: URI)
+    name: str # title
+    author: UCMCoreAuthor
+    isPartOf: Optional[UCMCoreSeries] = None # series
+    datePublished: datetime
+    dateModified: Optional[datetime] = None
+    keywords: List[str] = Field(default_factory=list) # tags
     description: str
-    identifier: Identifier
-    published_date: datetime
-    updated_date: Optional[datetime]
-    cover_path: Optional[str]
-    tags: List[str]
-    original_source: HttpUrl
-    pages: List[PageInfo]
-    text_length: Optional[int]
+    mainEntityOfPage: HttpUrl # original_source
+    image: Optional[str] = None # cover_pathの代わり (リソースキーを指す)
+
+class UCMResource(UCMBaseModel):
+    """リソースマニフェストのエントリ"""
+    path: str # ワークスペース内の相対パス (例: "./assets/images/cover.jpg")
+    mediaType: str # 例: "image/jpeg"
+    role: str # 'cover', 'content', 'embeddedImage' など
+
+class UCMContentBlock(UCMBaseModel):
+    """コンテンツの論理構造"""
+    type: str = "Page" # 構造のためシンプルなtype名を維持
+    title: str
+    source: str # リソースマニフェスト内のキー (例: "resource-page-1")
+
+class UCMProviderData(UCMBaseModel):
+    """プロバイダ固有のメタデータ (schema.org/PropertyValue)"""
+    type_: str = Field("PropertyValue", alias="@type")
+    propertyID: str # 例: "pixiv:textLength"
+    value: Any
+
+class UnifiedContentManifest(UCMBaseModel):
+    """
+    detail.json の新しいスキーマ。
+    UCM (Unified Content Manifest)
+    """
+    model_config = ConfigDict(frozen=True, populate_by_name=True) # populate_by_name を追加
+
+    core: UCMCoreMetadata
+    contentStructure: List[UCMContentBlock]
+    resources: Dict[str, UCMResource]
+    providerData: List[UCMProviderData] = Field(default_factory=list)
+
+    @classmethod
+    def load(cls, path: Path) -> "UnifiedContentManifest":
+        """
+        ワークスペースからdetail.jsonを読み込み、UCMを返します。
+
+        Raises:
+            FileNotFoundError: メタデータファイルが見つからない場合。
+        """
+        if not path.is_file():
+            raise FileNotFoundError(f"メタデータファイルが見つかりません: {path}")
+        # デフォルトでエイリアスを尊重する model_validate_json を使用
+        return cls.model_validate_json(path.read_text(encoding="utf-8"))

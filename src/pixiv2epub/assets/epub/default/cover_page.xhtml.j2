@@ -1,3 +1,4 @@
+{# FILE: src/pixiv2epub/assets/epub/default/cover_page.xhtml.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <!DOCTYPE html>
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="ja">
@@ -20,7 +21,7 @@
 </head>
 
 <body>
-    <div><img src="{{ cover_image_href }}" alt="カバー画像" /></div>
+    <div><img src="{{ cover_image_href }}" alt="カバー画像" /></div> {# cover_image_href passed directly #}
 </body>
 
 </html>

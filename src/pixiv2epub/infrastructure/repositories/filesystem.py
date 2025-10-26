@@ -7,7 +7,7 @@ from pathlib import Path
 from loguru import logger
 
 from ...domain.interfaces import IWorkspaceRepository
-from ...models.domain import NovelMetadata
+from ...models.domain import UnifiedContentManifest
 from ...models.workspace import Workspace, WorkspaceManifest
 from ...shared.constants import (
     ASSETS_DIR_NAME,
@@ -51,10 +51,10 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
     def persist_metadata(
         self,
         workspace: Workspace,
-        metadata: NovelMetadata,
+        metadata: UnifiedContentManifest,
         manifest: WorkspaceManifest,
     ):
-        """メタデータとマニフェストをワークスペースに永続化します。"""
+        """メタデータ(UCM)とマニフェストをワークスペースに永続化します。"""
         # manifest.jsonの保存
         try:
             with open(workspace.manifest_path, "w", encoding="utf-8") as f:
@@ -65,9 +65,10 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
                 f"'{MANIFEST_FILE_NAME}' の保存に失敗しました。"
             )
 
-        # detail.jsonの保存
+        # detail.jsonの保存 (UCMを保存)
         try:
-            metadata_dict = metadata.model_dump(mode="json")
+            # by_alias=True で @context などのエイリアスが正しく出力される
+            metadata_dict = metadata.model_dump(mode="json", by_alias=True)
             detail_path = workspace.source_path / DETAIL_FILE_NAME
             with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
