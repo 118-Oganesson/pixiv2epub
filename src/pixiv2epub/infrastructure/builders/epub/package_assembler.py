@@ -42,20 +42,21 @@ class EpubPackageAssembler:
             # 修正: pathlib を使ってパスを安全に構築
             oebps_path = Path(OEBPS_DIR)
 
+            # 修正: 監査報告書 §3.1 に基づき、str() を .as_posix() に変更
             zip_file.writestr(
-                str(oebps_path / components.info_page.href),
+                (oebps_path / components.info_page.href).as_posix(),
                 components.info_page.content,
             )
             if components.cover_page:
                 zip_file.writestr(
-                    str(oebps_path / components.cover_page.href),
+                    (oebps_path / components.cover_page.href).as_posix(),
                     components.cover_page.content,
                 )
             for page in components.final_pages:
-                zip_file.writestr(str(oebps_path / page.href), page.content)
+                zip_file.writestr((oebps_path / page.href).as_posix(), page.content)
             if components.css_asset:
                 zip_file.writestr(
-                    str(oebps_path / components.css_asset.href),
+                    (oebps_path / components.css_asset.href).as_posix(),
                     components.css_asset.content,
                 )
 
@@ -83,7 +84,7 @@ class EpubPackageAssembler:
                 if result.success and not result.skipped and result.output_bytes:
                     file_bytes = result.output_bytes
 
-            # 修正: pathlib を使ってパスを安全に構築
-            zip_file.writestr(str(prefix_path / image.href), file_bytes)
+            # 修正: 監査報告書 §3.1 に基づき、str() を .as_posix() に変更
+            zip_file.writestr((prefix_path / image.href).as_posix(), file_bytes)
         except IOError as e:
             logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")

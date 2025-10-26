@@ -2,69 +2,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="ja">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        {# UCM Core Metadata (Python側で処理済み) #}
-        {# 修正: metadata.title -> manifest.core.name #}
         <dc:title>{{ manifest.core.name }}</dc:title>
         <dc:language>ja</dc:language>
-        {# 修正: metadata.identifier.uuid -> manifest.core.id_ (UCMの正規tag: URI) #}
         <dc:identifier id="bookid">{{ manifest.core.id_ }}</dc:identifier>
-        {# 修正: metadata.author.name -> manifest.core.author.name #}
         <dc:creator id="author">{{ manifest.core.author.name }}</dc:creator>
         <meta refines="#author" property="role" scheme="marc:relators">aut</meta>
-        {# 修正: formatted_date -> manifest.core.datePublished.isoformat() #}
-        {# 修正: modified_time -> manifest.core.dateModified.isoformat() #}
         <dc:date>{{ manifest.core.datePublished.isoformat() }}</dc:date>
         <meta property="dcterms:modified">{{ (manifest.core.dateModified or manifest.core.datePublished).isoformat() }}
         </meta>
 
-        {# Provider Specific Identifiers (Python側で処理済み) #}
-        {# 修正: metadata.identifier.novel_id -> provider_ids.novel_id #}
         {% if provider_ids.novel_id -%}
         <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ provider_ids.novel_id }}</dc:identifier>
         {% endif -%}
-        {# 修正: metadata.identifier.post_id -> provider_ids.post_id #}
         {% if provider_ids.post_id -%}
         <dc:identifier id="fanbox-id">urn:fanbox:post:{{ provider_ids.post_id }}</dc:identifier>
         {% endif -%}
 
-        {# Series Information (Python側で処理済み) #}
-        {# 修正: metadata.series -> manifest.core.isPartOf #}
         {% if manifest.core.isPartOf -%}
         <meta property="belongs-to-collection" id="series-title">{{ manifest.core.isPartOf.name }}</meta>
         <meta refines="#series-title" property="collection-type">series</meta>
         {% if manifest.core.isPartOf.order -%}
         <meta refines="#series-title" property="group-position">{{ manifest.core.isPartOf.order }}</meta>
         {% endif -%}
-        {# シリーズIDはPython側で抽出済みのものを使用 #}
         <meta property="meta" scheme="urn:{{ 'pixiv' if provider_ids.novel_id else 'fanbox' }}:series:id">{{
         manifest.core.isPartOf.identifier.split(":")[-1] }}</meta>
         {% endif -%}
 
-        {# Description and Tags #}
-        {# 修正: metadata.description -> manifest.core.description #}
         {% if manifest.core.description -%}
-        {# テンプレート内のフィルタはプレゼンテーションロジックとして許容 #}
         <dc:description>{{ manifest.core.description | striptags | replace('\n', ' ') }}</dc:description>
         {% endif -%}
-        {# 修正: metadata.tags -> manifest.core.keywords #}
+
         {% for tag in manifest.core.keywords -%}
         <dc:subject>{{ tag }}</dc:subject>
         {% endfor -%}
 
-        {# Cover Image Reference #}
         {% if cover_image_id -%}
         <meta name="cover" content="{{ cover_image_id }}" />
         {% endif -%}
     </metadata>
     <manifest>
-        {# Manifest Items (Passed from Generator) #}
         {% for item in manifest_items -%}
         <item id="{{ item.id }}" href="{{ item.href }}" media-type="{{ item.media_type }}" {% if item.properties
             %}properties="{{ item.properties }}" {% endif %} />
         {% endfor -%}
     </manifest>
     <spine>
-        {# Spine Items (Passed from Generator) #}
         {% for item in spine_itemrefs -%}
         <itemref idref="{{ item.idref }}" {% if not item.linear %}linear="no" {% endif %} />
         {% endfor -%}

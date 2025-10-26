@@ -3,7 +3,7 @@ import json
 import os
 from pathlib import Path
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader
+from jinja2 import ChoiceLoader, Environment, FileSystemLoader, TemplateError
 from loguru import logger
 
 from ....models.domain import UnifiedContentManifest
@@ -58,9 +58,15 @@ class EpubBuilder(BaseBuilder):
             self.archiver.archive(components, output_path)
             log.success("EPUBファイルの作成成功")
             return output_path
+        except TemplateError as e:
+            logger.bind(template_name=e.name).error(
+                f"テンプレート '{e.name}' のレンダリングに失敗しました。",
+                exc_info=True,  # スタックトレースを出力
+            )
+            self._cleanup_failed_build(output_path)
+            raise BuildError(f"テンプレートエラー: {e}") from e
         except Exception as e:
-            # 修正: .exception() を使いスタックトレースをログに出力
-            logger.exception("EPUBファイルの作成中に致命的なエラーが発生しました。")
+            logger.exception("EPUBファイルの作成中に予期せぬエラーが発生しました。")
             self._cleanup_failed_build(output_path)
             raise BuildError(f"EPUBのビルドに失敗しました: {e}") from e
 
@@ -108,7 +114,6 @@ class EpubBuilder(BaseBuilder):
             template = self.settings.builder.filename_template
 
         # tag: URI からIDを抽出
-        # 修正: core.id -> core.id_
         content_id = core.id_.split(":")[-1]
         author_id = core.author.identifier.split(":")[-1]
         series_id_str = str(

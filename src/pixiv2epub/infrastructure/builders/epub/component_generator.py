@@ -197,6 +197,7 @@ class EpubComponentGenerator:
                 }
             )
             spine_itemrefs.append({"idref": cover_page.id, "linear": False})
+
         manifest_items.append(
             {
                 "id": info_page.id,
@@ -219,25 +220,16 @@ class EpubComponentGenerator:
 
         core = self.manifest.core
 
-        # 修正: content_id は tag: URI の末尾の部分
         content_id_str = core.id_.split(":")[-1]
 
-        # 修正: テンプレートが期待する provider_ids を UCM の core.id_ から作成
         provider_ids = {
             "novel_id": content_id_str if "pixiv.net" in core.id_ else None,
             "post_id": content_id_str if "fanbox.cc" in core.id_ else None,
         }
 
-        # 修正: UCM の core メタデータから日付を取得
-        modified_time_dt = core.dateModified or core.datePublished
-        modified_time = modified_time_dt.isoformat()
-        published_date_str = core.datePublished.isoformat()
-
         context = {
             "manifest": self.manifest,
-            "provider_ids": provider_ids,  # 修正: 正しく導出した provider_ids を渡す
-            "formatted_date": published_date_str,  # 修正: UCMのデータを渡す
-            "modified_time": modified_time,  # 修正: UCMのデータを渡す
+            "provider_ids": provider_ids,
             "manifest_items": manifest_items,
             "spine_itemrefs": spine_itemrefs,
             "cover_image_id": cover_asset.id if cover_asset else None,

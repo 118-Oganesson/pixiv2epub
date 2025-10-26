@@ -11,11 +11,10 @@
     <nav epub:type="toc">
         <h1>目次</h1>
         <ol>
-            {# 修正: toc コンテキストを使用 #}
             {% if toc.has_info_page %}
             <li><a href="{{ toc.info_page.href }}">{{ toc.info_page.title }}</a></li>
             {% endif %}
-            {# 修正: toc.pages を使用 #}
+
             {% for page in toc.pages %}
             <li><a href="{{ page.href }}">{{ page.title }}</a></li>
             {% endfor %}
@@ -24,15 +23,14 @@
     <nav epub:type="landmarks" hidden="">
         <h2>ランドマーク</h2>
         <ol>
-            {# 修正: landmarks コンテキストを使用 #}
             {% if landmarks.has_cover %}
             <li><a epub:type="cover" href="text/cover.xhtml">表紙</a></li>
             {% endif %}
-            {# 修正: landmarks.info_page を使用 #}
+
             {% if landmarks.info_page %}
-            <li><a epub:type="bodymatter" href="{{ landmarks.info_page.href }}">{{ landmarks.info_page.title }}</a></li>
+            <li><a href="{{ landmarks.info_page.href }}">{{ landmarks.info_page.title }}</a></li>
             {% endif %}
-            {# 修正: landmarks.start_page_href を使用 #}
+
             {% if landmarks.start_page_href %}
             <li><a epub:type="bodymatter" href="{{ landmarks.start_page_href }}">本文開始</a></li>
             {% endif %}
