@@ -1,4 +1,3 @@
-{# FILE: src/pixiv2epub/assets/epub/default/content.opf.j2 #}
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid" xml:lang="ja">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
@@ -14,6 +13,7 @@
         {% if provider_ids.novel_id -%}
         <dc:identifier id="pixiv-id">urn:pixiv:novel:{{ provider_ids.novel_id }}</dc:identifier>
         {% endif -%}
+
         {% if provider_ids.post_id -%}
         <dc:identifier id="fanbox-id">urn:fanbox:post:{{ provider_ids.post_id }}</dc:identifier>
         {% endif -%}
@@ -24,6 +24,7 @@
         {% if manifest.core.isPartOf.order -%}
         <meta refines="#series-title" property="group-position">{{ manifest.core.isPartOf.order }}</meta>
         {% endif -%}
+
         <meta property="meta" scheme="urn:{{ 'pixiv' if provider_ids.novel_id else 'fanbox' }}:series:id">{{
         manifest.core.isPartOf.identifier.split(":")[-1] }}</meta>
         {% endif -%}
