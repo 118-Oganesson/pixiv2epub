@@ -25,14 +25,16 @@
         <meta refines="#series-title" property="group-position">{{ manifest.core.isPartOf.order }}</meta>
         {% endif -%}
 
+        {% if provider_ids.series_id -%}
         <meta property="meta" scheme="urn:{{ 'pixiv' if provider_ids.novel_id else 'fanbox' }}:series:id">{{
-        manifest.core.isPartOf.identifier.split(":")[-1] }}</meta>
+        provider_ids.series_id }}</meta>
+        {%- endif %}
         {% endif -%}
+
 
         {% if manifest.core.description -%}
-        <dc:description>{{ manifest.core.description | striptags | replace('\n', ' ') }}</dc:description>
+        <dc:description>{{ plain_description }}</dc:description>
         {% endif -%}
-
         {% for tag in manifest.core.keywords -%}
         <dc:subject>{{ tag }}</dc:subject>
         {% endfor -%}

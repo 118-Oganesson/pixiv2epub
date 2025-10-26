@@ -124,15 +124,19 @@ class PixivProvider(IProvider):
         )
 
         if not update_required:
-            logger.bind(novel_id=novel_id).info(
-                "コンテンツに変更なし、スキップします。"
-            )
+            logger.bind(
+                provider=self.get_provider_name(),
+                identifier=novel_id,
+                content_type=ContentType.WORK.name,
+            ).info("コンテンツに変更なし、スキップします。")
             return None
 
         # 3. 更新がある場合のみ、詳細データ取得とワークスペースセットアップを実行
-        logger.bind(novel_id=novel_id).info(
-            "コンテンツの更新を検出、処理を続行します。"
-        )
+        logger.bind(
+            provider=self.get_provider_name(),
+            identifier=novel_id,
+            content_type=ContentType.WORK.name,
+        ).info("コンテンツの更新を検出、処理を続行します。")
         raw_novel_detail_data = self.api_client.novel_detail(novel_id)
 
         workspace = self.repository.setup_workspace(novel_id, self.get_provider_name())
@@ -302,7 +306,7 @@ class PixivProvider(IProvider):
             detail_data=raw_novel_detail_data,
             parsed_text=parsed_text,
             parsed_description=parsed_description,
-            # image_paths=image_paths, # マッパーに渡す必要があれば追加
+            image_paths=image_paths,
         )
         return metadata
 

@@ -1,5 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
-import re  # 正規表現ライブラリをインポート
+import re
 from typing import Dict, List, Optional
 
 from jinja2 import Environment
@@ -36,13 +36,25 @@ class EpubComponentGenerator:
         css_asset = self._generate_css()
         css_rel_path = f"../{css_asset.href}" if css_asset else None
 
+        plain_description = ""
+        if self.manifest.core.description:
+            plain_description = re.sub(r"<[^>]+>", "", self.manifest.core.description)
+            plain_description = plain_description.replace("\n", " ").strip()
+
         final_pages = self._generate_main_pages(css_rel_path)
         info_page = self._generate_info_page(css_rel_path, cover_asset)
         cover_page = self._generate_cover_page(cover_asset)
+
         content_opf = self._generate_opf(
-            final_pages, image_assets, info_page, cover_page, cover_asset, css_asset
+            final_pages,
+            image_assets,
+            info_page,
+            cover_page,
+            cover_asset,
+            css_asset,
+            plain_description=plain_description,  #
         )
-        # 修正: _generate_nav に渡す引数を調整
+
         nav_xhtml = self._generate_nav(final_pages, info_page, cover_page is not None)
 
         return EpubComponents(
@@ -88,8 +100,6 @@ class EpubComponentGenerator:
 
                 # UCM のリソースパス (例: "./page-1.xhtml") を使用
                 content = self.workspace.get_page_content(page_resource.path)
-
-                # 修正: 脆弱な文字列置換を堅牢な正規表現置換に変更
                 # "../assets/images/foo.jpg" -> "../images/foo.jpg"
                 content = re.sub(
                     r'src="\.\./assets/(images/.+?)"', r'src="../\1"', content
@@ -167,6 +177,7 @@ class EpubComponentGenerator:
         cover_page: Optional[PageAsset],
         cover_asset: Optional[ImageAsset],
         css_asset: Optional[PageAsset],
+        plain_description: str,
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
         manifest_items, spine_itemrefs = [], []
@@ -225,6 +236,11 @@ class EpubComponentGenerator:
         provider_ids = {
             "novel_id": content_id_str if "pixiv.net" in core.id_ else None,
             "post_id": content_id_str if "fanbox.cc" in core.id_ else None,
+            "series_id": (
+                core.isPartOf.identifier.split(":")[-1]
+                if core.isPartOf and core.isPartOf.identifier
+                else None
+            ),
         }
 
         context = {
@@ -233,6 +249,7 @@ class EpubComponentGenerator:
             "manifest_items": manifest_items,
             "spine_itemrefs": spine_itemrefs,
             "cover_image_id": cover_asset.id if cover_asset else None,
+            "plain_description": plain_description,
         }
         return self._render_template("content.opf.j2", context)
 
@@ -240,7 +257,7 @@ class EpubComponentGenerator:
         self, pages: List[PageAsset], info_page: PageAsset, has_cover: bool
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
-        # 修正: 構造化された単一のコンテキスト辞書を作成
+        # 構造化された単一のコンテキスト辞書を作成
         nav_context = {
             "toc": {
                 "has_info_page": True,
@@ -256,7 +273,7 @@ class EpubComponentGenerator:
                     "title": info_page.title,
                     "href": info_page.href,
                 },
-                # 修正: pages[0].href が存在する場合のみアクセスする
+                # pages[0].href が存在する場合のみアクセスする
                 "start_page_href": pages[0].href if pages else None,
             },
         }

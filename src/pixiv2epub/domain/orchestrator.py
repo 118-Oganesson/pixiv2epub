@@ -86,7 +86,20 @@ class DownloadBuildOrchestrator:
 
         for i, workspace in enumerate(workspaces, 1):
             try:
-                with logger.contextualize(workspace_id=workspace.id):
+                provider_name, identifier = "unknown", "unknown"
+                try:
+                    # workspace.id (例: "pixiv_12345") から分割
+                    provider_name, identifier = workspace.id.split("_", 1)
+                except ValueError:
+                    logger.warning(
+                        f"ワークスペースID '{workspace.id}' の形式が不正です。"
+                    )
+
+                with logger.contextualize(
+                    workspace_id=workspace.id,
+                    provider=provider_name,
+                    identifier=identifier,
+                ):
                     logger.bind(current_work=i, total_works=total).info(
                         "個別作品の処理を開始"
                     )
@@ -100,13 +113,13 @@ class DownloadBuildOrchestrator:
                     "ワークスペースの処理失敗",
                     exc_info=self.settings.log_level == "DEBUG",
                 )
-            # 修正: テンプレートエラーを個別に捕捉
+            # テンプレートエラーを個別に捕捉
             except TemplateError as e:
                 logger.bind(workspace_id=workspace.id, template_name=e.name).error(
                     f"テンプレート '{e.name}' のレンダリングに失敗しました。",
                     exc_info=True,  # スタックトレースを出力
                 )
-            # 修正: 予期せぬエラーは .exception() でスタックトレースを記録
+            # 予期せぬエラーは .exception() でスタックトレースを記録
             except Exception:
                 logger.bind(workspace_id=workspace.id).exception(
                     "ワークスペース処理中に予期せぬエラー発生"
