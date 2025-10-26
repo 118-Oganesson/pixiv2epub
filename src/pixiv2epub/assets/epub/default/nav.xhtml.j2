@@ -11,11 +11,12 @@
     <nav epub:type="toc">
         <h1>目次</h1>
         <ol>
-            {% if has_info_page %}
-            <li><a href="text/info.xhtml">{{ info_page_title }}</a></li> {# info_page_title passed by generator #}
+            {# 修正: toc コンテキストを使用 #}
+            {% if toc.has_info_page %}
+            <li><a href="{{ toc.info_page.href }}">{{ toc.info_page.title }}</a></li>
             {% endif %}
-            {# pages list (with href and title) passed by generator based on UCM contentStructure #}
-            {% for page in pages %}
+            {# 修正: toc.pages を使用 #}
+            {% for page in toc.pages %}
             <li><a href="{{ page.href }}">{{ page.title }}</a></li>
             {% endfor %}
         </ol>
@@ -23,15 +24,17 @@
     <nav epub:type="landmarks" hidden="">
         <h2>ランドマーク</h2>
         <ol>
-            {% if has_cover %} {# has_cover passed by generator #}
+            {# 修正: landmarks コンテキストを使用 #}
+            {% if landmarks.has_cover %}
             <li><a epub:type="cover" href="text/cover.xhtml">表紙</a></li>
             {% endif %}
-            {% if has_info_page %} {# has_info_page passed by generator #}
-            <li><a epub:type="bodymatter" href="text/info.xhtml">{{ info_page_title }}</a></li> {# info_page_title
-            passed by generator #}
+            {# 修正: landmarks.info_page を使用 #}
+            {% if landmarks.info_page %}
+            <li><a epub:type="bodymatter" href="{{ landmarks.info_page.href }}">{{ landmarks.info_page.title }}</a></li>
             {% endif %}
-            {% if pages %} {# pages list passed by generator #}
-            <li><a epub:type="bodymatter" href="{{ pages[0].href }}">本文開始</a></li>
+            {# 修正: landmarks.start_page_href を使用 #}
+            {% if landmarks.start_page_href %}
+            <li><a epub:type="bodymatter" href="{{ landmarks.start_page_href }}">本文開始</a></li>
             {% endif %}
         </ol>
     </nav>

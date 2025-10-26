@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import List
 
 from loguru import logger
+from jinja2 import TemplateError
 
 from ..domain.interfaces import IBuilder, IProviderFactory
 from ..models.workspace import Workspace
@@ -99,10 +100,16 @@ class DownloadBuildOrchestrator:
                     "ワークスペースの処理失敗",
                     exc_info=self.settings.log_level == "DEBUG",
                 )
+            # 修正: テンプレートエラーを個別に捕捉
+            except TemplateError as e:
+                logger.bind(workspace_id=workspace.id, template_name=e.name).error(
+                    f"テンプレート '{e.name}' のレンダリングに失敗しました。",
+                    exc_info=True,  # スタックトレースを出力
+                )
+            # 修正: 予期せぬエラーは .exception() でスタックトレースを記録
             except Exception:
-                logger.bind(workspace_id=workspace.id).error(
-                    "ワークスペース処理中に予期せぬエラー発生",
-                    exc_info=True,
+                logger.bind(workspace_id=workspace.id).exception(
+                    "ワークスペース処理中に予期せぬエラー発生"
                 )
             finally:
                 if workspace:

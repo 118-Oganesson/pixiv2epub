@@ -22,10 +22,6 @@ class EpubPackageAssembler:
     """EPUBコンポーネントをZIPファイルに圧縮・梱包するクラス。"""
 
     def __init__(self, settings: Settings):
-        """
-        Args:
-            settings (Settings): アプリケーション全体の設定情報。
-        """
         self.settings = settings
         self.img_optimizer = (
             ImageCompressor(self.settings)
@@ -42,21 +38,24 @@ class EpubPackageAssembler:
             zip_file.writestr(CONTAINER_XML_PATH, CONTAINER_XML_CONTENT)
             zip_file.writestr(ROOT_FILE_PATH, components.content_opf)
             zip_file.writestr(NAV_XHTML_PATH, components.nav_xhtml)
-            oebps_prefix = f"{OEBPS_DIR}/"
+
+            # 修正: pathlib を使ってパスを安全に構築
+            oebps_path = Path(OEBPS_DIR)
+
             zip_file.writestr(
-                f"{oebps_prefix}{components.info_page.href}",
+                str(oebps_path / components.info_page.href),
                 components.info_page.content,
             )
             if components.cover_page:
                 zip_file.writestr(
-                    f"{oebps_prefix}{components.cover_page.href}",
+                    str(oebps_path / components.cover_page.href),
                     components.cover_page.content,
                 )
             for page in components.final_pages:
-                zip_file.writestr(f"{oebps_prefix}{page.href}", page.content)
+                zip_file.writestr(str(oebps_path / page.href), page.content)
             if components.css_asset:
                 zip_file.writestr(
-                    f"{oebps_prefix}{components.css_asset.href}",
+                    str(oebps_path / components.css_asset.href),
                     components.css_asset.content,
                 )
 
@@ -66,11 +65,14 @@ class EpubPackageAssembler:
 
             logger.info(f"{len(components.final_images)}件の画像を処理します。")
             for image in components.final_images:
-                self._write_image(zip_file, image, oebps_prefix)
+                # 修正: _write_image にも oebps_path (Pathオブジェクト) を渡す
+                self._write_image(zip_file, image, oebps_path)
 
         logger.debug(f"EPUB を生成しました: {output_path}")
 
-    def _write_image(self, zip_file: zipfile.ZipFile, image: ImageAsset, prefix: str = ""):
+    def _write_image(
+        self, zip_file: zipfile.ZipFile, image: ImageAsset, prefix_path: Path
+    ):
         """単一の画像ファイルを読み込み、必要に応じて圧縮してZIPファイルに書き込みます。"""
         try:
             file_bytes = image.path.read_bytes()
@@ -80,6 +82,8 @@ class EpubPackageAssembler:
                 )
                 if result.success and not result.skipped and result.output_bytes:
                     file_bytes = result.output_bytes
-            zip_file.writestr(f"{prefix}{image.href}", file_bytes)
+
+            # 修正: pathlib を使ってパスを安全に構築
+            zip_file.writestr(str(prefix_path / image.href), file_bytes)
         except IOError as e:
             logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")

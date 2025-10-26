@@ -59,6 +59,7 @@ class EpubBuilder(BaseBuilder):
             log.success("EPUBファイルの作成成功")
             return output_path
         except Exception as e:
+            # 修正: .exception() を使いスタックトレースをログに出力
             logger.exception("EPUBファイルの作成中に致命的なエラーが発生しました。")
             self._cleanup_failed_build(output_path)
             raise BuildError(f"EPUBのビルドに失敗しました: {e}") from e
@@ -107,7 +108,8 @@ class EpubBuilder(BaseBuilder):
             template = self.settings.builder.filename_template
 
         # tag: URI からIDを抽出
-        content_id = core.id.split(":")[-1]
+        # 修正: core.id -> core.id_
+        content_id = core.id_.split(":")[-1]
         author_id = core.author.identifier.split(":")[-1]
         series_id_str = str(
             core.isPartOf.identifier.split(":")[-1] if core.isPartOf else "0"

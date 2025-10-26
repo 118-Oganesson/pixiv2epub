@@ -8,23 +8,7 @@ from loguru import logger
 from ....models.domain import ImageAsset, UnifiedContentManifest, UCMResource
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
-
-MEDIA_TYPES = {
-    "jpg": "image/jpeg",
-    "jpeg": "image/jpeg",
-    "png": "image/png",
-    "gif": "image/gif",
-    "svg": "image/svg+xml",
-    "webp": "image/webp",
-    "xhtml": "application/xhtml+xml",
-    "css": "text/css",
-}
-
-
-def get_media_type_from_filename(filename: str) -> str:
-    """ファイル名の拡張子からMIMEタイプを返します。"""
-    ext = filename.lower().split(".")[-1]
-    return MEDIA_TYPES.get(ext, "application/octet-stream")
+from ....utils.common import get_media_type_from_filename
 
 
 class AssetManager:

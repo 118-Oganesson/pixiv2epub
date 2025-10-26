@@ -22,20 +22,10 @@ from ..providers.fanbox.constants import FANBOX_EPOCH
 from .interfaces import IMetadataMapper
 from .parsers import PixivTagParser
 
+# 修正: 共通ユーティリティからインポート
+from ...utils.common import get_media_type_from_filename
 
-def get_media_type_from_filename(filename: str) -> str:
-    """ファイル名の拡張子からMIMEタイプを返します。"""
-    ext = filename.lower().split(".")[-1]
-    MEDIA_TYPES = {
-        "jpg": "image/jpeg",
-        "jpeg": "image/jpeg",
-        "png": "image/png",
-        "gif": "image/gif",
-        "webp": "image/webp",
-        "xhtml": "application/xhtml+xml",
-        "css": "text/css",
-    }
-    return MEDIA_TYPES.get(ext, "application/octet-stream")
+# 修正: get_media_type_from_filename のローカル定義を削除
 
 
 class PixivMetadataMapper(IMetadataMapper):
@@ -58,21 +48,17 @@ class PixivMetadataMapper(IMetadataMapper):
                 detail_data (Dict): `novel_detail` API のレスポンス。
                 parsed_text (str): [newpage] で分割可能なパース済み本文HTML。
                 parsed_description (str): パース済みの作品概要 (HTML)。
-                                          このメソッドに渡される前に、
-                                          PixivタグがHTMLに変換済みである必要があります。
-
-        Returns:
-            UnifiedContentManifest: 標準化されたメタデータマニフェスト。
+                image_paths (Dict[str, Path]): (新規) ダウンロードされた埋め込み画像。
         """
         novel_data: NovelApiResponse = kwargs["novel_data"]
         detail_data: Dict = kwargs["detail_data"]
         parsed_text: str = kwargs["parsed_text"]
         parsed_description: str = kwargs["parsed_description"]
+        # 修正: image_paths を kwargs から取得
+        image_paths: Dict[str, Path] = kwargs.get("image_paths", {})
 
         novel = detail_data.get("novel", {})
-        # pages_content はコンテンツ構造の構築時に使用
-
-        # --- 1. IDとURLの定義 ---
+        # ... (IDとURLの定義は変更なし) ...
         novel_id = novel.get("id")
         user_id = novel.get("user", {}).get("id")
         series_info_dict = novel.get("series")
@@ -91,9 +77,18 @@ class PixivMetadataMapper(IMetadataMapper):
                 mediaType=get_media_type_from_filename(cover_path.name),
                 role="cover",
             )
-        # TODO: kwargs から image_paths を受け取り、埋め込み画像リソースをここに追加
+
+        # 修正: 埋め込み画像リソースをここに追加
+        for image_id, image_path in image_paths.items():
+            resource_key = f"resource-embedded-image-{image_id}"
+            resources[resource_key] = UCMResource(
+                path=f"../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{image_path.name}",
+                mediaType=get_media_type_from_filename(image_path.name),
+                role="embeddedImage",
+            )
 
         # --- 3. コンテンツ構造の構築 ---
+        # ... (変更なし) ...
         content_structure: List[UCMContentBlock] = []
         pages_content = parsed_text.split("[newpage]")
         for i, content in enumerate(pages_content):
@@ -112,7 +107,7 @@ class PixivMetadataMapper(IMetadataMapper):
                 )
             )
 
-        # --- 4. コアメタデータの構築 ---
+        # ... (コアメタデータとプロバイダデータの構築は変更なし) ...
         series_order = novel_data.computed_series_order
         series_core = None
         if series_info_dict:
@@ -148,7 +143,6 @@ class PixivMetadataMapper(IMetadataMapper):
             image=cover_key,
         )
 
-        # --- 5. プロバイダ固有データの構築 ---
         provider_data = [
             UCMProviderData(
                 type_="PropertyValue",  # エイリアスではなくフィールド名を使用
@@ -183,15 +177,14 @@ class FanboxMetadataMapper(IMetadataMapper):
             cover_path: ダウンロードされたカバー画像のパス (存在する場合)。
             **kwargs:
                 post_data (Post): `post.info` API から取得したPydanticモデル。
-                                  このメソッドは、このオブジェクト内の `excerpt` を
-                                  description として独自にエスケープ処理します。
-
-        Returns:
-            UnifiedContentManifest: 標準化されたメタデータマニフェスト。
+                image_paths (Dict[str, Path]): (新規) ダウンロードされた埋め込み画像。
         """
         post_data: Post = kwargs["post_data"]
+        # 修正: image_paths を kwargs から取得
+        image_paths: Dict[str, Path] = kwargs.get("image_paths", {})
 
         # --- 1. IDとURLの定義 ---
+        # ... (変更なし) ...
         author_id_str = post_data.creator_id
         post_id_str = post_data.id
         author_tag_id = f"tag:fanbox.cc,{FANBOX_EPOCH}:creator:{author_id_str}"
@@ -209,18 +202,25 @@ class FanboxMetadataMapper(IMetadataMapper):
                 role="cover",
             )
 
+        # 修正: 埋め込み画像リソースをここに追加
+        for image_id, image_path in image_paths.items():
+            resource_key = f"resource-embedded-image-{image_id}"
+            resources[resource_key] = UCMResource(
+                path=f"../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{image_path.name}",
+                mediaType=get_media_type_from_filename(image_path.name),
+                role="embeddedImage",
+            )
+
         content_key = "resource-page-1"
         resources[content_key] = UCMResource(
             path="./page-1.xhtml",  # source/ ディレクトリからの相対パス
             mediaType="application/xhtml+xml",
             role="content",
         )
-        # TODO: kwargs から image_paths を受け取り、埋め込み画像リソースをここに追加
 
-        # --- 3. コンテンツ構造の構築 ---
+        # ... (コンテンツ構造、コアメタデータ、プロバイダデータの構築は変更なし) ...
         content_structure = [UCMContentBlock(title="本文", source=content_key)]
 
-        # --- 4. コアメタデータの構築 ---
         core_metadata = UCMCoreMetadata(
             context_={
                 "@vocab": "https://schema.org/",
@@ -243,7 +243,6 @@ class FanboxMetadataMapper(IMetadataMapper):
             image=cover_key,
         )
 
-        # --- 5. プロバイダ固有データの構築 ---
         provider_data = [
             UCMProviderData(
                 type_="PropertyValue",  # エイリアスではなくフィールド名を使用

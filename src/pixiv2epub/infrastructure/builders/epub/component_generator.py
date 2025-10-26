@@ -1,4 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
+import re  # 正規表現ライブラリをインポート
 from typing import Dict, List, Optional
 
 from jinja2 import Environment
@@ -41,6 +42,7 @@ class EpubComponentGenerator:
         content_opf = self._generate_opf(
             final_pages, image_assets, info_page, cover_page, cover_asset, css_asset
         )
+        # 修正: _generate_nav に渡す引数を調整
         nav_xhtml = self._generate_nav(final_pages, info_page, cover_page is not None)
 
         return EpubComponents(
@@ -87,8 +89,11 @@ class EpubComponentGenerator:
                 # UCM のリソースパス (例: "./page-1.xhtml") を使用
                 content = self.workspace.get_page_content(page_resource.path)
 
-                # 中間ファイル用の画像パスを、最終的なEPUB内のパスに置換する
-                content = content.replace("../assets/images/", "../images/")
+                # 修正: 脆弱な文字列置換を堅牢な正規表現置換に変更
+                # "../assets/images/foo.jpg" -> "../images/foo.jpg"
+                content = re.sub(
+                    r'src="\.\./assets/(images/.+?)"', r'src="../\1"', content
+                )
 
                 context = {
                     "title": page_block.title,
@@ -214,24 +219,25 @@ class EpubComponentGenerator:
 
         core = self.manifest.core
 
-        # content_id は tag: URI の末尾の部分
-        content_id_str = core.id.split(":")[-1]
+        # 修正: content_id は tag: URI の末尾の部分
+        content_id_str = core.id_.split(":")[-1]
 
-        # テンプレートが期待する provider_ids を作成
+        # 修正: テンプレートが期待する provider_ids を UCM の core.id_ から作成
         provider_ids = {
-            "novel_id": content_id_str if "pixiv.net" in core.id else None,
-            "post_id": content_id_str if "fanbox.cc" in core.id else None,
+            "novel_id": content_id_str if "pixiv.net" in core.id_ else None,
+            "post_id": content_id_str if "fanbox.cc" in core.id_ else None,
         }
 
+        # 修正: UCM の core メタデータから日付を取得
         modified_time_dt = core.dateModified or core.datePublished
         modified_time = modified_time_dt.isoformat()
         published_date_str = core.datePublished.isoformat()
 
         context = {
             "manifest": self.manifest,
-            "provider_ids": provider_ids,
-            "formatted_date": published_date_str,
-            "modified_time": modified_time,
+            "provider_ids": provider_ids,  # 修正: 正しく導出した provider_ids を渡す
+            "formatted_date": published_date_str,  # 修正: UCMのデータを渡す
+            "modified_time": modified_time,  # 修正: UCMのデータを渡す
             "manifest_items": manifest_items,
             "spine_itemrefs": spine_itemrefs,
             "cover_image_id": cover_asset.id if cover_asset else None,
@@ -242,11 +248,24 @@ class EpubComponentGenerator:
         self, pages: List[PageAsset], info_page: PageAsset, has_cover: bool
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
-        nav_pages = [{"href": page.href, "title": page.title} for page in pages]
-        context = {
-            "pages": nav_pages,
-            "has_info_page": True,
-            "info_page_title": info_page.title,
-            "has_cover": has_cover,
+        # 修正: 構造化された単一のコンテキスト辞書を作成
+        nav_context = {
+            "toc": {
+                "has_info_page": True,
+                "info_page": {
+                    "title": info_page.title,
+                    "href": info_page.href,  # info_page.href は "text/info.xhtml"
+                },
+                "pages": [{"href": page.href, "title": page.title} for page in pages],
+            },
+            "landmarks": {
+                "has_cover": has_cover,
+                "info_page": {
+                    "title": info_page.title,
+                    "href": info_page.href,
+                },
+                # 修正: pages[0].href が存在する場合のみアクセスする
+                "start_page_href": pages[0].href if pages else None,
+            },
         }
-        return self._render_template("nav.xhtml.j2", context)
+        return self._render_template("nav.xhtml.j2", nav_context)
