@@ -145,8 +145,8 @@ class FanboxBlockParser(IContentParser):
             return '\n'.join(final_html_parts)
 
         elif isinstance(raw_content, PostBodyText):
-            body = raw_content
-            return escape(body.text or '').replace('\n', '<br />')
+            text_body = raw_content
+            return escape(text_body.text or '').replace('\n', '<br />')
 
         logger.warning(
             f'FanboxBlockParserに予期せぬ型が渡されました: {type(raw_content)}'

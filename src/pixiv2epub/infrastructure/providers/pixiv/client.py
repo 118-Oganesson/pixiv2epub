@@ -1,12 +1,12 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/client.py
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
 from pybreaker import CircuitBreaker
 
-from ....shared.exceptions import AuthenticationError
+from ....shared.exceptions import ApiError, AuthenticationError
 from ....shared.settings import PixivAuthSettings
 from ..base_client import BaseApiClient
 
@@ -47,22 +47,43 @@ class PixivApiClient(BaseApiClient):
         return PixivError
 
     def novel_detail(self, novel_id: int) -> dict[str, Any]:
-        return self._safe_api_call(self.api.novel_detail, novel_id=novel_id)
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(self.api.novel_detail, novel_id=novel_id),
+        )
 
     def webview_novel(self, novel_id: int) -> dict[str, Any]:
-        return self._safe_api_call(self.api.webview_novel, novel_id=novel_id)
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(self.api.webview_novel, novel_id=novel_id),
+        )
 
     def novel_series(self, series_id: int) -> dict[str, Any]:
-        return self._safe_api_call(self.api.novel_series, series_id=series_id)
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(self.api.novel_series, series_id=series_id),
+        )
 
     def illust_detail(self, illust_id: int) -> dict[str, Any]:
-        return self._safe_api_call(self.api.illust_detail, illust_id=illust_id)
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(self.api.illust_detail, illust_id=illust_id),
+        )
 
     def user_novels(self, user_id: int, next_url: str | None = None) -> dict[str, Any]:
         if next_url:
             params = self.api.parse_qs(next_url)
-            return self._safe_api_call(self.api.user_novels, **params)
-        return self._safe_api_call(self.api.user_novels, user_id=user_id)
+            if params is None:
+                # pixivpy3の実装上、通常はdictが返るはずだが、mypyエラーに対処
+                raise ApiError(
+                    f'Failed to parse next_url: {next_url}', self.provider_name
+                )
+            return cast(
+                dict[str, Any], self._safe_api_call(self.api.user_novels, **params)
+            )
+        return cast(
+            dict[str, Any], self._safe_api_call(self.api.user_novels, user_id=user_id)
+        )
 
     def download(self, url: str, path: Path, name: str) -> None:
         self._safe_api_call(self.api.download, url, path=path, name=name)

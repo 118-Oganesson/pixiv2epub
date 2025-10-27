@@ -51,7 +51,7 @@ class ImageDownloader(BaseDownloader):
         # 高解像度版、オリジナル版の順で試行
         high_res_url = re.sub(r'/c/\d+x\d+(?:_\d+)?/', '/c/600x600/', cover_url)
         for url in (high_res_url, cover_url):
-            if path := self._download_single_image(url, cover_filename, image_dir):  #
+            if path := self._download_single_image(url, cover_filename, image_dir):
                 return path
 
         logger.error('カバー画像のダウンロードに最終的に失敗しました。')

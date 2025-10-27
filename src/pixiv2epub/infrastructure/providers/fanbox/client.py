@@ -2,7 +2,7 @@
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import cloudscraper
 from loguru import logger
@@ -56,33 +56,45 @@ class FanboxApiClient(BaseApiClient):
         url = self.base_url + endpoint
         response = self.session.get(url, params=params)
         response.raise_for_status()
-        return response.json()
+        return cast(dict[str, Any], response.json())
 
     # --- データ取得メソッド ---
 
     def creator_info(self, creator_id: str) -> dict[str, Any]:
         """指定されたクリエイターのプロフィール情報を取得します。"""
-        return self._safe_api_call(
-            self._get_json, 'creator.get', params={'creatorId': creator_id}
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(
+                self._get_json, 'creator.get', params={'creatorId': creator_id}
+            ),
         )
 
     def post_info(self, post_id: str) -> dict[str, Any]:
         """指定された投稿IDの詳細な情報を取得します。"""
-        return self._safe_api_call(
-            self._get_json, 'post.info', params={'postId': post_id}
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(
+                self._get_json, 'post.info', params={'postId': post_id}
+            ),
         )
 
     def post_paginate_creator(self, creator_id: str) -> dict[str, Any]:
         """クリエイターの投稿ページのURLリストを取得します。"""
-        return self._safe_api_call(
-            self._get_json, 'post.paginateCreator', params={'creatorId': creator_id}
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(
+                self._get_json, 'post.paginateCreator', params={'creatorId': creator_id}
+            ),
         )
 
     def post_list_creator(self, url: str) -> dict[str, Any]:
         """ページURLから投稿リストを取得します。"""
         query_str = urllib.parse.urlparse(url).query
         params = dict(urllib.parse.parse_qsl(query_str))
-        return self._safe_api_call(self._get_json, 'post.listCreator', params=params)
+        return cast(
+            dict[str, Any],
+            self._safe_api_call(self._get_json, 'post.listCreator', params=params),
+        )
 
     def download(self, url: str, path: Path, name: str) -> None:
         """

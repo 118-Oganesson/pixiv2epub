@@ -119,7 +119,7 @@ def _get_refresh_token(
             f'リフレッシュトークンの取得に失敗しました。APIからの応答: {response_data}'
         )
 
-    refresh_token = response_data['refresh_token']
+    refresh_token = str(response_data['refresh_token'])
     logger.info('リフレッシュトークンの取得に成功しました。')
     return refresh_token
 

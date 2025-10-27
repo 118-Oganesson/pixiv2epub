@@ -35,7 +35,7 @@ app = typer.Typer(
 class AppState:
     """サブコマンドに渡すための状態を保持するクラス"""
 
-    def __init__(self):
+    def __init__(self) -> None:
         self._settings: Settings | None = None
         self._app: Application | None = None
         self.provider_factory: ProviderFactory | None = None

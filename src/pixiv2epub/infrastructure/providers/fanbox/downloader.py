@@ -3,7 +3,7 @@ from pathlib import Path
 
 from loguru import logger
 
-from ....models.fanbox import Post
+from ....models.fanbox import Post, PostBodyArticle
 from ....shared.constants import COVER_IMAGE_STEM
 from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
@@ -50,7 +50,10 @@ class FanboxImageDownloader(BaseDownloader):
     ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         image_paths: dict[str, Path] = {}
-        if not hasattr(post_data.body, 'image_map') or not post_data.body.image_map:
+        if (
+            not isinstance(post_data.body, PostBodyArticle)
+            or not post_data.body.image_map
+        ):
             logger.info('本文中に埋め込み画像はありません。')
             return image_paths
 

@@ -111,24 +111,22 @@ class PixivMetadataMapper(IMetadataMapper):
                 f'tag:pixiv.net,{PIXIV_EPOCH}:series:{series_info_dict.get("id")}'
             )
             series_core = UCMCoreSeries(
-                **{'@type': 'CreativeWorkSeries'},
+                type_='CreativeWorkSeries',
                 name=series_info_dict.get('title'),
                 identifier=series_tag_id,
                 order=series_order,
             )
 
         core_metadata = UCMCoreMetadata(
-            **{
-                '@context': {
-                    '@vocab': 'https://schema.org/',
-                    'pixiv': 'https://www.pixiv.net/terms.php#',
-                }
+            context_={
+                '@vocab': 'https://schema.org/',
+                'pixiv': 'https://www.pixiv.net/terms.php#',
             },
-            **{'@type': 'BlogPosting'},
-            **{'@id': novel_tag_id},
+            type_='BlogPosting',
+            id_=novel_tag_id,
             name=novel.get('title'),
             author=UCMCoreAuthor(
-                **{'@type': 'Person'},
+                type_='Person',
                 name=novel.get('user', {}).get('name'),
                 identifier=author_tag_id,
             ),
@@ -143,7 +141,7 @@ class PixivMetadataMapper(IMetadataMapper):
 
         provider_data = [
             UCMProviderData(
-                **{'@type': 'PropertyValue'},
+                type_='PropertyValue',
                 propertyID='pixiv:textLength',
                 value=novel.get('text_length'),
             )
@@ -218,17 +216,15 @@ class FanboxMetadataMapper(IMetadataMapper):
         content_structure = [UCMContentBlock(title='本文', source=content_key)]
 
         core_metadata = UCMCoreMetadata(
-            **{
-                '@context': {
-                    '@vocab': 'https://schema.org/',
-                    'fanbox': 'https://www.pixiv.net/terms.php#',
-                }
+            context_={
+                '@vocab': 'https://schema.org/',
+                'fanbox': 'https://www.pixiv.net/terms.php#',
             },
-            **{'@type': 'BlogPosting'},
-            **{'@id': post_tag_id},
+            type_='BlogPosting',
+            id_=post_tag_id,
             name=post_data.title,
             author=UCMCoreAuthor(
-                **{'@type': 'Person'},
+                type_='Person',
                 name=post_data.user.name,
                 identifier=author_tag_id,
             ),
@@ -243,12 +239,12 @@ class FanboxMetadataMapper(IMetadataMapper):
 
         provider_data = [
             UCMProviderData(
-                **{'@type': 'PropertyValue'},
+                type_='PropertyValue',
                 propertyID='fanbox:feeRequired',
                 value=post_data.fee_required,
             ),
             UCMProviderData(
-                **{'@type': 'PropertyValue'},
+                type_='PropertyValue',
                 propertyID='fanbox:textLength',
                 value=self._get_body_text_length(post_data.body),
             ),

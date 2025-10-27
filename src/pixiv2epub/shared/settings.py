@@ -51,12 +51,10 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
             load_toml_config(self.config_file) if self.config_file else {}
         )
 
-    def get_field_value(
-        self, field: object, field_name: str
-    ) -> tuple[Any, str | None, bool]:
+    def get_field_value(self, field: object, field_name: str) -> tuple[Any, str, bool]:
         """このカスタムソースはフィールドごとの値取得をサポートしないため、__call__に処理を委ねます。"""
         # Pydanticの仕様に合わせ、(値, キー, 複合的か)のタプルを返す
-        return None, None, False
+        return None, field_name, False
 
     def __call__(self) -> dict[str, Any]:
         """設定ファイル全体を辞書として一度に返します。"""
@@ -289,7 +287,7 @@ class Settings(BaseSettings):
         )
 
         try:
-            super().__init__(**values)
+            super().__init__(**values)  # type: ignore[arg-type]
         except (ValidationError, ValueError) as e:
             raise SettingsError(f'設定の検証に失敗しました:\n{e}') from e
 
@@ -320,7 +318,10 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        config_file_path = init_settings.init_kwargs.get('_config_file')
+        config_file_path = None
+        if hasattr(init_settings, 'init_kwargs'):
+            config_file_path = init_settings.init_kwargs.get('_config_file')
+
         if config_file_path and not isinstance(config_file_path, Path):
             config_file_path = Path(config_file_path)
 
