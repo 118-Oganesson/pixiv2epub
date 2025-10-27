@@ -29,9 +29,9 @@ class EpubPackageAssembler:
             else None
         )
 
-    def archive(self, components: "EpubComponents", output_path: Path) -> None:
+    def archive(self, components: 'EpubComponents', output_path: Path) -> None:
         """準備されたコンポーネントをZIPファイルに書き込み、EPUBを生成します。"""
-        with zipfile.ZipFile(output_path, "w") as zip_file:
+        with zipfile.ZipFile(output_path, 'w') as zip_file:
             zip_file.writestr(
                 MIMETYPE_FILE_NAME, MIMETYPE_STRING, compress_type=zipfile.ZIP_STORED
             )
@@ -61,15 +61,15 @@ class EpubPackageAssembler:
                 )
 
             if not components.final_images:
-                logger.debug("画像ファイルはありません。")
+                logger.debug('画像ファイルはありません。')
                 return
 
-            logger.info(f"{len(components.final_images)}件の画像を処理します。")
+            logger.info(f'{len(components.final_images)}件の画像を処理します。')
             for image in components.final_images:
                 # 修正: _write_image にも oebps_path (Pathオブジェクト) を渡す
                 self._write_image(zip_file, image, oebps_path)
 
-        logger.debug(f"EPUB を生成しました: {output_path}")
+        logger.debug(f'EPUB を生成しました: {output_path}')
 
     def _write_image(
         self, zip_file: zipfile.ZipFile, image: ImageAsset, prefix_path: Path
@@ -87,4 +87,4 @@ class EpubPackageAssembler:
             # 修正: 監査報告書 §3.1 に基づき、str() を .as_posix() に変更
             zip_file.writestr((prefix_path / image.href).as_posix(), file_bytes)
         except OSError as e:
-            logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")
+            logger.error(f'画像ファイルの読み込み/書き込み失敗: {image.path}, {e}')

@@ -14,7 +14,7 @@ class Application:
 
     def __init__(self, settings: Settings):
         self.settings = settings
-        logger.debug("Pixiv2Epubアプリケーションが初期化されました。")
+        logger.debug('Pixiv2Epubアプリケーションが初期化されました。')
 
     def build_from_workspace(
         self,
@@ -27,5 +27,5 @@ class Application:
             return builder.build(workspace)
         except ValueError as e:
             raise AssetMissingError(
-                f"指定されたパスは有効なワークスペースではありません: {workspace_path}"
+                f'指定されたパスは有効なワークスペースではありません: {workspace_path}'
             ) from e

@@ -31,13 +31,13 @@ class BaseDownloader:
         """単一の画像をダウンロードし、ローカルパスを返します。"""
         target_path = image_dir / filename
         if target_path.exists() and not self.overwrite:
-            logger.debug("画像は既に存在するためスキップ: {}", filename)
+            logger.debug('画像は既に存在するためスキップ: {}', filename)
             return target_path
 
         try:
             self.api_client.download(url, path=image_dir, name=filename)
-            logger.debug("画像をダウンロードしました: {}", filename)
+            logger.debug('画像をダウンロードしました: {}', filename)
             return target_path
         except Exception as e:
-            logger.warning("画像 ({}) のダウンロードに失敗しました: {}", url, e)
+            logger.warning('画像 ({}) のダウンロードに失敗しました: {}', url, e)
             return None

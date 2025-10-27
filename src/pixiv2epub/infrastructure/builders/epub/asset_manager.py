@@ -53,11 +53,11 @@ class AssetManager:
         for i, path in enumerate(image_paths, 1):
             image_assets.append(
                 ImageAsset(
-                    id=f"img_{i}",
-                    href=f"{IMAGES_DIR_NAME}/{path.name}",
+                    id=f'img_{i}',
+                    href=f'{IMAGES_DIR_NAME}/{path.name}',
                     path=path,
                     media_type=get_media_type_from_filename(path.name),
-                    properties="",
+                    properties='',
                     filename=path.name,
                 )
             )
@@ -75,7 +75,7 @@ class AssetManager:
 
         for i, asset in enumerate(image_assets):
             if asset.filename == cover_filename:
-                updated_asset = asset.model_copy(update={"properties": "cover-image"})
+                updated_asset = asset.model_copy(update={'properties': 'cover-image'})
                 image_assets[i] = updated_asset
                 return image_assets[i]
 
@@ -89,8 +89,8 @@ class AssetManager:
         filenames = set()
 
         def add_filename_from_path(path: str) -> None:
-            p = path.strip().strip("'\"")
-            if not p or p.startswith(("http", "data:")):
+            p = path.strip().strip('\'"')
+            if not p or p.startswith(('http', 'data:')):
                 return
             # パスからファイル名のみを抽出
             # 例: ../assets/images/foo.jpg -> foo.jpg
@@ -100,16 +100,16 @@ class AssetManager:
         for page_block in self.manifest.contentStructure:
             resource_key = page_block.source
             page_resource = self.manifest.resources.get(resource_key)
-            if not page_resource or page_resource.role != "content":
+            if not page_resource or page_resource.role != 'content':
                 continue
 
             # UCM のリソースパス (例: "./page-1.xhtml") を使用
-            page_file = self.source_dir / page_resource.path.lstrip("./")
+            page_file = self.source_dir / page_resource.path.lstrip('./')
 
             if not page_file.is_file():
                 continue
             try:
-                content = page_file.read_text(encoding="utf-8")
+                content = page_file.read_text(encoding='utf-8')
                 for match in re.finditer(r'src=(["\'])(.*?)\1', content, re.IGNORECASE):
                     add_filename_from_path(match.group(2))
             except Exception as e:

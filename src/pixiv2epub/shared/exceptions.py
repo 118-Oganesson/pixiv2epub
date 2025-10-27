@@ -24,7 +24,7 @@ class ProviderError(Pixiv2EpubError):
 
     def __init__(self, message: str, provider_name: str | None = None):
         if provider_name:
-            super().__init__(f"[{provider_name}] {message}")
+            super().__init__(f'[{provider_name}] {message}')
         else:
             super().__init__(message)
         self.provider_name = provider_name
@@ -43,13 +43,13 @@ class ContentNotFoundError(ProviderError):
 
 
 class ApiError(ProviderError):
-    """API通信中の回復可能な可能性のあるエラー（タイムアウト、5xxエラーなど）。"""
+    """API通信中の回復可能な可能性のあるエラー(タイムアウト、5xxエラーなど)。"""
 
     pass
 
 
 class DataProcessingError(Pixiv2EpubError):
-    """ダウンロード後のデータ処理中のエラー（パース、マッピングなど）。"""
+    """ダウンロード後のデータ処理中のエラー(パース、マッピングなど)。"""
 
     pass
 
@@ -61,7 +61,7 @@ class BuildError(Pixiv2EpubError):
 
 
 class AssetMissingError(BuildError):
-    """ビルドに必要なアセット（manifest.jsonなど）が見つからないエラー。"""
+    """ビルドに必要なアセット(manifest.jsonなど)が見つからないエラー。"""
 
     pass
 

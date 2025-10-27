@@ -15,22 +15,22 @@ from ..shared.settings import Settings
 def _human_readable_size(size_bytes: int | None) -> str:
     """バイト数を人間が読みやすい形式の文字列 (kB, MBなど) に変換します。"""
     if size_bytes is None:
-        return "N/A"
+        return 'N/A'
     n_float = float(size_bytes)
-    units = ["B", "kB", "MB", "GB", "TB"]
+    units = ['B', 'kB', 'MB', 'GB', 'TB']
     i = 0
     while n_float >= 1024 and i < len(units) - 1:
         n_float /= 1024.0
         i += 1
-    if units[i] == "B":
-        return f"{int(n_float)} {units[i]}"
-    return f"{n_float:.2f} {units[i]}"
+    if units[i] == 'B':
+        return f'{int(n_float)} {units[i]}'
+    return f'{n_float:.2f} {units[i]}'
 
 
 class ImageCompressor:
     """pngquant, jpegoptim, cwebp を利用して画像を圧縮するクラス。"""
 
-    REQUIRED_TOOLS = ["pngquant", "jpegoptim", "cwebp"]
+    REQUIRED_TOOLS = ('pngquant', 'jpegoptim', 'cwebp')
 
     def __init__(self, settings: Settings):
         """
@@ -54,12 +54,12 @@ class ImageCompressor:
         """ファイルパスの拡張子から画像フォーマットを判定します。"""
         path = Path(path)
         ext = path.suffix.lower()
-        if ext == ".png":
-            return "png"
-        elif ext in [".jpg", ".jpeg"]:
-            return "jpeg"
-        elif ext == ".webp":
-            return "webp"
+        if ext == '.png':
+            return 'png'
+        elif ext in ['.jpg', '.jpeg']:
+            return 'jpeg'
+        elif ext == '.webp':
+            return 'webp'
         else:
             return None
 
@@ -83,7 +83,7 @@ class ImageCompressor:
         start_time = time.time()
 
         if not input_path.is_file():
-            logger.error("ファイルが見つかりません: {}", input_path)
+            logger.error('ファイルが見つかりません: {}', input_path)
             return CompressionResult(
                 input_path,
                 None,
@@ -94,13 +94,13 @@ class ImageCompressor:
                 None,
                 None,
                 None,
-                f"ファイルが見つかりません: {input_path}",
+                f'ファイルが見つかりません: {input_path}',
                 False,
             )
 
         fmt = self.detect_format(input_path)
         if fmt is None:
-            logger.warning("対応していない画像形式です: {}", input_path)
+            logger.warning('対応していない画像形式です: {}', input_path)
             return CompressionResult(
                 input_path,
                 None,
@@ -111,7 +111,7 @@ class ImageCompressor:
                 None,
                 None,
                 None,
-                "対応していない画像形式です",
+                '対応していない画像形式です',
                 False,
             )
 
@@ -121,24 +121,24 @@ class ImageCompressor:
             else None
         )
 
-        with tempfile.TemporaryDirectory(prefix="imgcompress_") as tmp_dir:
+        with tempfile.TemporaryDirectory(prefix='imgcompress_') as tmp_dir:
             tmp_out_path = Path(tmp_dir) / input_path.name
             original_size = input_path.stat().st_size
 
-            if fmt == "png":
-                tool = "pngquant"
+            if fmt == 'png':
+                tool = 'pngquant'
                 res = self._compress_pngquant(input_path, tmp_out_path)
-            elif fmt == "jpeg":
-                tool = "jpegoptim"
+            elif fmt == 'jpeg':
+                tool = 'jpegoptim'
                 res = self._compress_jpegoptim(input_path, tmp_out_path)
             else:  # webp
-                tool = "cwebp"
+                tool = 'cwebp'
                 res = self._compress_cwebp(input_path, tmp_out_path)
 
             duration = time.time() - start_time
 
             if not res.success:
-                logger.error("{} による圧縮に失敗しました: {}", tool, input_path)
+                logger.error('{} による圧縮に失敗しました: {}', tool, input_path)
                 return CompressionResult(
                     input_path,
                     None,
@@ -156,7 +156,7 @@ class ImageCompressor:
 
             if not tmp_out_path.is_file() or tmp_out_path.stat().st_size == 0:
                 logger.error(
-                    "予期せぬエラー: 一時出力ファイルが見つかりません: {}", tmp_out_path
+                    '予期せぬエラー: 一時出力ファイルが見つかりません: {}', tmp_out_path
                 )
                 return CompressionResult(
                     input_path,
@@ -168,7 +168,7 @@ class ImageCompressor:
                     tool,
                     res.command,
                     res.stdout,
-                    "一時出力ファイルが見つかりません",
+                    '一時出力ファイルが見つかりません',
                     False,
                     duration=duration,
                 )
@@ -177,7 +177,7 @@ class ImageCompressor:
             if compressed_size >= original_size and self.settings.skip_if_larger:
                 data = tmp_out_path.read_bytes() if return_bytes else None
                 logger.info(
-                    "圧縮結果が元より大きいためスキップ: {} ({} -> {})",
+                    '圧縮結果が元より大きいためスキップ: {} ({} -> {})',
                     input_path.name,
                     _human_readable_size(original_size),
                     _human_readable_size(compressed_size),
@@ -192,7 +192,7 @@ class ImageCompressor:
                     tool,
                     res.command,
                     res.stdout,
-                    "圧縮後のファイルサイズが元より大きいためスキップ",
+                    '圧縮後のファイルサイズが元より大きいためスキップ',
                     True,
                     skipped=True,
                     duration=duration,
@@ -216,9 +216,9 @@ class ImageCompressor:
 
             if write_output:
                 logger.info(
-                    "圧縮完了: {} -> {} | 元: {}, 圧縮後: {}, 削減: {} ({:.2f}%)",
+                    '圧縮完了: {} -> {} | 元: {}, 圧縮後: {}, 削減: {} ({:.2f}%)',
                     input_path.name,
-                    final_out_path.name if final_out_path else "N/A",
+                    final_out_path.name if final_out_path else 'N/A',
                     _human_readable_size(original_size),
                     _human_readable_size(compressed_size),
                     _human_readable_size(saved_bytes),
@@ -255,13 +255,13 @@ class ImageCompressor:
         paths_to_process: list[Path] = []
         if isinstance(input_paths, (str, Path)) and Path(input_paths).is_dir():
             base_dir = Path(input_paths)
-            pattern = "**/*" if recursive else "*"
+            pattern = '**/*' if recursive else '*'
             paths_to_process = [p for p in base_dir.glob(pattern) if p.is_file()]
         elif isinstance(input_paths, list):
             paths_to_process = [Path(p) for p in input_paths]
         else:
             raise ValueError(
-                "input_pathsにはディレクトリパスかファイルパスのリストを指定してください。"
+                'input_pathsにはディレクトリパスかファイルパスのリストを指定してください。'
             )
 
         workers = max_workers or self.settings.max_workers
@@ -281,28 +281,26 @@ class ImageCompressor:
                 try:
                     results.append(future.result())
                 except Exception as e:
-                    logger.error("画像圧縮中にエラーが発生しました: {}", e)
+                    logger.error('画像圧縮中にエラーが発生しました: {}', e)
         return results
 
-    def _run_command(
-        self, cmd: list[str], timeout: int = 60
-    ) -> dict[str, bytes | int]:
+    def _run_command(self, cmd: list[str], timeout: int = 60) -> dict[str, bytes | int]:
         """外部コマンドを実行し、結果をキャプチャします。"""
         try:
-            logger.debug("コマンド実行: {}", " ".join(cmd))
+            logger.debug('コマンド実行: {}', ' '.join(cmd))
             proc = subprocess.run(
                 cmd, capture_output=True, timeout=timeout, check=False
             )
             return {
-                "returncode": proc.returncode,
-                "stdout": proc.stdout,
-                "stderr": proc.stderr,
+                'returncode': proc.returncode,
+                'stdout': proc.stdout,
+                'stderr': proc.stderr,
             }
         except Exception as e:
             return {
-                "returncode": -1,
-                "stdout": b"",
-                "stderr": str(e).encode("utf-8", "replace"),
+                'returncode': -1,
+                'stdout': b'',
+                'stderr': str(e).encode('utf-8', 'replace'),
             }
 
     def _prepare_result(
@@ -314,12 +312,12 @@ class ImageCompressor:
         result: dict,
     ) -> CompressionResult:
         """コマンド実行結果をCompressionResultに変換するヘルパー。"""
-        success = result["returncode"] == 0 and tmp_out_path.is_file()
-        stdout = result["stdout"].decode("utf-8", "replace") if result["stdout"] else ""
-        stderr = result["stderr"].decode("utf-8", "replace") if result["stderr"] else ""
+        success = result['returncode'] == 0 and tmp_out_path.is_file()
+        stdout = result['stdout'].decode('utf-8', 'replace') if result['stdout'] else ''
+        stderr = result['stderr'].decode('utf-8', 'replace') if result['stderr'] else ''
 
         if not success:
-            logger.error("{}による圧縮に失敗しました: {}", tool_name, stderr)
+            logger.error('{}による圧縮に失敗しました: {}', tool_name, stderr)
 
         return CompressionResult(
             input_path,
@@ -329,7 +327,7 @@ class ImageCompressor:
             None,
             None,
             tool_name,
-            " ".join(cmd),
+            ' '.join(cmd),
             stdout,
             stderr,
             success,
@@ -339,7 +337,7 @@ class ImageCompressor:
         self, input_path: Path, tmp_out_path: Path
     ) -> CompressionResult:
         """pngquant を使用してPNG画像を圧縮します。"""
-        if not self.tools_available.get("pngquant"):
+        if not self.tools_available.get('pngquant'):
             return CompressionResult(
                 input_path,
                 None,
@@ -347,31 +345,31 @@ class ImageCompressor:
                 None,
                 None,
                 None,
-                "pngquant",
+                'pngquant',
                 None,
                 None,
-                "pngquantコマンドが見つからないためスキップ",
+                'pngquantコマンドが見つからないためスキップ',
                 False,
                 skipped=True,
             )
 
         opts = self.settings.pngquant
-        cmd = ["pngquant", str(opts.colors)]
+        cmd = ['pngquant', str(opts.colors)]
         if opts.quality:
-            cmd.extend(["--quality", opts.quality])
-        cmd.extend(["--speed", str(opts.speed)])
+            cmd.extend(['--quality', opts.quality])
+        cmd.extend(['--speed', str(opts.speed)])
         if opts.strip:
-            cmd.append("--strip")
-        cmd.extend(["--force", "--output", str(tmp_out_path), str(input_path)])
+            cmd.append('--strip')
+        cmd.extend(['--force', '--output', str(tmp_out_path), str(input_path)])
 
         result = self._run_command(cmd)
-        return self._prepare_result(input_path, tmp_out_path, "pngquant", cmd, result)
+        return self._prepare_result(input_path, tmp_out_path, 'pngquant', cmd, result)
 
     def _compress_jpegoptim(
         self, input_path: Path, tmp_out_path: Path
     ) -> CompressionResult:
         """jpegoptim を使用してJPEG画像を圧縮します。"""
-        if not self.tools_available.get("jpegoptim"):
+        if not self.tools_available.get('jpegoptim'):
             return CompressionResult(
                 input_path,
                 None,
@@ -379,35 +377,35 @@ class ImageCompressor:
                 None,
                 None,
                 None,
-                "jpegoptim",
+                'jpegoptim',
                 None,
                 None,
-                "jpegoptimコマンドが見つからないためスキップ",
+                'jpegoptimコマンドが見つからないためスキップ',
                 False,
                 skipped=True,
             )
 
         opts = self.settings.jpegoptim
         tmp_out_path.parent.mkdir(parents=True, exist_ok=True)
-        cmd = ["jpegoptim", f"-m{opts.max_quality}"]
+        cmd = ['jpegoptim', f'-m{opts.max_quality}']
         if opts.strip_all:
-            cmd.append("--strip-all")
+            cmd.append('--strip-all')
         if opts.progressive is True:
-            cmd.append("--all-progressive")
+            cmd.append('--all-progressive')
         elif opts.progressive is False:
-            cmd.append("--all-normal")
+            cmd.append('--all-normal')
         if opts.preserve_timestamp:
-            cmd.append("--preserve")
-        cmd.extend(["--dest", str(tmp_out_path.parent), str(input_path)])
+            cmd.append('--preserve')
+        cmd.extend(['--dest', str(tmp_out_path.parent), str(input_path)])
 
         result = self._run_command(cmd)
-        return self._prepare_result(input_path, tmp_out_path, "jpegoptim", cmd, result)
+        return self._prepare_result(input_path, tmp_out_path, 'jpegoptim', cmd, result)
 
     def _compress_cwebp(
         self, input_path: Path, tmp_out_path: Path
     ) -> CompressionResult:
         """cwebp を使用して画像をWebP形式に変換・圧縮します。"""
-        if not self.tools_available.get("cwebp"):
+        if not self.tools_available.get('cwebp'):
             return CompressionResult(
                 input_path,
                 None,
@@ -415,22 +413,22 @@ class ImageCompressor:
                 None,
                 None,
                 None,
-                "cwebp",
+                'cwebp',
                 None,
                 None,
-                "cwebpコマンドが見つからないためスキップ",
+                'cwebpコマンドが見つからないためスキップ',
                 False,
                 skipped=True,
             )
 
         opts = self.settings.cwebp
-        cmd = ["cwebp"]
+        cmd = ['cwebp']
         if opts.lossless:
-            cmd.append("-lossless")
+            cmd.append('-lossless')
         else:
-            cmd.extend(["-q", str(opts.quality)])
-        cmd.extend(["-metadata", opts.metadata])
-        cmd.extend([str(input_path), "-o", str(tmp_out_path)])
+            cmd.extend(['-q', str(opts.quality)])
+        cmd.extend(['-metadata', opts.metadata])
+        cmd.extend([str(input_path), '-o', str(tmp_out_path)])
 
         result = self._run_command(cmd)
-        return self._prepare_result(input_path, tmp_out_path, "cwebp", cmd, result)
+        return self._prepare_result(input_path, tmp_out_path, 'cwebp', cmd, result)

@@ -33,14 +33,14 @@ class FanboxImageDownloader(BaseDownloader):
     ) -> Path | None:
         """投稿のカバー画像をダウンロードします。"""
         if not post_data.cover_image_url:
-            logger.info("この投稿にはカバー画像がありません。")
+            logger.info('この投稿にはカバー画像がありません。')
             return None
 
         cover_url = str(post_data.cover_image_url)
-        ext = cover_url.split(".")[-1].split("?")[0]  # URLから拡張子を安全に取得
-        cover_filename = f"{COVER_IMAGE_STEM}.{ext}"
+        ext = cover_url.split('.')[-1].split('?')[0]  # URLから拡張子を安全に取得
+        cover_filename = f'{COVER_IMAGE_STEM}.{ext}'
 
-        logger.info("カバー画像をダウンロードします。")
+        logger.info('カバー画像をダウンロードします。')
         return self._download_single_image(cover_url, cover_filename, image_dir)
 
     def download_embedded_images(
@@ -50,18 +50,18 @@ class FanboxImageDownloader(BaseDownloader):
     ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         image_paths: dict[str, Path] = {}
-        if not hasattr(post_data.body, "image_map") or not post_data.body.image_map:
-            logger.info("本文中に埋め込み画像はありません。")
+        if not hasattr(post_data.body, 'image_map') or not post_data.body.image_map:
+            logger.info('本文中に埋め込み画像はありません。')
             return image_paths
 
         total_images = len(post_data.body.image_map)
-        logger.info("{}件の埋め込み画像をダウンロードします。", total_images)
+        logger.info('{}件の埋め込み画像をダウンロードします。', total_images)
 
         for image_id, image_item in post_data.body.image_map.items():
             url = str(image_item.original_url)
-            filename = f"{image_id}.{image_item.extension}"
+            filename = f'{image_id}.{image_item.extension}'
             if path := self._download_single_image(url, filename, image_dir):
                 image_paths[image_id] = path
 
-        logger.info("埋め込み画像のダウンロード処理が完了しました。")
+        logger.info('埋め込み画像のダウンロード処理が完了しました。')
         return image_paths

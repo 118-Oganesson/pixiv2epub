@@ -17,12 +17,12 @@ class Workspace:
     @property
     def source_path(self) -> Path:
         """小説のメタデータや本文ファイルが格納されるパス。"""
-        return self.root_path / "source"
+        return self.root_path / 'source'
 
     @property
     def assets_path(self) -> Path:
         """画像やCSSなどの補助リソースが格納されるパス。"""
-        return self.root_path / "assets"
+        return self.root_path / 'assets'
 
     @property
     def manifest_path(self) -> Path:
@@ -30,7 +30,7 @@ class Workspace:
         return self.root_path / MANIFEST_FILE_NAME
 
     @classmethod
-    def from_path(cls, path: Path) -> "Workspace":
+    def from_path(cls, path: Path) -> 'Workspace':
         """
         指定されたパスからWorkspaceインスタンスを生成します。
         パスに 'manifest.json' が存在しない場合はValueErrorを送出します。
@@ -38,7 +38,7 @@ class Workspace:
         manifest_path = path / MANIFEST_FILE_NAME
         if not manifest_path.is_file():
             raise ValueError(
-                f"指定されたパスにマニフェストファイルが見つかりません: {path}"
+                f'指定されたパスにマニフェストファイルが見つかりません: {path}'
             )
         return cls(id=path.name, root_path=path.resolve())
 
@@ -65,10 +65,10 @@ class Workspace:
         Returns:
              str: ページのHTMLコンテンツ。
         """
-        page_file = self.source_path / page_body_path.lstrip("./")
+        page_file = self.source_path / page_body_path.lstrip('./')
         if not page_file.is_file():
-            raise FileNotFoundError(f"ページファイルが見つかりません: {page_file}")
-        return page_file.read_text(encoding="utf-8")
+            raise FileNotFoundError(f'ページファイルが見つかりません: {page_file}')
+        return page_file.read_text(encoding='utf-8')
 
 
 @dataclass(frozen=True)
@@ -79,5 +79,5 @@ class WorkspaceManifest:
     created_at_utc: str
     source_identifier: str
     content_etag: str | None = None
-    workspace_schema_version: str = "1.0"
+    workspace_schema_version: str = '1.0'
     provider_specific_data: dict[str, Any] | None = None

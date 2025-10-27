@@ -30,7 +30,7 @@ class EpubBuilder(BaseBuilder):
 
     @classmethod
     def get_builder_name(cls) -> str:
-        return "epub"
+        return 'epub'
 
     def build(self, workspace: Workspace) -> Path:
         """EPUBファイルを生成するメインの実行メソッド。"""
@@ -38,10 +38,10 @@ class EpubBuilder(BaseBuilder):
         output_path = self._determine_output_path(manifest)
 
         log = logger.bind(workspace_id=workspace.id, output_path=str(output_path))
-        log.info("EPUB作成処理を開始")
+        log.info('EPUB作成処理を開始')
 
         if output_path.exists():
-            log.warning("出力ファイルは既に存在するため上書きします。")
+            log.warning('出力ファイルは既に存在するため上書きします。')
 
         try:
             # テンプレートエンジンとジェネレータを動的に初期化
@@ -56,7 +56,7 @@ class EpubBuilder(BaseBuilder):
                 cover_asset,
             )
             self.archiver.archive(components, output_path)
-            log.success("EPUBファイルの作成成功")
+            log.success('EPUBファイルの作成成功')
             return output_path
         except TemplateError as e:
             logger.bind(template_name=e.name).error(
@@ -64,30 +64,30 @@ class EpubBuilder(BaseBuilder):
                 exc_info=True,  # スタックトレースを出力
             )
             self._cleanup_failed_build(output_path)
-            raise BuildError(f"テンプレートエラー: {e}") from e
+            raise BuildError(f'テンプレートエラー: {e}') from e
         except Exception as e:
-            logger.exception("EPUBファイルの作成中に予期せぬエラーが発生しました。")
+            logger.exception('EPUBファイルの作成中に予期せぬエラーが発生しました。')
             self._cleanup_failed_build(output_path)
-            raise BuildError(f"EPUBのビルドに失敗しました: {e}") from e
+            raise BuildError(f'EPUBのビルドに失敗しました: {e}') from e
 
     def _create_template_env(self, workspace: Workspace) -> Environment:
         """ワークスペースのプロバイダーに基づいてJinja2環境を生成します。"""
         default_theme = self.settings.builder.default_theme_name
         provider_name = default_theme
         try:
-            with open(workspace.manifest_path, encoding="utf-8") as f:
+            with open(workspace.manifest_path, encoding='utf-8') as f:
                 manifest_data = json.load(f)
-            provider_name = manifest_data.get("provider_name", default_theme)
+            provider_name = manifest_data.get('provider_name', default_theme)
             logger.bind(provider_name=provider_name).debug(
-                "プロバイダーのテーマを使用します。"
+                'プロバイダーのテーマを使用します。'
             )
         except (OSError, json.JSONDecodeError):
             logger.bind(workspace_path=str(workspace.root_path)).warning(
                 f"'{MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
             )
 
-        assets_root = Path(__file__).parent.parent.parent.parent / "assets"
-        epub_assets_root = assets_root / "epub"
+        assets_root = Path(__file__).parent.parent.parent.parent / 'assets'
+        epub_assets_root = assets_root / 'epub'
         provider_template_dir = epub_assets_root / provider_name
         default_template_dir = epub_assets_root / default_theme
 
@@ -98,7 +98,7 @@ class EpubBuilder(BaseBuilder):
             loaders.append(FileSystemLoader(str(default_template_dir)))
         else:
             raise BuildError(
-                f"デフォルトのテンプレートディレクトリが見つかりません: {default_template_dir}"
+                f'デフォルトのテンプレートディレクトリが見つかりません: {default_template_dir}'
             )
 
         loader = ChoiceLoader(loaders)
@@ -114,19 +114,19 @@ class EpubBuilder(BaseBuilder):
             template = self.settings.builder.filename_template
 
         # tag: URI からIDを抽出
-        content_id = core.id_.split(":")[-1]
-        author_id = core.author.identifier.split(":")[-1]
+        content_id = core.id_.split(':')[-1]
+        author_id = core.author.identifier.split(':')[-1]
         series_id_str = str(
-            core.isPartOf.identifier.split(":")[-1] if core.isPartOf else "0"
+            core.isPartOf.identifier.split(':')[-1] if core.isPartOf else '0'
         )
 
         template_vars = {
-            "title": core.name or "untitled",
-            "id": content_id,
-            "author_name": core.author.name or "unknown_author",
-            "author_id": author_id or "0",
-            "series_title": core.isPartOf.name if core.isPartOf else "",
-            "series_id": series_id_str,
+            'title': core.name or 'untitled',
+            'id': content_id,
+            'author_name': core.author.name or 'unknown_author',
+            'author_id': author_id or '0',
+            'series_title': core.isPartOf.name if core.isPartOf else '',
+            'series_id': series_id_str,
         }
 
         safe_relative_path = generate_sanitized_path(
@@ -146,9 +146,9 @@ class EpubBuilder(BaseBuilder):
             if path.exists():
                 os.remove(path)
                 logger.bind(file_path=str(path)).info(
-                    "不完全な出力ファイルを削除しました。"
+                    '不完全な出力ファイルを削除しました。'
                 )
         except OSError as e:
             logger.bind(file_path=str(path), error=str(e)).error(
-                "出力ファイルの削除に失敗しました。"
+                '出力ファイルの削除に失敗しました。'
             )

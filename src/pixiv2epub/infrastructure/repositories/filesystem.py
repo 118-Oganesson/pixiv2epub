@@ -2,7 +2,6 @@
 import json
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
 
 from loguru import logger
 
@@ -25,10 +24,10 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
     def __init__(self, settings: WorkspaceSettings):
         self.workspace_dir = settings.root_directory
 
-    def setup_workspace(self, content_id: Any, provider_name: str) -> Workspace:
+    def setup_workspace(self, content_id: int | str, provider_name: str) -> Workspace:
         """content_idに基づいた永続的なワークスペースを準備します。"""
         self.workspace_dir.mkdir(parents=True, exist_ok=True)
-        workspace_id = f"{provider_name}_{content_id}"
+        workspace_id = f'{provider_name}_{content_id}'
         workspace_path = self.workspace_dir / workspace_id
         workspace = Workspace(id=workspace_id, root_path=workspace_path)
 
@@ -39,13 +38,13 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         )
 
         logger.bind(workspace_path=str(workspace.root_path)).debug(
-            "ワークスペースを準備しました。"
+            'ワークスペースを準備しました。'
         )
         return workspace
 
-    def get_workspace_path(self, content_id: Any, provider_name: str) -> Path:
-        """ワークスペースのルートパスを計算して返します（ディレクトリ作成は行いません）。"""
-        workspace_id = f"{provider_name}_{content_id}"
+    def get_workspace_path(self, content_id: int | str, provider_name: str) -> Path:
+        """ワークスペースのルートパスを計算して返します(ディレクトリ作成は行いません)。"""
+        workspace_id = f'{provider_name}_{content_id}'
         return self.workspace_dir / workspace_id
 
     def persist_metadata(
@@ -57,7 +56,7 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         """メタデータ(UCM)とマニフェストをワークスペースに永続化します。"""
         # manifest.jsonの保存
         try:
-            with open(workspace.manifest_path, "w", encoding="utf-8") as f:
+            with open(workspace.manifest_path, 'w', encoding='utf-8') as f:
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
             logger.debug(f"'{MANIFEST_FILE_NAME}' の保存が完了しました。")
         except OSError as e:
@@ -68,9 +67,9 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         # detail.jsonの保存 (UCMを保存)
         try:
             # by_alias=True で @context などのエイリアスが正しく出力される
-            metadata_dict = metadata.model_dump(mode="json", by_alias=True)
+            metadata_dict = metadata.model_dump(mode='json', by_alias=True)
             detail_path = workspace.source_path / DETAIL_FILE_NAME
-            with open(detail_path, "w", encoding="utf-8") as f:
+            with open(detail_path, 'w', encoding='utf-8') as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
             logger.debug(f"'{DETAIL_FILE_NAME}' の保存が完了しました。")
         except OSError as e:

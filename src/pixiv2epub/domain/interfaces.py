@@ -1,6 +1,6 @@
 # FILE: src/pixiv2epub/domain/interfaces.py
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from ..models.domain import UnifiedContentManifest
 from ..models.fanbox import Post
@@ -40,7 +40,9 @@ class IProvider(Protocol):
         """プロバイダの名前を返すクラスメソッド。"""
         ...
 
-    def get_works(self, identifier: Any, content_type: ContentType) -> list[Workspace]:
+    def get_works(
+        self, identifier: int | str, content_type: ContentType
+    ) -> list[Workspace]:
         """
         指定された識別子とコンテンツ種別に基づいて作品を取得し、
         処理済みのWorkspaceのリストを返します。
@@ -83,11 +85,11 @@ class IFanboxImageDownloader(Protocol):
 class IWorkspaceRepository(Protocol):
     """ワークスペースのファイルシステム操作を抽象化するインターフェース。"""
 
-    def setup_workspace(self, content_id: Any, provider_name: str) -> Workspace:
+    def setup_workspace(self, content_id: int | str, provider_name: str) -> Workspace:
         """content_idに基づいた永続的なワークスペースを準備します。"""
         ...
 
-    def get_workspace_path(self, content_id: Any, provider_name: str) -> Path:
+    def get_workspace_path(self, content_id: int | str, provider_name: str) -> Path:
         """
         content_idに基づいて永続的なワークスペースのルートパスを計算して返します。
         このメソッドはファイルシステムへの書き込みを行いません。

@@ -29,16 +29,16 @@ class PixivApiClient(BaseApiClient):
         )
         if not token_value:
             raise AuthenticationError(
-                "設定に有効なPixivのrefresh_tokenが見つかりません。", provider_name
+                '設定に有効なPixivのrefresh_tokenが見つかりません。', provider_name
             )
 
         self.api = AppPixivAPI()
         try:
             self.api.auth(refresh_token=token_value)
-            logger.debug("Pixiv APIの認証が完了しました。")
+            logger.debug('Pixiv APIの認証が完了しました。')
         except PixivError as e:
             raise AuthenticationError(
-                f"Pixiv APIの認証に失敗しました: {e}", provider_name
+                f'Pixiv APIの認証に失敗しました: {e}', provider_name
             ) from e
 
     @property

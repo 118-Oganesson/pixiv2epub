@@ -28,29 +28,29 @@ async def get_fanbox_sessid(save_session_path: Path) -> str:
         page = context.pages[0] if context.pages else await context.new_page()
 
         logger.info(
-            "FANBOXのサイトを開きます... もしログインしていない場合は、ログインしてください。"
+            'FANBOXのサイトを開きます... もしログインしていない場合は、ログインしてください。'
         )
-        await page.goto("https://www.fanbox.cc/")
+        await page.goto('https://www.fanbox.cc/')
 
         # ユーザーに手動でのログインを促す
         input(
-            "ブラウザでFANBOXにログインした後、このコンソールに戻りEnterキーを押してください..."
+            'ブラウザでFANBOXにログインした後、このコンソールに戻りEnterキーを押してください...'
         )
 
-        logger.info("クッキーを取得しています...")
+        logger.info('クッキーを取得しています...')
         cookies = await context.cookies()
         fanbox_sessid: str | None = None
         for cookie in cookies:
-            if cookie["name"] == "FANBOXSESSID":
-                fanbox_sessid = cookie["value"]
+            if cookie['name'] == 'FANBOXSESSID':
+                fanbox_sessid = cookie['value']
                 break
 
         await context.close()
 
         if fanbox_sessid:
-            logger.info("✅ FANBOXSESSIDの取得に成功しました！")
+            logger.info('✅ FANBOXSESSIDの取得に成功しました!')
             return fanbox_sessid
         else:
             raise AuthenticationError(
-                "FANBOXSESSIDが見つかりませんでした。正常にログインできているか確認してください。"
+                'FANBOXSESSIDが見つかりませんでした。正常にログインできているか確認してください。'
             )

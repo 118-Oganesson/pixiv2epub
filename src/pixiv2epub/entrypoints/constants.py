@@ -4,7 +4,7 @@ CLIやGUIなど、アプリケーションのエントリーポイントに関�
 """
 
 # GUIモードで使用するブラウザセッションのデフォルトパス
-DEFAULT_GUI_SESSION_PATH = "./.gui_session"
+DEFAULT_GUI_SESSION_PATH = './.gui_session'
 
 # .envファイルのデフォルト名
-DEFAULT_ENV_FILENAME = ".env"
+DEFAULT_ENV_FILENAME = '.env'

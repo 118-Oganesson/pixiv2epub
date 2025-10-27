@@ -6,8 +6,6 @@ Pixiv APIのJSONレスポンスをマッピングするためのPydanticデー�
 直接インポートしてはいけません。
 """
 
-from typing import Any
-
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -24,7 +22,7 @@ class PixivBaseModel(BaseModel):
 
     model_config = ConfigDict(
         populate_by_name=True,  # エイリアス名とフィールド名の両方で値を受け付ける
-        extra="ignore",  # モデルにない余分なフィールドは無視する
+        extra='ignore',  # モデルにない余分なフィールドは無視する
     )
 
 
@@ -37,7 +35,7 @@ class Rating(PixivBaseModel):
 
 class IllustTag(PixivBaseModel):
     tag: str
-    user_id: str | None = Field(None, alias="userId")
+    user_id: str | None = Field(None, alias='userId')
 
 
 class IllustImageUrls(PixivBaseModel):
@@ -50,7 +48,7 @@ class IllustDetails(PixivBaseModel):
     title: str
     description: str
     restrict: int
-    x_restrict: int = Field(alias="xRestrict")
+    x_restrict: int = Field(alias='xRestrict')
     sl: int
     tags: list[IllustTag] = Field(default_factory=list)
     images: IllustImageUrls = Field(default_factory=IllustImageUrls)
@@ -68,7 +66,7 @@ class PixivIllust(PixivBaseModel):
     page: int
     illust: IllustDetails
     user: IllustUser
-    available_message: str | None = Field(None, alias="availableMessage")
+    available_message: str | None = Field(None, alias='availableMessage')
 
 
 class UploadedImageUrls(PixivBaseModel):
@@ -76,23 +74,23 @@ class UploadedImageUrls(PixivBaseModel):
 
 
 class UploadedImage(PixivBaseModel):
-    novel_image_id: str = Field(alias="novelImageId")
+    novel_image_id: str = Field(alias='novelImageId')
     sl: str
     urls: UploadedImageUrls
 
 
 class SeriesNavigationNovel(PixivBaseModel):
     id: int
-    content_order: str = Field(alias="contentOrder")
+    content_order: str = Field(alias='contentOrder')
     viewable: bool
     title: str
-    cover_url: HttpUrl = Field(alias="coverUrl")
-    viewable_message: str | None = Field(None, alias="viewableMessage")
+    cover_url: HttpUrl = Field(alias='coverUrl')
+    viewable_message: str | None = Field(None, alias='viewableMessage')
 
 
 class SeriesNavigation(PixivBaseModel):
-    next_novel: SeriesNavigationNovel | None = Field(None, alias="nextNovel")
-    prev_novel: SeriesNavigationNovel | None = Field(None, alias="prevNovel")
+    next_novel: SeriesNavigationNovel | None = Field(None, alias='nextNovel')
+    prev_novel: SeriesNavigationNovel | None = Field(None, alias='prevNovel')
 
 
 class NovelApiResponse(PixivBaseModel):
@@ -100,27 +98,25 @@ class NovelApiResponse(PixivBaseModel):
 
     id: str
     title: str
-    user_id: str = Field(alias="userId")
-    cover_url: HttpUrl = Field(alias="coverUrl")
+    user_id: str = Field(alias='userId')
+    cover_url: HttpUrl = Field(alias='coverUrl')
     caption: str
     cdate: str
     text: str
-    ai_type: int = Field(alias="aiType")
-    is_original: bool = Field(alias="isOriginal")
+    ai_type: int = Field(alias='aiType')
+    is_original: bool = Field(alias='isOriginal')
     tags: list[str] = Field(default_factory=list)
     rating: Rating = Field(default_factory=Rating)
     illusts: dict[str, PixivIllust] = Field(default_factory=dict)
     images: dict[str, UploadedImage] = Field(default_factory=dict)
-    series_id: int | None = Field(None, alias="seriesId")
-    series_title: str | None = Field(None, alias="seriesTitle")
-    series_is_watched: bool | None = Field(None, alias="seriesIsWatched")
-    series_navigation: SeriesNavigation | None = Field(
-        None, alias="seriesNavigation"
-    )
+    series_id: int | None = Field(None, alias='seriesId')
+    series_title: str | None = Field(None, alias='seriesTitle')
+    series_is_watched: bool | None = Field(None, alias='seriesIsWatched')
+    series_navigation: SeriesNavigation | None = Field(None, alias='seriesNavigation')
 
-    @field_validator("illusts", "images", mode="before")
+    @field_validator('illusts', 'images', mode='before')
     @classmethod
-    def empty_list_to_dict(cls, v: Any) -> Any:
+    def empty_list_to_dict(cls, v: object) -> object:
         """APIが `illusts: []` や `images: []` のように空のリストを返す場合に対応する。"""
         if isinstance(v, list) and not v:
             return {}
@@ -170,12 +166,12 @@ class NovelInSeries(PixivBaseModel):
 class NovelSeriesApiResponse(PixivBaseModel):
     """Pixiv API (novel_series) からの応答データ全体を格納します。"""
 
-    novel_series_detail: SeriesDetail = Field(alias="novel_series_detail")
+    novel_series_detail: SeriesDetail = Field(alias='novel_series_detail')
     novels: list[NovelInSeries]
-    next_url: HttpUrl | None = Field(None, alias="next_url")
+    next_url: HttpUrl | None = Field(None, alias='next_url')
 
-    @model_validator(mode="after")
-    def assign_order_if_missing(self) -> "NovelSeriesApiResponse":
+    @model_validator(mode='after')
+    def assign_order_if_missing(self) -> 'NovelSeriesApiResponse':
         """
         APIレスポンスに order がない場合、リストの順序に基づいて採番する。
         """

@@ -17,13 +17,13 @@ from ....shared.settings import PixivAuthSettings
 
 def _s256(data: bytes) -> str:
     """SHA256ハッシュを計算し、Base64URLエンコードする"""
-    return urlsafe_b64encode(sha256(data).digest()).rstrip(b"=").decode("ascii")
+    return urlsafe_b64encode(sha256(data).digest()).rstrip(b'=').decode('ascii')
 
 
 def _oauth_pkce() -> tuple[str, str]:
     """PKCE用の code_verifier と code_challenge を生成する"""
     code_verifier = token_urlsafe(32)
-    code_challenge = _s256(code_verifier.encode("ascii"))
+    code_challenge = _s256(code_verifier.encode('ascii'))
     return code_verifier, code_challenge
 
 
@@ -34,18 +34,18 @@ def _login_and_get_code(
     """Playwright を使用してブラウザでログインし、認可コードを取得する"""
     code_verifier, code_challenge = _oauth_pkce()
     login_params = {
-        "code_challenge": code_challenge,
-        "code_challenge_method": "S256",
-        "client": "pixiv-android",
+        'code_challenge': code_challenge,
+        'code_challenge_method': 'S256',
+        'client': 'pixiv-android',
     }
-    logger.debug("Code verifier: {}", code_verifier)
+    logger.debug('Code verifier: {}', code_verifier)
 
     auth_code_holder = []
 
     def handle_request(request: Request) -> None:
-        if request.url.startswith("pixiv://"):
-            logger.info("コールバックURLを検出: {}", request.url)
-            match = re.search(r"code=([^&]*)", request.url)
+        if request.url.startswith('pixiv://'):
+            logger.info('コールバックURLを検出: {}', request.url)
+            match = re.search(r'code=([^&]*)', request.url)
             if match and not auth_code_holder:
                 auth_code_holder.append(match.groups()[0])
 
@@ -55,39 +55,39 @@ def _login_and_get_code(
         )
         page = context.new_page()
         logger.info(
-            "ブラウザを起動しました。表示されたウィンドウでPixivにログインしてください..."
+            'ブラウザを起動しました。表示されたウィンドウでPixivにログインしてください...'
         )
 
-        page.on("request", handle_request)
-        login_page_url = f"{settings.login_url}?{urlencode(login_params)}"
+        page.on('request', handle_request)
+        login_page_url = f'{settings.login_url}?{urlencode(login_params)}'
         page.goto(login_page_url)
 
         try:
-            logger.info("ブラウザでのログイン操作を待機しています...")
+            logger.info('ブラウザでのログイン操作を待機しています...')
             start_time = time.time()
             while not auth_code_holder:
                 page.wait_for_timeout(500)
                 if time.time() - start_time > 300:
-                    raise TimeoutError("ログイン操作が5分以内に完了されませんでした。")
+                    raise TimeoutError('ログイン操作が5分以内に完了されませんでした。')
 
-            logger.info("認可コードの取得に成功しました。")
+            logger.info('認可コードの取得に成功しました。')
             time.sleep(2)
 
         except Exception as e:
             raise AuthenticationError(
-                f"ログインプロセスがタイムアウトしたか、失敗しました: {e}"
-            )
+                f'ログインプロセスがタイムアウトしたか、失敗しました: {e}'
+            ) from e
         finally:
             context.close()
-            logger.info("ブラウザを終了しました。")
+            logger.info('ブラウザを終了しました。')
 
     if not auth_code_holder:
         raise AuthenticationError(
-            "認可コードを取得できませんでした。ログインが完了していない可能性があります。"
+            '認可コードを取得できませんでした。ログインが完了していない可能性があります。'
         )
 
     code = auth_code_holder[0]
-    logger.debug("Auth code: {}", code)
+    logger.debug('Auth code: {}', code)
     return code, code_verifier
 
 
@@ -98,29 +98,29 @@ def _get_refresh_token(
 ) -> str:
     """認可コードを使用してリフレッシュトークンを取得する"""
     data = {
-        "client_id": settings.client_id.get_secret_value(),
-        "client_secret": settings.client_secret.get_secret_value(),
-        "code": code,
-        "code_verifier": code_verifier,
-        "grant_type": "authorization_code",
-        "include_policy": "true",
-        "redirect_uri": settings.redirect_uri,
+        'client_id': settings.client_id.get_secret_value(),
+        'client_secret': settings.client_secret.get_secret_value(),
+        'code': code,
+        'code_verifier': code_verifier,
+        'grant_type': 'authorization_code',
+        'include_policy': 'true',
+        'redirect_uri': settings.redirect_uri,
     }
     headers = {
-        "User-Agent": settings.user_agent,
-        "App-OS-Version": "14.6",
-        "App-OS": "ios",
+        'User-Agent': settings.user_agent,
+        'App-OS-Version': '14.6',
+        'App-OS': 'ios',
     }
     response = requests.post(settings.auth_token_url, data=data, headers=headers)
 
     response_data = response.json()
-    if "refresh_token" not in response_data:
+    if 'refresh_token' not in response_data:
         raise AuthenticationError(
-            f"リフレッシュトークンの取得に失敗しました。APIからの応答: {response_data}"
+            f'リフレッシュトークンの取得に失敗しました。APIからの応答: {response_data}'
         )
 
-    refresh_token = response_data["refresh_token"]
-    logger.info("リフレッシュトークンの取得に成功しました。")
+    refresh_token = response_data['refresh_token']
+    logger.info('リフレッシュトークンの取得に成功しました。')
     return refresh_token
 
 
@@ -136,5 +136,5 @@ def get_pixiv_refresh_token(
         refresh_token = _get_refresh_token(auth_code, verifier, settings)
         return refresh_token
     except Exception as e:
-        logger.error("認証中に予期せぬエラーが発生しました: {}", e)
+        logger.error('認証中に予期せぬエラーが発生しました: {}', e)
         raise

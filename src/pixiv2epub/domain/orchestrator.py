@@ -30,7 +30,7 @@ class DownloadBuildOrchestrator:
 
     def run_from_input(self, input_str: str, download_only: bool = False) -> list[Path]:
         """
-        単一の入力（URLやID）から適切な処理を判断し、実行する。
+        単一の入力(URLやID)から適切な処理を判断し、実行する。
         """
         provider_enum, content_type, identifier = parse_content_identifier(input_str)
         provider = self.provider_factory.create(provider_enum)
@@ -40,18 +40,18 @@ class DownloadBuildOrchestrator:
             content_type=content_type.name,
             identifier=str(identifier),
         ):
-            logger.info("データ取得処理を開始")
+            logger.info('データ取得処理を開始')
             workspaces = provider.get_works(identifier, content_type)
 
             if download_only:
                 logger.bind(download_count=len(workspaces)).success(
-                    "ダウンロード処理が完了しました。"
+                    'ダウンロード処理が完了しました。'
                 )
                 return []
             else:
-                logger.info("ダウンロードとビルド処理を開始")
+                logger.info('ダウンロードとビルド処理を開始')
                 return self._build_workspaces(
-                    workspaces, f"{content_type.name.capitalize()}"
+                    workspaces, f'{content_type.name.capitalize()}'
                 )
 
     def _is_cleanup_enabled(self) -> bool:
@@ -59,14 +59,14 @@ class DownloadBuildOrchestrator:
         return self.settings.builder.cleanup_after_build
 
     def _handle_cleanup(self, workspace: Workspace) -> None:
-        """中間ファイル（ワークスペース）を削除する。"""
+        """中間ファイル(ワークスペース)を削除する。"""
         if self._is_cleanup_enabled():
             log = logger.bind(workspace_path=str(workspace.root_path))
             try:
-                log.info("ワークスペースのクリーンアップを開始")
+                log.info('ワークスペースのクリーンアップを開始')
                 shutil.rmtree(workspace.root_path)
             except OSError as e:
-                log.bind(error=str(e)).error("ワークスペースのクリーンアップ失敗")
+                log.bind(error=str(e)).error('ワークスペースのクリーンアップ失敗')
 
     def _build_workspaces(
         self,
@@ -76,19 +76,19 @@ class DownloadBuildOrchestrator:
         """作品群を処理するための共通ロジック。"""
 
         if not workspaces:
-            logger.warning("処理対象の作品が見つかりませんでした。")
+            logger.warning('処理対象の作品が見つかりませんでした。')
             return []
 
         output_paths: list[Path] = []
         total = len(workspaces)
-        logger.bind(total_works=total).info(f"{collection_type} のビルドを開始")
+        logger.bind(total_works=total).info(f'{collection_type} のビルドを開始')
 
         for i, workspace in enumerate(workspaces, 1):
             try:
-                provider_name, identifier = "unknown", "unknown"
+                provider_name, identifier = 'unknown', 'unknown'
                 try:
                     # workspace.id (例: "pixiv_12345") から分割
-                    provider_name, identifier = workspace.id.split("_", 1)
+                    provider_name, identifier = workspace.id.split('_', 1)
                 except ValueError:
                     logger.warning(
                         f"ワークスペースID '{workspace.id}' の形式が不正です。"
@@ -100,17 +100,17 @@ class DownloadBuildOrchestrator:
                     identifier=identifier,
                 ):
                     logger.bind(current_work=i, total_works=total).info(
-                        "個別作品の処理を開始"
+                        '個別作品の処理を開始'
                     )
                     output_path = self.builder.build(workspace)
                     output_paths.append(output_path)
             except ContentNotFoundError as e:
-                logger.bind(reason=str(e)).warning("コンテンツが見つからずスキップ")
+                logger.bind(reason=str(e)).warning('コンテンツが見つからずスキップ')
                 continue
             except (BuildError, ProviderError) as e:
                 logger.bind(workspace_id=workspace.id, error=str(e)).error(
-                    "ワークスペースの処理失敗",
-                    exc_info=self.settings.log_level == "DEBUG",
+                    'ワークスペースの処理失敗',
+                    exc_info=self.settings.log_level == 'DEBUG',
                 )
             # テンプレートエラーを個別に捕捉
             except TemplateError as e:
@@ -121,13 +121,13 @@ class DownloadBuildOrchestrator:
             # 予期せぬエラーは .exception() でスタックトレースを記録
             except Exception:
                 logger.bind(workspace_id=workspace.id).exception(
-                    "ワークスペース処理中に予期せぬエラー発生"
+                    'ワークスペース処理中に予期せぬエラー発生'
                 )
             finally:
                 if workspace:
                     self._handle_cleanup(workspace)
 
         logger.bind(success_count=len(output_paths), total_works=total).success(
-            f"{collection_type} の処理完了"
+            f'{collection_type} の処理完了'
         )
         return output_paths

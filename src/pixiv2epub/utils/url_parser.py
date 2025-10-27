@@ -4,12 +4,12 @@ import re
 from ..shared.enums import ContentType, Provider
 from ..shared.exceptions import InvalidInputError
 
-PIXIV_WORK_PATTERN = re.compile(r"pixiv\.net/novel/show\.php\?id=(\d+)")
-PIXIV_SERIES_PATTERN = re.compile(r"pixiv\.net/novel/series/(\d+)")
-PIXIV_CREATOR_PATTERN = re.compile(r"pixiv\.net/users/(\d+)")
-FANBOX_WORK_PATTERN = re.compile(r"fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)")
+PIXIV_WORK_PATTERN = re.compile(r'pixiv\.net/novel/show\.php\?id=(\d+)')
+PIXIV_SERIES_PATTERN = re.compile(r'pixiv\.net/novel/series/(\d+)')
+PIXIV_CREATOR_PATTERN = re.compile(r'pixiv\.net/users/(\d+)')
+FANBOX_WORK_PATTERN = re.compile(r'fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)')
 FANBOX_CREATOR_PATTERN = re.compile(
-    r"(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc"
+    r'(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc'
 )
 
 URL_PATTERNS = {

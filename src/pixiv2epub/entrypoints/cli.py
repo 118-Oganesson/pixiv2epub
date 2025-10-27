@@ -27,8 +27,8 @@ from .gui.manager import GuiManager
 from .provider_factory import ProviderFactory
 
 app = typer.Typer(
-    help="PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。",
-    rich_markup_mode="markdown",
+    help='PixivやFanboxの作品をURLやIDで指定し、高品質なEPUB形式に変換するコマンドラインツールです。',
+    rich_markup_mode='markdown',
 )
 
 
@@ -56,25 +56,25 @@ class AppState:
                 )
                 self.provider_factory = ProviderFactory(self._settings)
             except SettingsError as e:
-                logger.bind(error=str(e)).error("❌ 設定エラーが発生しました。")
+                logger.bind(error=str(e)).error('❌ 設定エラーが発生しました。')
                 logger.info(
                     "先に 'pixiv2epub auth <service>' コマンドを実行して認証を完了してください。"
                 )
-                raise typer.Exit(code=1)
+                raise typer.Exit(code=1) from e
 
     @property
     def settings(self) -> Settings:
         if self._settings is None:
-            raise RuntimeError("Settingsが初期化されていません。")
+            raise RuntimeError('Settingsが初期化されていません。')
         return self._settings
 
     @property
     def app(self) -> Application:
         """Applicationインスタンスへのアクセス。初回アクセス時に生成される。"""
         if self._settings is None:
-            raise RuntimeError("Settingsが初期化されていません。")
+            raise RuntimeError('Settingsが初期化されていません。')
         if self._app is None:
-            logger.debug("Applicationインスタンスを生成します。")
+            logger.debug('Applicationインスタンスを生成します。')
             self._app = Application(self._settings)
         return self._app
 
@@ -85,18 +85,18 @@ def main_callback(
     verbose: Annotated[
         bool,
         typer.Option(
-            "-v",
-            "--verbose",
-            help="詳細なデバッグログを有効にします。",
+            '-v',
+            '--verbose',
+            help='詳細なデバッグログを有効にします。',
             show_default=False,
         ),
     ] = False,
     config: Annotated[
         Path | None,
         typer.Option(
-            "-c",
-            "--config",
-            help="カスタム設定TOMLファイルへのパス。",
+            '-c',
+            '--config',
+            help='カスタム設定TOMLファイルへのパス。',
             exists=True,
             file_okay=True,
             dir_okay=False,
@@ -107,8 +107,8 @@ def main_callback(
     log_file: Annotated[
         bool,
         typer.Option(
-            "--log-file",
-            help="ログをJSON形式でファイルに出力します。",
+            '--log-file',
+            help='ログをJSON形式でファイルに出力します。',
             show_default=False,
         ),
     ] = False,
@@ -116,14 +116,14 @@ def main_callback(
     """
     Pixiv/Fanbox to EPUB Converter
     """
-    log_level = "DEBUG" if verbose else "INFO"
+    log_level = 'DEBUG' if verbose else 'INFO'
     setup_logging(log_level, serialize_to_file=log_file)
     ctx.obj = AppState()
 
-    if ctx.invoked_subcommand == "auth":
+    if ctx.invoked_subcommand == 'auth':
         ctx.obj.initialize_settings(config, log_level, require_auth=False)
     elif ctx.invoked_subcommand is not None:
-        require_auth = ctx.invoked_subcommand != "build"
+        require_auth = ctx.invoked_subcommand != 'build'
         ctx.obj.initialize_settings(config, log_level, require_auth=require_auth)
 
 
@@ -136,7 +136,7 @@ def auth(
             help="認証するサービスを選択します ('pixiv' または 'fanbox')。",
             case_sensitive=False,
         ),
-    ] = "pixiv",
+    ] = 'pixiv',
 ) -> None:
     """ブラウザで指定されたサービスにログインし、認証情報を保存します。"""
     session_path = Path(DEFAULT_GUI_SESSION_PATH)
@@ -146,43 +146,43 @@ def auth(
         env_path.touch()
 
     logger.bind(session_path=str(session_path.resolve())).info(
-        "GUI用のブラウザセッションを使用します。"
+        'GUI用のブラウザセッションを使用します。'
     )
 
     try:
         app_state: AppState = ctx.obj
-        if service == "pixiv":
-            logger.info("Pixiv認証を開始します...")
+        if service == 'pixiv':
+            logger.info('Pixiv認証を開始します...')
             refresh_token = get_pixiv_refresh_token(
                 save_session_path=session_path,
                 settings=app_state.settings.providers.pixiv,
             )
             set_key(
                 str(env_path),
-                "PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN",
+                'PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN',
                 refresh_token,
             )
             logger.bind(env_path=str(env_path.resolve())).success(
-                "Pixiv認証成功！ リフレッシュトークンを保存しました。"
+                'Pixiv認証成功! リフレッシュトークンを保存しました。'
             )
 
-        elif service == "fanbox":
-            logger.info("FANBOX認証を開始します...")
+        elif service == 'fanbox':
+            logger.info('FANBOX認証を開始します...')
             sessid = asyncio.run(get_fanbox_sessid(session_path))
-            set_key(str(env_path), "PIXIV2EPUB_PROVIDERS__FANBOX__SESSID", sessid)
+            set_key(str(env_path), 'PIXIV2EPUB_PROVIDERS__FANBOX__SESSID', sessid)
             logger.bind(env_path=str(env_path.resolve())).success(
-                "FANBOX認証成功！ FANBOXSESSIDを保存しました。"
+                'FANBOX認証成功! FANBOXSESSIDを保存しました。'
             )
     except AuthenticationError as e:
-        logger.bind(error=str(e)).error("❌ 認証に失敗しました。")
-        raise typer.Exit(code=1)
+        logger.bind(error=str(e)).error('❌ 認証に失敗しました。')
+        raise typer.Exit(code=1) from e
 
 
 def _handle_run(app_state: AppState, target_input: str) -> None:
     """ダウンロードとビルド処理を実行します。"""
     try:
         if not app_state.provider_factory:
-            raise RuntimeError("ProviderFactoryが初期化されていません。")
+            raise RuntimeError('ProviderFactoryが初期化されていません。')
 
         builder = EpubBuilder(settings=app_state.settings)
         orchestrator = DownloadBuildOrchestrator(
@@ -191,16 +191,16 @@ def _handle_run(app_state: AppState, target_input: str) -> None:
             provider_factory=app_state.provider_factory,
         )
         orchestrator.run_from_input(target_input)
-        logger.success("✅ すべての処理が完了しました。")
+        logger.success('✅ すべての処理が完了しました。')
     except Exception as e:
-        logger.error(f"処理中にエラーが発生しました: {e}", exc_info=True)
+        logger.error(f'処理中にエラーが発生しました: {e}', exc_info=True)
 
 
 def _handle_download(app_state: AppState, target_input: str) -> None:
     """ダウンロード処理のみを実行します。"""
     try:
         if not app_state.provider_factory:
-            raise RuntimeError("ProviderFactoryが初期化されていません。")
+            raise RuntimeError('ProviderFactoryが初期化されていません。')
 
         builder = EpubBuilder(settings=app_state.settings)
         orchestrator = DownloadBuildOrchestrator(
@@ -210,7 +210,7 @@ def _handle_download(app_state: AppState, target_input: str) -> None:
         )
         orchestrator.run_from_input(target_input, download_only=True)
     except Exception as e:
-        logger.error(f"ダウンロード処理中にエラーが発生しました: {e}", exc_info=True)
+        logger.error(f'ダウンロード処理中にエラーが発生しました: {e}', exc_info=True)
 
 
 @app.command()
@@ -219,8 +219,8 @@ def run(
     target_input: Annotated[
         str,
         typer.Argument(
-            help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
-            metavar="INPUT",
+            help='Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。',
+            metavar='INPUT',
         ),
     ],
 ) -> None:
@@ -234,8 +234,8 @@ def download(
     target_input: Annotated[
         str,
         typer.Argument(
-            help="Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。",
-            metavar="INPUT",
+            help='Pixiv/Fanboxの作品・シリーズ・ユーザーのURLまたはID。',
+            metavar='INPUT',
         ),
     ],
 ) -> None:
@@ -249,12 +249,12 @@ def build(
     workspace_path: Annotated[
         Path,
         typer.Argument(
-            help="ビルド対象のワークスペースディレクトリへのパス。",
+            help='ビルド対象のワークスペースディレクトリへのパス。',
             exists=True,
             file_okay=False,
             dir_okay=True,
             resolve_path=True,
-            metavar="WORKSPACE_PATH",
+            metavar='WORKSPACE_PATH',
         ),
     ],
 ) -> None:
@@ -269,39 +269,39 @@ def build(
         workspaces_to_build.append(workspace_path)
     except ValueError:
         logger.bind(search_path=str(workspace_path)).info(
-            "ビルド可能なワークスペースを再帰的に検索します..."
+            'ビルド可能なワークスペースを再帰的に検索します...'
         )
         for manifest_path in workspace_path.rglob(MANIFEST_FILE_NAME):
             workspaces_to_build.append(manifest_path.parent)
 
     if not workspaces_to_build:
         logger.bind(search_path=str(workspace_path)).warning(
-            "ビルド可能なワークスペースが見つかりませんでした。"
+            'ビルド可能なワークスペースが見つかりませんでした。'
         )
         return
 
     total = len(workspaces_to_build)
     success_count = 0
-    logger.bind(count=total).info("✅ ビルド対象ワークスペースが見つかりました。")
+    logger.bind(count=total).info('✅ ビルド対象ワークスペースが見つかりました。')
 
     builder = EpubBuilder(settings=app_state.settings)
     for i, path in enumerate(workspaces_to_build, 1):
         log = logger.bind(
             current=i, total=total, workspace_name=path.name, workspace_path=str(path)
         )
-        log.info("--- ビルド処理を開始 ---")
+        log.info('--- ビルド処理を開始 ---')
         try:
             output_path = app_instance.build_from_workspace(path, builder=builder)
-            log.bind(output_path=str(output_path)).success("ビルド成功")
+            log.bind(output_path=str(output_path)).success('ビルド成功')
             success_count += 1
         except Exception as e:
             log.bind(error=str(e)).error(
-                "❌ ビルドに失敗しました。",
-                exc_info=app_state.settings.log_level == "DEBUG",
+                '❌ ビルドに失敗しました。',
+                exc_info=app_state.settings.log_level == 'DEBUG',
             )
-        logger.info("---")
+        logger.info('---')
     logger.bind(success_count=success_count, total=total).info(
-        "✨ 全てのビルド処理が完了しました。"
+        '✨ 全てのビルド処理が完了しました。'
     )
 
 
@@ -314,7 +314,7 @@ def gui(
             help="最初に開くサービスを選択します ('pixiv' または 'fanbox')。",
             case_sensitive=False,
         ),
-    ] = "pixiv",
+    ] = 'pixiv',
 ) -> None:
     """ブラウザを起動し、PixivやFanboxページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
@@ -322,18 +322,18 @@ def gui(
 
     session_path = Path(DEFAULT_GUI_SESSION_PATH)
     logger.bind(session_path=str(session_path.resolve())).info(
-        "GUIセッションのデータを保存/読込します。"
+        'GUIセッションのデータを保存/読込します。'
     )
     if not session_path.exists():
-        logger.info("初回起動時、またはセッションが切れた場合はログインが必要です。")
+        logger.info('初回起動時、またはセッションが切れた場合はログインが必要です。')
 
     # サービスに基づいて開始URLを決定
-    if service == "fanbox":
-        start_url = "https://www.fanbox.cc/"
-        service_name = "Fanbox"
+    if service == 'fanbox':
+        start_url = 'https://www.fanbox.cc/'
+        service_name = 'Fanbox'
     else:
-        start_url = "https://www.pixiv.net/"
-        service_name = "Pixiv"
+        start_url = 'https://www.pixiv.net/'
+        service_name = 'Pixiv'
 
     try:
         with sync_playwright() as p:
@@ -345,19 +345,19 @@ def gui(
             gui_manager = GuiManager(page, app_instance)
             gui_manager.setup_bridge()
 
-            if page.url == "about:blank":
-                logger.info(f"{service_name}トップページに移動します。")
-                page.goto(start_url, wait_until="domcontentloaded")
+            if page.url == 'about:blank':
+                logger.info(f'{service_name}トップページに移動します。')
+                page.goto(start_url, wait_until='domcontentloaded')
             else:
-                logger.info("既存のセッションを再利用します。")
+                logger.info('既存のセッションを再利用します。')
 
             logger.info(
-                "ブラウザセッション待機中... ウィンドウを閉じるとプログラムは終了します。"
+                'ブラウザセッション待機中... ウィンドウを閉じるとプログラムは終了します。'
             )
             # ユーザーがブラウザを閉じるまで無期限に待機
-            context.wait_for_event("close", timeout=0)
+            context.wait_for_event('close', timeout=0)
     finally:
-        logger.info("GUIモードを終了します。")
+        logger.info('GUIモードを終了します。')
 
 
 @logger.catch(exclude=Pixiv2EpubError)
@@ -369,13 +369,13 @@ def run_app() -> None:
     try:
         app()
     except AuthenticationError as e:
-        logger.bind(error=str(e)).error("❌ 認証エラーが発生しました。")
+        logger.bind(error=str(e)).error('❌ 認証エラーが発生しました。')
         logger.info(
             "'pixiv2epub auth <service>' コマンドを実行して再認証してください。"
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e
     except Pixiv2EpubError as e:
         logger.bind(error=str(e)).error(
-            "❌ 処理中にエラーが発生しました。", exc_info=True
+            '❌ 処理中にエラーが発生しました。', exc_info=True
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from e

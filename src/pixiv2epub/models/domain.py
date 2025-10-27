@@ -1,6 +1,6 @@
 # FILE: src/pixiv2epub/models/domain.py
 """
-アプリケーションのドメイン（関心領域）における中心的なデータモデルを定義します。
+アプリケーションのドメイン(関心領域)における中心的なデータモデルを定義します。
 Unified Content Manifest (UCM) を中心とします。
 """
 
@@ -46,7 +46,7 @@ class ImageAsset(BaseModel, frozen=True):
 
 
 class PageAsset(BaseModel, frozen=True):
-    """EPUBの各ページ（XHTML）の情報を管理します。"""
+    """EPUBの各ページ(XHTML)の情報を管理します。"""
 
     id: str
     href: str
@@ -67,65 +67,83 @@ class EpubComponents(BaseModel):
     content_opf: bytes
     nav_xhtml: bytes
 
+
 # --- UCM (Unified Content Manifest) モデル ---
 # detail.json の新しいスキーマ
+
 
 class UCMBaseModel(BaseModel):
     # エイリアス名とフィールド名の両方で値を受け付ける
     model_config = ConfigDict(populate_by_name=True)
 
+
 class UCMCoreAuthor(UCMBaseModel):
     """schema.org/Person に準拠した著者情報"""
-    type_: str = Field("Person", alias="@type")
+
+    type_: str = Field('Person', alias='@type')
     name: str
-    identifier: str # 例: "tag:pixiv.net,2007-09-10:user:87654321"
+    identifier: str  # 例: "tag:pixiv.net,2007-09-10:user:87654321"
+
 
 class UCMCoreSeries(UCMBaseModel):
     """schema.org/CreativeWorkSeries に準拠したシリーズ情報"""
-    type_: str = Field("CreativeWorkSeries", alias="@type")
+
+    type_: str = Field('CreativeWorkSeries', alias='@type')
     name: str
-    identifier: str # 例: "tag:pixiv.net,2007-09-10:series:112233"
-    order: int | None = None # シリーズ内の順序
+    identifier: str  # 例: "tag:pixiv.net,2007-09-10:series:112233"
+    order: int | None = None  # シリーズ内の順序
+
 
 class UCMCoreMetadata(UCMBaseModel):
     """コンテンツの核となるメタデータ (JSON-LD準拠)"""
-    context_: dict[str, str] = Field(..., alias="@context")
-    type_: str = Field(..., alias="@type") # 例: "BlogPosting", "Article"
-    id_: str = Field(..., alias="@id") # 正規ID (tag: URI)
-    name: str # title
+
+    context_: dict[str, str] = Field(..., alias='@context')
+    type_: str = Field(..., alias='@type')  # 例: "BlogPosting", "Article"
+    id_: str = Field(..., alias='@id')  # 正規ID (tag: URI)
+    name: str  # title
     author: UCMCoreAuthor
-    isPartOf: UCMCoreSeries | None = None # series
+    isPartOf: UCMCoreSeries | None = None  # series
     datePublished: datetime
     dateModified: datetime | None = None
-    keywords: list[str] = Field(default_factory=list) # tags
+    keywords: list[str] = Field(default_factory=list)  # tags
     description: str
-    mainEntityOfPage: HttpUrl # original_source
-    image: str | None = None # cover_pathの代わり (リソースキーを指す)
+    mainEntityOfPage: HttpUrl  # original_source
+    image: str | None = None  # cover_pathの代わり (リソースキーを指す)
+
 
 class UCMResource(UCMBaseModel):
     """リソースマニフェストのエントリ"""
-    path: str # ワークスペース内の相対パス (例: "./assets/images/cover.jpg")
-    mediaType: str # 例: "image/jpeg"
-    role: str # 'cover', 'content', 'embeddedImage' など
+
+    path: str  # ワークスペース内の相対パス (例: "./assets/images/cover.jpg")
+    mediaType: str  # 例: "image/jpeg"
+    role: str  # 'cover', 'content', 'embeddedImage' など
+
 
 class UCMContentBlock(UCMBaseModel):
     """コンテンツの論理構造"""
-    type: str = "Page" # 構造のためシンプルなtype名を維持
+
+    type: str = 'Page'  # 構造のためシンプルなtype名を維持
     title: str
-    source: str # リソースマニフェスト内のキー (例: "resource-page-1")
+    source: str  # リソースマニフェスト内のキー (例: "resource-page-1")
+
 
 class UCMProviderData(UCMBaseModel):
     """プロバイダ固有のメタデータ (schema.org/PropertyValue)"""
-    type_: str = Field("PropertyValue", alias="@type")
-    propertyID: str # 例: "pixiv:textLength"
+
+    type_: str = Field('PropertyValue', alias='@type')
+    propertyID: str  # 例: "pixiv:textLength"
     value: Any
+
 
 class UnifiedContentManifest(UCMBaseModel):
     """
     detail.json の新しいスキーマ。
     UCM (Unified Content Manifest)
     """
-    model_config = ConfigDict(frozen=True, populate_by_name=True) # populate_by_name を追加
+
+    model_config = ConfigDict(
+        frozen=True, populate_by_name=True
+    )  # populate_by_name を追加
 
     core: UCMCoreMetadata
     contentStructure: list[UCMContentBlock]
@@ -133,7 +151,7 @@ class UnifiedContentManifest(UCMBaseModel):
     providerData: list[UCMProviderData] = Field(default_factory=list)
 
     @classmethod
-    def load(cls, path: Path) -> "UnifiedContentManifest":
+    def load(cls, path: Path) -> 'UnifiedContentManifest':
         """
         ワークスペースからdetail.jsonを読み込み、UCMを返します。
 
@@ -141,6 +159,6 @@ class UnifiedContentManifest(UCMBaseModel):
             FileNotFoundError: メタデータファイルが見つからない場合。
         """
         if not path.is_file():
-            raise FileNotFoundError(f"メタデータファイルが見つかりません: {path}")
+            raise FileNotFoundError(f'メタデータファイルが見つかりません: {path}')
         # デフォルトでエイリアスを尊重する model_validate_json を使用
-        return cls.model_validate_json(path.read_text(encoding="utf-8"))
+        return cls.model_validate_json(path.read_text(encoding='utf-8'))

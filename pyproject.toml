@@ -45,10 +45,10 @@ setup = [
 build = [{ cmd = "uv pip install -e ." }]
 
 # Ruffによるフォーマット
-format = "ruff format src tests"
+format = "ruff format src"
 
 # RuffによるLint（自動修正なし）
-lint = "ruff check src tests"
+lint = "ruff check src"
 
 # RuffによるLint（自動修正あり）
 lint-fix = "ruff check src --fix"

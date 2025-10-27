@@ -29,16 +29,16 @@ class BaseBuilder(ABC):
     ) -> UnifiedContentManifest:
         """ビルド対象のメタデータを読み込みます。"""
         if custom_metadata:
-            logger.debug("カスタムメタデータを使用してビルダーを初期化します。")
+            logger.debug('カスタムメタデータを使用してビルダーを初期化します。')
             return UnifiedContentManifest.model_validate(custom_metadata)
 
         try:
             return workspace.load_metadata()
         except FileNotFoundError as e:
-            raise BuildError(f"ビルドに必要なメタデータが見つかりません: {e}") from e
+            raise BuildError(f'ビルドに必要なメタデータが見つかりません: {e}') from e
         except Exception as e:
             raise BuildError(
-                f"メタデータの読み込み中にエラーが発生しました: {e}"
+                f'メタデータの読み込み中にエラーが発生しました: {e}'
             ) from e
 
     @classmethod

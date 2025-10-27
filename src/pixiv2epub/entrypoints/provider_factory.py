@@ -86,7 +86,7 @@ class ProviderFactory:
         builder = self._builders.get(provider_type)
         if not builder:
             raise ValueError(
-                f"サポートされていないプロバイダーです: {provider_type.name}"
+                f'サポートされていないプロバイダーです: {provider_type.name}'
             )
 
         try:
@@ -94,5 +94,5 @@ class ProviderFactory:
         except Exception as e:
             # 認証エラーなども含め、依存関係の構築失敗はここで捕捉
             raise RuntimeError(
-                f"{provider_type.name} の依存関係の構築に失敗しました: {e}"
+                f'{provider_type.name} の依存関係の構築に失敗しました: {e}'
             ) from e

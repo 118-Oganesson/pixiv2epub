@@ -54,9 +54,11 @@ class FanboxProvider(IProvider):
 
     @classmethod
     def get_provider_name(cls) -> str:
-        return "fanbox"
+        return 'fanbox'
 
-    def get_works(self, identifier: Any, content_type: ContentType) -> list[Workspace]:
+    def get_works(
+        self, identifier: int | str, content_type: ContentType
+    ) -> list[Workspace]:
         """
         IProviderインターフェースの統一エントリーポイント。
         コンテンツ種別に応じて適切な内部メソッドに処理を委譲します。
@@ -68,7 +70,7 @@ class FanboxProvider(IProvider):
             return self._get_creator_works(str(identifier))
         else:
             raise ProviderError(
-                f"Fanbox provider does not support content type: {content_type.name}",
+                f'Fanbox provider does not support content type: {content_type.name}',
                 self.get_provider_name(),
             )
 
@@ -77,7 +79,7 @@ class FanboxProvider(IProvider):
         クリエイターの全投稿を効率的に同期し、Workspaceのリストを返します。
         APIコール前に更新チェックを行うことで、不要なデータ取得をスキップします。
         """
-        logger.info(f"クリエイター ({creator_id}) の作品同期を開始します。")
+        logger.info(f'クリエイター ({creator_id}) の作品同期を開始します。')
         post_summaries = self._fetch_all_creator_posts_summary(creator_id)
         workspaces: list[Workspace] = []
         total = len(post_summaries)
@@ -90,13 +92,13 @@ class FanboxProvider(IProvider):
             manifest_path = workspace_path / MANIFEST_FILE_NAME
 
             # APIレスポンスから直接タイムスタンプを取得
-            api_timestamp = post_summary_data.get("updatedDatetime", "")
+            api_timestamp = post_summary_data.get('updatedDatetime', '')
 
             if not self._perform_pre_flight_check(manifest_path, api_timestamp):
-                log.info("コンテンツに変更なし、スキップします。")
+                log.info('コンテンツに変更なし、スキップします。')
                 continue
 
-            log.info("--- 投稿を処理中 ---")
+            log.info('--- 投稿を処理中 ---')
             try:
                 # _get_single_work は post_id のみを受け取る
                 workspace = self._get_single_work(post_id)
@@ -104,8 +106,8 @@ class FanboxProvider(IProvider):
                     workspaces.append(workspace)
             except Exception as e:
                 log.bind(error=str(e)).error(
-                    "投稿の処理中にエラーが発生しました。",
-                    exc_info=self.settings.log_level == "DEBUG",
+                    '投稿の処理中にエラーが発生しました。',
+                    exc_info=self.settings.log_level == 'DEBUG',
                 )
         return workspaces
 
@@ -123,7 +125,7 @@ class FanboxProvider(IProvider):
             # 2. ワークスペースを作成する前にアクセス可能性をチェック
             if not self._is_content_accessible(post_data_model.body):
                 logger.bind(post_id=post_id, title=post_data_model.body.title).warning(
-                    "有料コンテンツにアクセスできません。スキップします。"
+                    '有料コンテンツにアクセスできません。スキップします。'
                 )
                 return None
 
@@ -132,7 +134,7 @@ class FanboxProvider(IProvider):
                 post_id, self.get_provider_name()
             )
 
-            # 4. ワークスペースのクリーンアップ（古いソースを削除）
+            # 4. ワークスペースのクリーンアップ(古いソースを削除)
             if workspace.source_path.exists():
                 shutil.rmtree(workspace.source_path)
             workspace.source_path.mkdir(parents=True, exist_ok=True)
@@ -143,27 +145,27 @@ class FanboxProvider(IProvider):
             )
 
             # 6. メタデータとマニフェストを永続化
-            source_identifier = f"tag:fanbox.cc,{FANBOX_EPOCH}:post:{post_id}"
+            source_identifier = f'tag:fanbox.cc,{FANBOX_EPOCH}:post:{post_id}'
 
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
                 created_at_utc=datetime.now(UTC).isoformat(),
                 source_identifier=source_identifier,
                 content_etag=post_data_model.body.updated_datetime,
-                workspace_schema_version="1.0",
-                provider_specific_data={"creatorId": post_data_model.body.creator_id},
+                workspace_schema_version='1.0',
+                provider_specific_data={'creatorId': post_data_model.body.creator_id},
             )
             self.repository.persist_metadata(workspace, metadata, manifest)
 
             logger.bind(title=metadata.core.name).success(
-                "作品データの処理が完了しました。"
+                '作品データの処理が完了しました。'
             )
             return workspace
 
         except Exception as e:
             logger.bind(post_id=post_id, error=str(e)).error(
-                "単一投稿の処理中にエラーが発生しました。",
-                exc_info=self.settings.log_level == "DEBUG",
+                '単一投稿の処理中にエラーが発生しました。',
+                exc_info=self.settings.log_level == 'DEBUG',
             )
             return None
 
@@ -175,29 +177,29 @@ class FanboxProvider(IProvider):
         (旧 _fetch_all_creator_post_ids の改良版)
         """
         log = logger.bind(creator_id=creator_id)
-        log.info("クリエイターの全投稿サマリーの取得を開始")
+        log.info('クリエイターの全投稿サマリーの取得を開始')
         summaries: list[tuple[str, dict[str, Any]]] = []
         try:
             paginate_response = self.api_client.post_paginate_creator(creator_id)
-            page_urls = paginate_response.get("body", [])
+            page_urls = paginate_response.get('body', [])
             if not isinstance(page_urls, list):
                 return []
 
             for i, page_url in enumerate(page_urls, 1):
-                log.debug(f"投稿リスト {i}/{len(page_urls)} ページ目を取得中...")
+                log.debug(f'投稿リスト {i}/{len(page_urls)} ページ目を取得中...')
                 list_response = self.api_client.post_list_creator(page_url)
-                for item in list_response.get("body", []):
+                for item in list_response.get('body', []):
                     if (
                         isinstance(item, dict)
-                        and "id" in item
-                        and "updatedDatetime" in item
+                        and 'id' in item
+                        and 'updatedDatetime' in item
                     ):
-                        summaries.append((item["id"], item))
+                        summaries.append((item['id'], item))
         except Exception as e:
-            log.bind(error=str(e)).error("投稿サマリー取得中にエラーが発生しました。")
+            log.bind(error=str(e)).error('投稿サマリー取得中にエラーが発生しました。')
             return []
 
-        log.bind(count=len(summaries)).info("投稿サマリーの取得が完了しました。")
+        log.bind(count=len(summaries)).info('投稿サマリーの取得が完了しました。')
         return summaries
 
     def _perform_pre_flight_check(
@@ -211,17 +213,17 @@ class FanboxProvider(IProvider):
         if not manifest_path.is_file():
             return True  # マニフェストが存在しない = 新規
         try:
-            with manifest_path.open("r", encoding="utf-8") as f:
+            with manifest_path.open('r', encoding='utf-8') as f:
                 manifest_data = json.load(f)
             # content_etag フィールドにタイムスタンプが格納されている
-            local_timestamp = manifest_data.get("content_etag")
+            local_timestamp = manifest_data.get('content_etag')
             return not (local_timestamp and local_timestamp == api_timestamp)
         except (OSError, json.JSONDecodeError):
             return True  # マニフェストが壊れている = 要更新
 
     def _is_content_accessible(self, post: Post) -> bool:
         """
-        投稿が有料かつ本文が取得できない（アクセス不能）状態でないかを確認します。
+        投稿が有料かつ本文が取得できない(アクセス不能)状態でないかを確認します。
         """
         return not (post.fee_required > 0 and post.body is None)
 
@@ -241,8 +243,8 @@ class FanboxProvider(IProvider):
 
             if post_data.body:
                 parsed_html = self._parser.parse(post_data.body, image_paths)
-                page_path = workspace.source_path / "page-1.xhtml"
-                page_path.write_text(parsed_html, encoding="utf-8")
+                page_path = workspace.source_path / 'page-1.xhtml'
+                page_path.write_text(parsed_html, encoding='utf-8')
 
             return self._mapper.map_to_metadata(
                 workspace=workspace,
@@ -252,6 +254,6 @@ class FanboxProvider(IProvider):
             )
         except (ValidationError, KeyError, TypeError) as e:
             raise DataProcessingError(
-                f"投稿ID {workspace.id} のデータ解析に失敗: {e}",
+                f'投稿ID {workspace.id} のデータ解析に失敗: {e}',
                 self.get_provider_name(),
             ) from e

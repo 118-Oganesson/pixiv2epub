@@ -12,7 +12,7 @@ from ...shared.exceptions import ApiError, AuthenticationError
 
 
 class BaseApiClient(ABC):
-    """APIクライアントの共通ロジック（リトライ、エラーハンドリング）を実装する基底クラス。"""
+    """APIクライアントの共通ロジック(リトライ、エラーハンドリング)を実装する基底クラス。"""
 
     def __init__(
         self,
@@ -32,7 +32,9 @@ class BaseApiClient(ABC):
         """具象クライアントが捕捉すべきメインの例外クラスを返します。"""
         raise NotImplementedError
 
-    def _execute_with_retries(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    def _execute_with_retries(
+        self, func: Callable, *args: object, **kwargs: object
+    ) -> object:
         """API呼び出しをリトライ機構付きで実行します。"""
         last_exception = None
         for attempt in range(1, self.retries + 1):
@@ -42,61 +44,61 @@ class BaseApiClient(ABC):
                 return result
             except (self._api_exception_class, RequestException) as e:
                 last_exception = e
-                status_code = getattr(getattr(e, "response", None), "status_code", None)
+                status_code = getattr(getattr(e, 'response', None), 'status_code', None)
 
                 # kwargsから処理対象のIDを抽出し、ログに含めることでデバッグを容易にします。
                 context: dict[str, Any] = {
-                    "func_name": func.__name__,
-                    "attempt": attempt,
-                    "total_retries": self.retries,
-                    "error": str(e),
-                    "status_code": status_code or "N/A",
+                    'func_name': func.__name__,
+                    'attempt': attempt,
+                    'total_retries': self.retries,
+                    'error': str(e),
+                    'status_code': status_code or 'N/A',
                 }
                 id_keys = [
-                    "work_id",
-                    "novel_id",
-                    "series_id",
-                    "post_id",
-                    "creator_id",
-                    "user_id",
+                    'work_id',
+                    'novel_id',
+                    'series_id',
+                    'post_id',
+                    'creator_id',
+                    'user_id',
                 ]
                 # argsからもIDを抽出しようと試みる (例: novel_detail(12345))
                 if args:
-                    context["target_id"] = args[0]
+                    context['target_id'] = args[0]
                 # kwargsの方がキーが明示的なので優先する
                 for key in id_keys:
                     if key in kwargs:
-                        context["target_id"] = kwargs[key]
+                        context['target_id'] = kwargs[key]
                         break
 
                 log = logger.bind(**context)
 
                 if status_code in [401, 403]:
                     raise AuthenticationError(
-                        f"API認証エラー (HTTP {status_code})",
+                        f'API認証エラー (HTTP {status_code})',
                         provider_name=self.provider_name,
                     ) from e
 
                 if status_code and 400 <= status_code < 500:
-                    log.error("APIで回復不能なクライアントエラーが発生しました。")
+                    log.error('APIで回復不能なクライアントエラーが発生しました。')
                     raise ApiError(
-                        f"APIクライアントエラー (HTTP {status_code})",
+                        f'APIクライアントエラー (HTTP {status_code})',
                         provider_name=self.provider_name,
                     ) from e
 
-                log.warning("API呼び出し中にエラーが発生しました。")
+                log.warning('API呼び出し中にエラーが発生しました。')
                 if attempt < self.retries:
                     time.sleep(self.delay * (attempt + 1))  # Backoff delay
 
         logger.bind(func_name=func.__name__).error(
-            "API呼び出しが最終的に失敗しました。"
+            'API呼び出しが最終的に失敗しました。'
         )
         raise ApiError(
-            f"API呼び出しがリトライ上限に達しました: {func.__name__}",
+            f'API呼び出しがリトライ上限に達しました: {func.__name__}',
             provider_name=self.provider_name,
         ) from last_exception
 
-    def _safe_api_call(self, func: Callable, *args: Any, **kwargs: Any) -> Any:
+    def _safe_api_call(self, func: Callable, *args: object, **kwargs: object) -> object:
         """
         API呼び出しをサーキットブレーカーとリトライ機構付きで安全に実行します。
         サーキットが開いている場合、この関数は即座に失敗します。
@@ -105,9 +107,9 @@ class BaseApiClient(ABC):
             return self.breaker.call(self._execute_with_retries, func, *args, **kwargs)
         except CircuitBreakerError as e:
             logger.bind(func_name=func.__name__).error(
-                "サーキットブレーカー作動中。API呼び出しを中止しました。"
+                'サーキットブレーカー作動中。API呼び出しを中止しました。'
             )
             raise ApiError(
-                "サービスが一時的に利用不可のようです。しばらくしてから再試行してください (サーキットブレーカー作動中)。",
+                'サービスが一時的に利用不可のようです。しばらくしてから再試行してください (サーキットブレーカー作動中)。',
                 provider_name=self.provider_name,
             ) from e
