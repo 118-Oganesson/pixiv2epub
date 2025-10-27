@@ -148,7 +148,7 @@ class PixivProvider(IProvider):
         workspace.source_path.mkdir(parents=True, exist_ok=True)
 
         # 4. ワークスペースにコンテンツを処理・格納
-        fetched_data = {
+        fetched_data: dict[str, dict[str, Any]] = {
             'primary_data': raw_webview_novel_data,
             'secondary_data': raw_novel_detail_data,
         }
@@ -245,7 +245,9 @@ class PixivProvider(IProvider):
         return downloaded_workspaces
 
     def _perform_hash_check(
-        self, manifest_path: Path, api_response: dict
+        self,
+        manifest_path: Path,
+        api_response: dict[str, Any],
     ) -> tuple[bool, str]:
         """
         コンテンツのハッシュ値を比較して更新を判断します。
@@ -265,7 +267,7 @@ class PixivProvider(IProvider):
     def _process_and_populate_workspace(
         self,
         workspace: Workspace,
-        fetched_data: dict[str, dict],
+        fetched_data: dict[str, dict[str, Any]],
     ) -> UnifiedContentManifest:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
@@ -321,7 +323,7 @@ class PixivProvider(IProvider):
     def get_series_info(self, series_id: int | str) -> NovelSeriesApiResponse:
         """シリーズ詳細情報を取得します。"""
         try:
-            series_data_dict = self.api_client.novel_series(series_id)
+            series_data_dict = self.api_client.novel_series(int(series_id))
             return NovelSeriesApiResponse.model_validate(series_data_dict)
         except (PixivError, ValidationError) as e:
             raise ApiError(
@@ -331,8 +333,9 @@ class PixivProvider(IProvider):
 
     def _fetch_all_user_novel_ids(self, user_id: int) -> tuple[list[int], list[int]]:
         """指定されたユーザーの全小説IDを取得し、単独作品とシリーズ作品IDに分離します。"""
-        single_ids, series_ids = [], set()
-        next_url = None
+        single_ids: list[int] = []
+        series_ids: set[int] = set()
+        next_url: str | None = None
         while True:
             res = self.api_client.user_novels(user_id, next_url)
             for novel in res.get('novels', []):

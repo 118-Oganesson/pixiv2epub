@@ -46,7 +46,7 @@ class AssetManager:
 
     def _collect_image_files(self) -> list[ImageAsset]:
         """`assets/images`ディレクトリから画像ファイルを収集します。"""
-        image_assets = []
+        image_assets: list[ImageAsset] = []
         if not self.image_dir.is_dir():
             return image_assets
         image_paths = sorted([p for p in self.image_dir.iterdir() if p.is_file()])

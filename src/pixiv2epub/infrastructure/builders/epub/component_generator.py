@@ -1,5 +1,6 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
 import re
+from typing import Any
 
 from jinja2 import Environment
 from loguru import logger
@@ -38,7 +39,7 @@ class EpubComponentGenerator:
         plain_description = ''
         if self.manifest.core.description:
             plain_description = re.sub(r'<[^>]+>', '', self.manifest.core.description)
-            plain_description = plain_description.replace('\n', ' ').strip()
+        plain_description = plain_description.replace('\n', ' ').strip()
 
         final_pages = self._generate_main_pages(css_rel_path)
         info_page = self._generate_info_page(css_rel_path, cover_asset)
@@ -80,7 +81,7 @@ class EpubComponentGenerator:
             logger.warning(f'CSSテンプレートのレンダリングに失敗: {e}')
             return None
 
-    def _render_template(self, template_name: str, context: dict) -> bytes:
+    def _render_template(self, template_name: str, context: dict[str, Any]) -> bytes:
         template = self.template_env.get_template(template_name)
         rendered_str = template.render(context)
         return rendered_str.encode('utf-8')
@@ -104,7 +105,7 @@ class EpubComponentGenerator:
                     r'src="\.\./assets/(images/.+?)"', r'src="../\1"', content
                 )
 
-                context = {
+                context: dict[str, Any] = {
                     'title': page_block.title,
                     'content': content,
                     'css_path': css_path,
@@ -132,13 +133,13 @@ class EpubComponentGenerator:
         formatted_date = core.datePublished.strftime('%Y年%m月%d日 %H:%M')
 
         # providerDataから text_length を検索
-        text_length = 'N/A'
+        text_length: Any = 'N/A'
         for item in self.manifest.providerData:
             if item.propertyID.endswith(':textLength'):
                 text_length = item.value
                 break
 
-        context = {
+        context: dict[str, Any] = {
             'manifest': self.manifest,
             'css_path': css_path,
             'formatted_date': formatted_date,
@@ -177,7 +178,8 @@ class EpubComponentGenerator:
         plain_description: str,
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
-        manifest_items, spine_itemrefs = [], []
+        manifest_items: list[dict[str, Any]] = []
+        spine_itemrefs: list[dict[str, Any]] = []
         manifest_items.append(
             {
                 'id': 'nav',
@@ -240,7 +242,7 @@ class EpubComponentGenerator:
             ),
         }
 
-        context = {
+        context: dict[str, Any] = {
             'manifest': self.manifest,
             'provider_ids': provider_ids,
             'manifest_items': manifest_items,
@@ -255,7 +257,7 @@ class EpubComponentGenerator:
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
         # 構造化された単一のコンテキスト辞書を作成
-        nav_context = {
+        nav_context: dict[str, Any] = {
             'toc': {
                 'has_info_page': True,
                 'info_page': {

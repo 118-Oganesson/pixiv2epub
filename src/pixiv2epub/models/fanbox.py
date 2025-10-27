@@ -173,7 +173,7 @@ class PostBodyArticle(FanboxBaseModel):
     url_embed_map: dict[str, UrlEmbedMapItem] = Field(
         default_factory=dict, alias='urlEmbedMap'
     )
-    embed_map: dict = Field(default_factory=dict, alias='embedMap')
+    embed_map: dict[str, Any] = Field(default_factory=dict, alias='embedMap')
 
 
 class PostBodyText(FanboxBaseModel):

@@ -1,5 +1,6 @@
 # FILE: src/pixiv2epub/entrypoints/gui/manager.py
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 from playwright.sync_api import Page
@@ -20,7 +21,7 @@ class GuiManager:
         self.app = app
         self.provider_factory = ProviderFactory(app.settings)
 
-    def _run_task_from_browser(self, url: str) -> dict:
+    def _run_task_from_browser(self, url: str) -> dict[str, Any]:
         """ブラウザから呼び出されるラッパー関数。"""
         log = logger.bind(url=url)
         log.info('ブラウザからタスク実行リクエストを受け取りました。')

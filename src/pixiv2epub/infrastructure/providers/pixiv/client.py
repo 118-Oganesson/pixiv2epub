@@ -1,5 +1,6 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/client.py
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
@@ -45,23 +46,23 @@ class PixivApiClient(BaseApiClient):
     def _api_exception_class(self) -> type[Exception]:
         return PixivError
 
-    def novel_detail(self, novel_id: int) -> dict:
+    def novel_detail(self, novel_id: int) -> dict[str, Any]:
         return self._safe_api_call(self.api.novel_detail, novel_id=novel_id)
 
-    def webview_novel(self, novel_id: int) -> dict:
+    def webview_novel(self, novel_id: int) -> dict[str, Any]:
         return self._safe_api_call(self.api.webview_novel, novel_id=novel_id)
 
-    def novel_series(self, series_id: int) -> dict:
+    def novel_series(self, series_id: int) -> dict[str, Any]:
         return self._safe_api_call(self.api.novel_series, series_id=series_id)
 
-    def illust_detail(self, illust_id: int) -> dict:
+    def illust_detail(self, illust_id: int) -> dict[str, Any]:
         return self._safe_api_call(self.api.illust_detail, illust_id=illust_id)
 
-    def user_novels(self, user_id: int, next_url: str | None = None) -> dict:
+    def user_novels(self, user_id: int, next_url: str | None = None) -> dict[str, Any]:
         if next_url:
             params = self.api.parse_qs(next_url)
             return self._safe_api_call(self.api.user_novels, **params)
         return self._safe_api_call(self.api.user_novels, user_id=user_id)
 
     def download(self, url: str, path: Path, name: str) -> None:
-        return self._safe_api_call(self.api.download, url, path=path, name=name)
+        self._safe_api_call(self.api.download, url, path=path, name=name)

@@ -1,6 +1,7 @@
 # FILE: src/pixiv2epub/domain/interfaces.py
+
 from pathlib import Path
-from typing import Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from ..models.domain import UnifiedContentManifest
 from ..models.fanbox import Post
@@ -55,7 +56,9 @@ class IProvider(Protocol):
 class IPixivImageDownloader(Protocol):
     """Pixivの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
 
-    def download_cover(self, novel_detail: dict, image_dir: Path) -> Path | None:
+    def download_cover(
+        self, novel_detail: dict[str, Any], image_dir: Path
+    ) -> Path | None:
         """小説の表紙画像をダウンロードします。"""
         ...
 

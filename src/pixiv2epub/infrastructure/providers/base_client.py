@@ -33,7 +33,10 @@ class BaseApiClient(ABC):
         raise NotImplementedError
 
     def _execute_with_retries(
-        self, func: Callable, *args: object, **kwargs: object
+        self,
+        func: Callable[..., object],
+        *args: object,
+        **kwargs: object,
     ) -> object:
         """API呼び出しをリトライ機構付きで実行します。"""
         last_exception = None
@@ -98,7 +101,9 @@ class BaseApiClient(ABC):
             provider_name=self.provider_name,
         ) from last_exception
 
-    def _safe_api_call(self, func: Callable, *args: object, **kwargs: object) -> object:
+    def _safe_api_call(
+        self, func: Callable[..., object], *args: object, **kwargs: object
+    ) -> object:
         """
         API呼び出しをサーキットブレーカーとリトライ機構付きで安全に実行します。
         サーキットが開いている場合、この関数は即座に失敗します。

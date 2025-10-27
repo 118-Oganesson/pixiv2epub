@@ -1,6 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/downloader.py
 import re
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -34,7 +35,7 @@ class ImageDownloader(BaseDownloader):
 
     def download_cover(
         self,
-        novel_detail: dict,
+        novel_detail: dict[str, Any],
         image_dir: Path,
     ) -> Path | None:
         """小説の表紙画像をダウンロードします。"""
@@ -85,7 +86,7 @@ class ImageDownloader(BaseDownloader):
             try:
                 illust_resp = self.api_client.illust_detail(int(illust_id))
                 illust = illust_resp.get('illust', {})
-                url: str | None = (
+                illust_url: str | None = (
                     illust.get('meta_single_page', {}).get('original_image_url')
                     if illust.get('page_count', 1) == 1
                     else (
@@ -94,10 +95,12 @@ class ImageDownloader(BaseDownloader):
                         .get('original')
                     )
                 )
-                if url:
-                    ext = url.split('.')[-1].split('?')[0]
+                if illust_url:
+                    ext = illust_url.split('.')[-1].split('?')[0]
                     filename = f'{PIXIV_IMAGE_PREFIX}{illust_id}.{ext}'
-                    if path := self._download_single_image(url, filename, image_dir):
+                    if path := self._download_single_image(
+                        illust_url, filename, image_dir
+                    ):
                         image_paths[illust_id] = path
             except Exception as e:
                 logger.warning(f'イラスト {illust_id} の取得に失敗: {e}')

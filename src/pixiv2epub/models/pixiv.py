@@ -123,7 +123,6 @@ class NovelApiResponse(PixivBaseModel):
         return v
 
     @computed_field
-    @property
     def computed_series_order(self) -> int | None:
         """series_navigationデータからシリーズ内の順序を導出します。"""
         if not self.series_id or not self.series_navigation:

@@ -2,6 +2,7 @@
 import time
 import urllib.parse
 from pathlib import Path
+from typing import Any
 
 import cloudscraper
 from loguru import logger
@@ -48,7 +49,9 @@ class FanboxApiClient(BaseApiClient):
     def _api_exception_class(self) -> type[Exception]:
         return RequestException
 
-    def _get_json(self, endpoint: str, params: dict | None = None) -> dict:
+    def _get_json(
+        self, endpoint: str, params: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         """GETリクエストを送信し、JSONレスポンスを返します。"""
         url = self.base_url + endpoint
         response = self.session.get(url, params=params)
@@ -57,25 +60,25 @@ class FanboxApiClient(BaseApiClient):
 
     # --- データ取得メソッド ---
 
-    def creator_info(self, creator_id: str) -> dict:
+    def creator_info(self, creator_id: str) -> dict[str, Any]:
         """指定されたクリエイターのプロフィール情報を取得します。"""
         return self._safe_api_call(
             self._get_json, 'creator.get', params={'creatorId': creator_id}
         )
 
-    def post_info(self, post_id: str) -> dict:
+    def post_info(self, post_id: str) -> dict[str, Any]:
         """指定された投稿IDの詳細な情報を取得します。"""
         return self._safe_api_call(
             self._get_json, 'post.info', params={'postId': post_id}
         )
 
-    def post_paginate_creator(self, creator_id: str) -> dict:
+    def post_paginate_creator(self, creator_id: str) -> dict[str, Any]:
         """クリエイターの投稿ページのURLリストを取得します。"""
         return self._safe_api_call(
             self._get_json, 'post.paginateCreator', params={'creatorId': creator_id}
         )
 
-    def post_list_creator(self, url: str) -> dict:
+    def post_list_creator(self, url: str) -> dict[str, Any]:
         """ページURLから投稿リストを取得します。"""
         query_str = urllib.parse.urlparse(url).query
         params = dict(urllib.parse.parse_qsl(query_str))
