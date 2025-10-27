@@ -40,7 +40,7 @@ def _login_and_get_code(
     }
     logger.debug('Code verifier: {}', code_verifier)
 
-    auth_code_holder = []
+    auth_code_holder: list[str] = []
 
     def handle_request(request: Request) -> None:
         if request.url.startswith('pixiv://'):

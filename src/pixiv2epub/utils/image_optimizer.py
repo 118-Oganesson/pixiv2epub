@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -284,7 +285,7 @@ class ImageCompressor:
                     logger.error('画像圧縮中にエラーが発生しました: {}', e)
         return results
 
-    def _run_command(self, cmd: list[str], timeout: int = 60) -> dict[str, bytes | int]:
+    def _run_command(self, cmd: list[str], timeout: int = 60) -> dict[str, Any]:
         """外部コマンドを実行し、結果をキャプチャします。"""
         try:
             logger.debug('コマンド実行: {}', ' '.join(cmd))
@@ -309,7 +310,7 @@ class ImageCompressor:
         tmp_out_path: Path,
         tool_name: str,
         cmd: list[str],
-        result: dict,
+        result: dict[str, Any],
     ) -> CompressionResult:
         """コマンド実行結果をCompressionResultに変換するヘルパー。"""
         success = result['returncode'] == 0 and tmp_out_path.is_file()
