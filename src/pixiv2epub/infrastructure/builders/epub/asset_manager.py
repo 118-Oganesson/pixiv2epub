@@ -7,7 +7,7 @@ from loguru import logger
 from ....models.domain import ImageAsset, UCMResource, UnifiedContentManifest
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
-from ....utils.common import get_media_type_from_filename
+from ....utils.media_types import get_media_type_from_filename
 
 
 class AssetManager:

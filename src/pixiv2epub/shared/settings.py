@@ -271,6 +271,18 @@ class WorkspaceSettings(BaseModel):
     )
 
 
+class CliSettings(BaseModel):
+    """CLI/GUIエントリーポイントに固有の設定"""
+
+    default_gui_session_path: Path = Field(
+        default=Path('./.gui_session'),
+        description='GUIモードで使用するブラウザセッションのデフォルトパス。',
+    )
+    default_env_filename: str = Field(
+        default='.env', description='.envファイルのデフォルト名。'
+    )
+
+
 class Settings(BaseSettings):
     """
     アプリケーションの階層的設定管理クラス。
@@ -288,6 +300,7 @@ class Settings(BaseSettings):
     builder: BuilderSettings = Field(default_factory=BuilderSettings)
     compression: CompressionSettings = Field(default_factory=CompressionSettings)
     workspace: WorkspaceSettings = Field(default_factory=WorkspaceSettings)
+    cli: CliSettings = Field(default_factory=CliSettings)
     log_level: str = 'INFO'
 
     _config_file: Path | None = None

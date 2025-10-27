@@ -22,7 +22,6 @@ from ..shared.exceptions import (
 )
 from ..shared.settings import Settings
 from ..utils.logging import setup_logging
-from .constants import DEFAULT_ENV_FILENAME, DEFAULT_GUI_SESSION_PATH
 from .gui.manager import GuiManager
 from .provider_factory import ProviderFactory
 
@@ -139,9 +138,16 @@ def auth(
     ] = 'pixiv',
 ) -> None:
     """ブラウザで指定されたサービスにログインし、認証情報を保存します。"""
-    session_path = Path(DEFAULT_GUI_SESSION_PATH)
+
+    app_state: AppState = ctx.obj
+    session_path = Path(app_state.settings.cli.default_gui_session_path)
     env_path_str = find_dotenv()
-    env_path = Path(env_path_str) if env_path_str else Path(DEFAULT_ENV_FILENAME)
+    env_path = (
+        Path(env_path_str)
+        if env_path_str
+        else Path(app_state.settings.cli.default_env_filename)
+    )
+
     if not env_path.exists():
         env_path.touch()
 
@@ -150,7 +156,6 @@ def auth(
     )
 
     try:
-        app_state: AppState = ctx.obj
         if service == 'pixiv':
             logger.info('Pixiv認証を開始します...')
             refresh_token = get_pixiv_refresh_token(
@@ -173,6 +178,7 @@ def auth(
             logger.bind(env_path=str(env_path.resolve())).success(
                 'FANBOX認証成功! FANBOXSESSIDを保存しました。'
             )
+
     except AuthenticationError as e:
         logger.bind(error=str(e)).error('❌ 認証に失敗しました。')
         raise typer.Exit(code=1) from e
@@ -320,7 +326,8 @@ def gui(
     app_state: AppState = ctx.obj
     app_instance = app_state.app
 
-    session_path = Path(DEFAULT_GUI_SESSION_PATH)
+    session_path = Path(app_state.settings.cli.default_gui_session_path)
+
     logger.bind(session_path=str(session_path.resolve())).info(
         'GUIセッションのデータを保存/読込します。'
     )

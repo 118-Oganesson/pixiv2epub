@@ -20,7 +20,7 @@ from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME
-from ...utils.common import get_media_type_from_filename
+from ...utils.media_types import get_media_type_from_filename
 from ..providers.fanbox.constants import FANBOX_EPOCH
 from ..providers.pixiv.constants import PIXIV_EPOCH, PIXIV_NOVEL_URL
 from .interfaces import IMetadataMapper

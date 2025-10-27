@@ -1,6 +1,6 @@
-# FILE: src/pixiv2epub/utils/common.py
+# FILE: src/pixiv2epub/shared/media_types.py
 """
-アプリケーション全体で共有される共通のユーティリティ関数。
+ファイル拡張子とMIMEタイプに関連する共有ユーティリティ。
 """
 
 
