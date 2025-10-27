@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 # 定数をこのファイル内に配置
 INVALID_PATH_CHARS_REGEX = r'[\\/:*?"<>|]'
@@ -34,7 +34,7 @@ def sanitize_path_part(part: str, max_length: int) -> str:
 
 
 def generate_sanitized_path(
-    template: str, variables: Dict[str, Any], max_length: int
+    template: str, variables: dict[str, Any], max_length: int
 ) -> Path:
     """テンプレートと変数から安全なパスを生成します。変数を先にサニタイズします。"""
 

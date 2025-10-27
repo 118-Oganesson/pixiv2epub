@@ -5,7 +5,6 @@ from base64 import urlsafe_b64encode
 from hashlib import sha256
 from pathlib import Path
 from secrets import token_urlsafe
-from typing import Tuple
 from urllib.parse import urlencode
 
 import requests
@@ -21,7 +20,7 @@ def _s256(data: bytes) -> str:
     return urlsafe_b64encode(sha256(data).digest()).rstrip(b"=").decode("ascii")
 
 
-def _oauth_pkce() -> Tuple[str, str]:
+def _oauth_pkce() -> tuple[str, str]:
     """PKCE用の code_verifier と code_challenge を生成する"""
     code_verifier = token_urlsafe(32)
     code_challenge = _s256(code_verifier.encode("ascii"))
@@ -31,7 +30,7 @@ def _oauth_pkce() -> Tuple[str, str]:
 def _login_and_get_code(
     save_session_path: Path,
     settings: PixivAuthSettings,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
     """Playwright を使用してブラウザでログインし、認可コードを取得する"""
     code_verifier, code_challenge = _oauth_pkce()
     login_params = {
@@ -43,7 +42,7 @@ def _login_and_get_code(
 
     auth_code_holder = []
 
-    def handle_request(request: Request):
+    def handle_request(request: Request) -> None:
         if request.url.startswith("pixiv://"):
             logger.info("コールバックURLを検出: {}", request.url)
             match = re.search(r"code=([^&]*)", request.url)
@@ -95,7 +94,7 @@ def _login_and_get_code(
 def _get_refresh_token(
     code: str,
     code_verifier: str,
-    settings: PixivAuthSettings, 
+    settings: PixivAuthSettings,
 ) -> str:
     """認可コードを使用してリフレッシュトークンを取得する"""
     data = {
@@ -108,7 +107,7 @@ def _get_refresh_token(
         "redirect_uri": settings.redirect_uri,
     }
     headers = {
-        "User-Agent": settings.user_agent, 
+        "User-Agent": settings.user_agent,
         "App-OS-Version": "14.6",
         "App-OS": "ios",
     }
@@ -127,7 +126,7 @@ def _get_refresh_token(
 
 def get_pixiv_refresh_token(
     save_session_path: Path,
-    settings: PixivAuthSettings, 
+    settings: PixivAuthSettings,
 ) -> str:
     """
     一連の認証フローを実行し、Pixivのリフレッシュトークンを取得する。

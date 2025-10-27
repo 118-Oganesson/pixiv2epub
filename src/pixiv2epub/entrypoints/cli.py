@@ -1,13 +1,12 @@
 # FILE: src/pixiv2epub/entrypoints/cli.py
 import asyncio
 from pathlib import Path
-from typing import List, Optional
+from typing import Annotated
 
 import typer
 from dotenv import find_dotenv, set_key
 from loguru import logger
 from playwright.sync_api import sync_playwright
-from typing_extensions import Annotated
 
 from ..app import Application
 from ..domain.orchestrator import DownloadBuildOrchestrator
@@ -37,16 +36,16 @@ class AppState:
     """サブコマンドに渡すための状態を保持するクラス"""
 
     def __init__(self):
-        self._settings: Optional[Settings] = None
-        self._app: Optional[Application] = None
-        self.provider_factory: Optional[ProviderFactory] = None
+        self._settings: Settings | None = None
+        self._app: Application | None = None
+        self.provider_factory: ProviderFactory | None = None
 
     def initialize_settings(
         self,
-        config_file: Optional[Path],
+        config_file: Path | None,
         log_level: str,
         require_auth: bool = True,
-    ):
+    ) -> None:
         """設定オブジェクトを初期化する。"""
         if self._settings is None:
             try:
@@ -93,7 +92,7 @@ def main_callback(
         ),
     ] = False,
     config: Annotated[
-        Optional[Path],
+        Path | None,
         typer.Option(
             "-c",
             "--config",
@@ -113,7 +112,7 @@ def main_callback(
             show_default=False,
         ),
     ] = False,
-):
+) -> None:
     """
     Pixiv/Fanbox to EPUB Converter
     """
@@ -138,7 +137,7 @@ def auth(
             case_sensitive=False,
         ),
     ] = "pixiv",
-):
+) -> None:
     """ブラウザで指定されたサービスにログインし、認証情報を保存します。"""
     session_path = Path(DEFAULT_GUI_SESSION_PATH)
     env_path_str = find_dotenv()
@@ -179,7 +178,7 @@ def auth(
         raise typer.Exit(code=1)
 
 
-def _handle_run(app_state: AppState, target_input: str):
+def _handle_run(app_state: AppState, target_input: str) -> None:
     """ダウンロードとビルド処理を実行します。"""
     try:
         if not app_state.provider_factory:
@@ -197,7 +196,7 @@ def _handle_run(app_state: AppState, target_input: str):
         logger.error(f"処理中にエラーが発生しました: {e}", exc_info=True)
 
 
-def _handle_download(app_state: AppState, target_input: str):
+def _handle_download(app_state: AppState, target_input: str) -> None:
     """ダウンロード処理のみを実行します。"""
     try:
         if not app_state.provider_factory:
@@ -224,7 +223,7 @@ def run(
             metavar="INPUT",
         ),
     ],
-):
+) -> None:
     """指定されたURLまたはIDの作品をダウンロードし、EPUBをビルドします。"""
     _handle_run(ctx.obj, target_input)
 
@@ -239,7 +238,7 @@ def download(
             metavar="INPUT",
         ),
     ],
-):
+) -> None:
     """作品データをワークスペースにダウンロードするだけで終了します。"""
     _handle_download(ctx.obj, target_input)
 
@@ -258,12 +257,12 @@ def build(
             metavar="WORKSPACE_PATH",
         ),
     ],
-):
+) -> None:
     """既存のワークスペースディレクトリからEPUBをビルドします。"""
     app_state: AppState = ctx.obj
     app_instance = app_state.app
 
-    workspaces_to_build: List[Path] = []
+    workspaces_to_build: list[Path] = []
 
     try:
         Workspace.from_path(workspace_path)
@@ -316,7 +315,7 @@ def gui(
             case_sensitive=False,
         ),
     ] = "pixiv",
-):
+) -> None:
     """ブラウザを起動し、PixivやFanboxページ上で直接操作するGUIモードを開始します。"""
     app_state: AppState = ctx.obj
     app_instance = app_state.app
@@ -362,7 +361,7 @@ def gui(
 
 
 @logger.catch(exclude=Pixiv2EpubError)
-def run_app():
+def run_app() -> None:
     """
     アプリケーション全体を@logger.catchでラップし、
     制御下の例外は個別処理、それ以外をLoguruに記録させるためのラッパー関数。

@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/strategies/interfaces.py
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from ...models.domain import UnifiedContentManifest
 from ...models.workspace import Workspace
@@ -13,7 +13,7 @@ class IContentParser(ABC):
     """
 
     @abstractmethod
-    def parse(self, raw_content: Any, image_paths: Dict[str, Path]) -> str:
+    def parse(self, raw_content: Any, image_paths: dict[str, Path]) -> str:
         """APIレスポンスの本文をパースし、単一のHTML文字列を返す。"""
         raise NotImplementedError
 
@@ -27,7 +27,7 @@ class IMetadataMapper(ABC):
     def map_to_metadata(
         self,
         workspace: Workspace,
-        cover_path: Optional[Path],
+        cover_path: Path | None,
         **kwargs: Any,
     ) -> UnifiedContentManifest:
         """APIレスポンスを UnifiedContentManifest に変換する。"""

@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/client.py
 from pathlib import Path
-from typing import Dict, Type
 
 from loguru import logger
 from pixivpy3 import AppPixivAPI, PixivError
@@ -43,22 +42,22 @@ class PixivApiClient(BaseApiClient):
             ) from e
 
     @property
-    def _api_exception_class(self) -> Type[Exception]:
+    def _api_exception_class(self) -> type[Exception]:
         return PixivError
 
-    def novel_detail(self, novel_id: int) -> Dict:
+    def novel_detail(self, novel_id: int) -> dict:
         return self._safe_api_call(self.api.novel_detail, novel_id=novel_id)
 
-    def webview_novel(self, novel_id: int) -> Dict:
+    def webview_novel(self, novel_id: int) -> dict:
         return self._safe_api_call(self.api.webview_novel, novel_id=novel_id)
 
-    def novel_series(self, series_id: int) -> Dict:
+    def novel_series(self, series_id: int) -> dict:
         return self._safe_api_call(self.api.novel_series, series_id=series_id)
 
-    def illust_detail(self, illust_id: int) -> Dict:
+    def illust_detail(self, illust_id: int) -> dict:
         return self._safe_api_call(self.api.illust_detail, illust_id=illust_id)
 
-    def user_novels(self, user_id: int, next_url: str = None) -> Dict:
+    def user_novels(self, user_id: int, next_url: str | None = None) -> dict:
         if next_url:
             params = self.api.parse_qs(next_url)
             return self._safe_api_call(self.api.user_novels, **params)

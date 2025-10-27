@@ -49,7 +49,7 @@ class GuiManager:
                 "message": f"予期せぬエラーが発生しました: {e}",
             }
 
-    def setup_bridge(self):
+    def setup_bridge(self) -> None:
         """Python関数をJavaScriptに公開し、UI注入スクリプトをページに登録します。"""
         try:
             self.page.expose_function("pixiv2epub_run", self._run_task_from_browser)

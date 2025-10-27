@@ -1,13 +1,12 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/downloader.py
 from pathlib import Path
-from typing import Dict, Optional
 
 from loguru import logger
 
 from ....models.fanbox import Post
+from ....shared.constants import COVER_IMAGE_STEM
 from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
-from ....shared.constants import COVER_IMAGE_STEM
 
 
 class FanboxImageDownloader(BaseDownloader):
@@ -31,7 +30,7 @@ class FanboxImageDownloader(BaseDownloader):
         self,
         post_data: Post,
         image_dir: Path,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """投稿のカバー画像をダウンロードします。"""
         if not post_data.cover_image_url:
             logger.info("この投稿にはカバー画像がありません。")
@@ -48,9 +47,9 @@ class FanboxImageDownloader(BaseDownloader):
         self,
         post_data: Post,
         image_dir: Path,
-    ) -> Dict[str, Path]:
+    ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
-        image_paths: Dict[str, Path] = {}
+        image_paths: dict[str, Path] = {}
         if not hasattr(post_data.body, "image_map") or not post_data.body.image_map:
             logger.info("本文中に埋め込み画像はありません。")
             return image_paths

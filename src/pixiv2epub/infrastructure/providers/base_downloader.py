@@ -1,6 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base_downloader.py
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
+
 from loguru import logger
 
 
@@ -26,7 +27,7 @@ class BaseDownloader:
         url: str,
         filename: str,
         image_dir: Path,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """単一の画像をダウンロードし、ローカルパスを返します。"""
         target_path = image_dir / filename
         if target_path.exists() and not self.overwrite:

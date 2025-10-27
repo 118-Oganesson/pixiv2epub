@@ -1,18 +1,17 @@
 # FILE: src/pixiv2epub/infrastructure/providers/pixiv/downloader.py
 import re
 from pathlib import Path
-from typing import Dict, Optional
 
 from loguru import logger
 
 from ....models.pixiv import NovelApiResponse
-from ..base_downloader import BaseDownloader
-from .client import PixivApiClient
 from ....shared.constants import (
     COVER_IMAGE_STEM,
-    UPLOADED_IMAGE_PREFIX,
     PIXIV_IMAGE_PREFIX,
+    UPLOADED_IMAGE_PREFIX,
 )
+from ..base_downloader import BaseDownloader
+from .client import PixivApiClient
 
 
 class ImageDownloader(BaseDownloader):
@@ -37,7 +36,7 @@ class ImageDownloader(BaseDownloader):
         self,
         novel_detail: dict,
         image_dir: Path,
-    ) -> Optional[Path]:
+    ) -> Path | None:
         """小説の表紙画像をダウンロードします。"""
         cover_url = novel_detail.get("image_urls", {}).get("large")
         if not cover_url:
@@ -61,7 +60,7 @@ class ImageDownloader(BaseDownloader):
         self,
         novel_data: NovelApiResponse,
         image_dir: Path,
-    ) -> Dict[str, Path]:
+    ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         logger.info("埋め込み画像のダウンロードを開始します...")
         text = novel_data.text
@@ -71,7 +70,7 @@ class ImageDownloader(BaseDownloader):
         total_images = len(uploaded_ids) + len(pixiv_ids)
         logger.info(f"対象画像: {total_images}件")
 
-        image_paths: Dict[str, Path] = {}
+        image_paths: dict[str, Path] = {}
 
         for image_id in uploaded_ids:
             image_meta = novel_data.images.get(image_id)
@@ -86,7 +85,7 @@ class ImageDownloader(BaseDownloader):
             try:
                 illust_resp = self.api_client.illust_detail(int(illust_id))
                 illust = illust_resp.get("illust", {})
-                url: Optional[str] = (
+                url: str | None = (
                     illust.get("meta_single_page", {}).get("original_image_url")
                     if illust.get("page_count", 1) == 1
                     else (

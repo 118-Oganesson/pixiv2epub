@@ -2,7 +2,7 @@
 
 import tomllib
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from pydantic import (
     BaseModel,
@@ -21,7 +21,7 @@ from .exceptions import SettingsError
 
 
 # --- TOMLファイル読み込みロジック ---
-def load_toml_config(toml_file: Path) -> Dict[str, Any]:
+def load_toml_config(toml_file: Path) -> dict[str, Any]:
     """指定されたTOMLファイルを読み込みます。"""
     if not toml_file.is_file():
         return {}
@@ -32,7 +32,7 @@ def load_toml_config(toml_file: Path) -> Dict[str, Any]:
         raise SettingsError(f"設定ファイル '{toml_file}' の解析に失敗しました: {e}")
 
 
-def get_project_defaults() -> Dict[str, Any]:
+def get_project_defaults() -> dict[str, Any]:
     """pyproject.tomlから[tool.pixiv2epub]セクションを読み込みます。"""
     pyproject_path = Path.cwd() / "pyproject.toml"
     config = load_toml_config(pyproject_path)
@@ -42,10 +42,10 @@ def get_project_defaults() -> Dict[str, Any]:
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
     """ユーザー指定のTOML設定ファイルを読み込むためのカスタムソース。"""
 
-    def __init__(self, settings_cls: type[BaseSettings], config_file: Optional[Path]):
+    def __init__(self, settings_cls: type[BaseSettings], config_file: Path | None):
         super().__init__(settings_cls)
         self.config_file = config_file
-        self._toml_config: Dict[str, Any] = (
+        self._toml_config: dict[str, Any] = (
             load_toml_config(self.config_file) if self.config_file else {}
         )
 
@@ -54,7 +54,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
         # Pydanticの仕様に合わせ、(値, キー, 複合的か)のタプルを返す
         return None, None, False
 
-    def __call__(self) -> Dict[str, Any]:
+    def __call__(self) -> dict[str, Any]:
         """設定ファイル全体を辞書として一度に返します。"""
         return self._toml_config
 
@@ -65,7 +65,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
 class PixivAuthSettings(BaseModel):
     """Pixiv認証に特化した設定モデル。"""
 
-    refresh_token: Optional[SecretStr] = Field(
+    refresh_token: SecretStr | None = Field(
         None, description="Pixiv APIのリフレッシュトークン。"
     )
     client_id: SecretStr = Field(
@@ -95,8 +95,8 @@ class PixivAuthSettings(BaseModel):
     @field_validator("refresh_token")
     @classmethod
     def validate_token_is_not_placeholder(
-        cls, value: Optional[SecretStr]
-    ) -> Optional[SecretStr]:
+        cls, value: SecretStr | None
+    ) -> SecretStr | None:
         if value is None:
             return None
         secret_value = value.get_secret_value()
@@ -111,7 +111,7 @@ class PixivAuthSettings(BaseModel):
 class FanboxAuthSettings(BaseModel):
     """Fanbox認証に特化した設定モデル。"""
 
-    sessid: Optional[SecretStr] = Field(
+    sessid: SecretStr | None = Field(
         None, description="FANBOXにログインした際のFANBOXSESSIDクッキー。"
     )
 
@@ -122,8 +122,8 @@ class FanboxAuthSettings(BaseModel):
     @field_validator("sessid")
     @classmethod
     def validate_sessid_is_not_placeholder(
-        cls, value: Optional[SecretStr]
-    ) -> Optional[SecretStr]:
+        cls, value: SecretStr | None
+    ) -> SecretStr | None:
         if value is None:
             return None
         secret_value = value.get_secret_value()
@@ -262,7 +262,7 @@ class Settings(BaseSettings):
     workspace: WorkspaceSettings = WorkspaceSettings()
     log_level: str = "INFO"
 
-    _config_file: Optional[Path] = None
+    _config_file: Path | None = None
 
     def __init__(self, **values: Any):
         config_file_path = values.pop("_config_file", None)

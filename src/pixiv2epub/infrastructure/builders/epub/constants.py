@@ -25,4 +25,4 @@ CONTAINER_XML_CONTENT = f"""<?xml version="1.0" encoding="UTF-8"?>
     <rootfile full-path="{ROOT_FILE_PATH}" media-type="{OEBPS_PACKAGE_MIMETYPE}"/>
   </rootfiles>
 </container>
-""".encode("utf-8")
+""".encode()

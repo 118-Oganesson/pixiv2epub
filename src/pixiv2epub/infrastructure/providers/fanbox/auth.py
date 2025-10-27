@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/providers/fanbox/auth.py
 from pathlib import Path
-from typing import Optional
 
 from loguru import logger
 from playwright.async_api import async_playwright
@@ -40,7 +39,7 @@ async def get_fanbox_sessid(save_session_path: Path) -> str:
 
         logger.info("クッキーを取得しています...")
         cookies = await context.cookies()
-        fanbox_sessid: Optional[str] = None
+        fanbox_sessid: str | None = None
         for cookie in cookies:
             if cookie["name"] == "FANBOXSESSID":
                 fanbox_sessid = cookie["value"]

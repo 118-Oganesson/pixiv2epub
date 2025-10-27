@@ -1,11 +1,10 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/asset_manager.py
 import re
 from pathlib import Path
-from typing import List, Optional, Set, Tuple
 
 from loguru import logger
 
-from ....models.domain import ImageAsset, UnifiedContentManifest, UCMResource
+from ....models.domain import ImageAsset, UCMResource, UnifiedContentManifest
 from ....models.workspace import Workspace
 from ....shared.constants import IMAGES_DIR_NAME
 from ....utils.common import get_media_type_from_filename
@@ -26,7 +25,7 @@ class AssetManager:
 
     def gather_assets(
         self,
-    ) -> Tuple[List[ImageAsset], Optional[ImageAsset]]:
+    ) -> tuple[list[ImageAsset], ImageAsset | None]:
         """アセットを収集、整理し、EPUBに含めるべき最終的なリストを返します。"""
         all_images = self._collect_image_files()
 
@@ -45,7 +44,7 @@ class AssetManager:
 
         return final_images, cover_image_asset
 
-    def _collect_image_files(self) -> List[ImageAsset]:
+    def _collect_image_files(self) -> list[ImageAsset]:
         """`assets/images`ディレクトリから画像ファイルを収集します。"""
         image_assets = []
         if not self.image_dir.is_dir():
@@ -65,8 +64,8 @@ class AssetManager:
         return image_assets
 
     def _find_cover_image(
-        self, image_assets: List[ImageAsset], cover_resource: Optional[UCMResource]
-    ) -> Optional[ImageAsset]:
+        self, image_assets: list[ImageAsset], cover_resource: UCMResource | None
+    ) -> ImageAsset | None:
         """UCMで指定されたカバー画像を特定し、`properties`属性を更新します。"""
         if not cover_resource:
             return None
@@ -85,11 +84,11 @@ class AssetManager:
         )
         return None
 
-    def _extract_referenced_image_filenames(self) -> Set[str]:
+    def _extract_referenced_image_filenames(self) -> set[str]:
         """本文(XHTML)やCSSファイル内から参照されている画像ファイル名を抽出します。"""
         filenames = set()
 
-        def add_filename_from_path(path: str):
+        def add_filename_from_path(path: str) -> None:
             p = path.strip().strip("'\"")
             if not p or p.startswith(("http", "data:")):
                 return

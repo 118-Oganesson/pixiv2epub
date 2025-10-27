@@ -2,28 +2,28 @@
 
 from html import escape
 from pathlib import Path
-from typing import Any, Dict, Optional, Union, List
+from typing import Any
 
 from ...models.domain import (
-    UnifiedContentManifest,
-    UCMCoreMetadata,
-    UCMCoreAuthor,
-    UCMCoreSeries,
-    UCMResource,
     UCMContentBlock,
+    UCMCoreAuthor,
+    UCMCoreMetadata,
+    UCMCoreSeries,
     UCMProviderData,
+    UCMResource,
+    UnifiedContentManifest,
 )
 from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME
-from ..providers.pixiv.constants import PIXIV_NOVEL_URL, PIXIV_EPOCH
-from ..providers.fanbox.constants import FANBOX_EPOCH
-from .interfaces import IMetadataMapper
-from .parsers import PixivTagParser
 
 # 修正: 共通ユーティリティからインポート
 from ...utils.common import get_media_type_from_filename
+from ..providers.fanbox.constants import FANBOX_EPOCH
+from ..providers.pixiv.constants import PIXIV_EPOCH, PIXIV_NOVEL_URL
+from .interfaces import IMetadataMapper
+from .parsers import PixivTagParser
 
 # 修正: get_media_type_from_filename のローカル定義を削除
 
@@ -34,7 +34,7 @@ class PixivMetadataMapper(IMetadataMapper):
     def map_to_metadata(
         self,
         workspace: Workspace,
-        cover_path: Optional[Path],
+        cover_path: Path | None,
         **kwargs: Any,
     ) -> UnifiedContentManifest:
         """
@@ -51,11 +51,11 @@ class PixivMetadataMapper(IMetadataMapper):
                 image_paths (Dict[str, Path]): (新規) ダウンロードされた埋め込み画像。
         """
         novel_data: NovelApiResponse = kwargs["novel_data"]
-        detail_data: Dict = kwargs["detail_data"]
+        detail_data: dict = kwargs["detail_data"]
         parsed_text: str = kwargs["parsed_text"]
         parsed_description: str = kwargs["parsed_description"]
         # 修正: image_paths を kwargs から取得
-        image_paths: Dict[str, Path] = kwargs.get("image_paths", {})
+        image_paths: dict[str, Path] = kwargs.get("image_paths", {})
 
         novel = detail_data.get("novel", {})
         # ... (IDとURLの定義は変更なし) ...
@@ -68,7 +68,7 @@ class PixivMetadataMapper(IMetadataMapper):
         source_url = PIXIV_NOVEL_URL.format(novel_id=novel_id)
 
         # --- 2. リソースマニフェストの構築 ---
-        resources: Dict[str, UCMResource] = {}
+        resources: dict[str, UCMResource] = {}
         cover_key = None
         if cover_path:
             cover_key = "resource-cover-image"
@@ -89,7 +89,7 @@ class PixivMetadataMapper(IMetadataMapper):
 
         # --- 3. コンテンツ構造の構築 ---
         # ... (変更なし) ...
-        content_structure: List[UCMContentBlock] = []
+        content_structure: list[UCMContentBlock] = []
         pages_content = parsed_text.split("[newpage]")
         for i, content in enumerate(pages_content):
             page_num = i + 1
@@ -166,7 +166,7 @@ class FanboxMetadataMapper(IMetadataMapper):
     def map_to_metadata(
         self,
         workspace: Workspace,
-        cover_path: Optional[Path],
+        cover_path: Path | None,
         **kwargs: Any,
     ) -> UnifiedContentManifest:
         """
@@ -181,7 +181,7 @@ class FanboxMetadataMapper(IMetadataMapper):
         """
         post_data: Post = kwargs["post_data"]
         # 修正: image_paths を kwargs から取得
-        image_paths: Dict[str, Path] = kwargs.get("image_paths", {})
+        image_paths: dict[str, Path] = kwargs.get("image_paths", {})
 
         # --- 1. IDとURLの定義 ---
         # ... (変更なし) ...
@@ -192,7 +192,7 @@ class FanboxMetadataMapper(IMetadataMapper):
         source_url = f"https://{author_id_str}.fanbox.cc/posts/{post_id_str}"
 
         # --- 2. リソースマニフェストの構築 ---
-        resources: Dict[str, UCMResource] = {}
+        resources: dict[str, UCMResource] = {}
         cover_key = None
         if cover_path:
             cover_key = "resource-cover-image"
@@ -265,7 +265,7 @@ class FanboxMetadataMapper(IMetadataMapper):
         )
 
     def _get_body_text_length(
-        self, body: Union[PostBodyArticle, PostBodyText, None]
+        self, body: PostBodyArticle | PostBodyText | None
     ) -> int:
         if isinstance(body, PostBodyText):
             return len(body.text or "")

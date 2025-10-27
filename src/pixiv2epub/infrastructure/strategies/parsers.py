@@ -1,8 +1,8 @@
 # FILE: src/pixiv2epub/infrastructure/strategies/parsers.py
 import re
+from collections.abc import Callable
 from html import escape
 from pathlib import Path
-from typing import Callable, Dict, List, Tuple, Union
 
 from loguru import logger
 
@@ -20,7 +20,7 @@ from .interfaces import IContentParser
 class PixivTagParser(IContentParser):
     """Pixivの独自タグ `[tag]` をHTMLに変換するパーサー。"""
 
-    def parse(self, raw_content: str, image_paths: Dict[str, Path]) -> str:
+    def parse(self, raw_content: str, image_paths: dict[str, Path]) -> str:
         self.image_relative_paths = {
             image_id: f"../assets/{IMAGES_DIR_NAME}/{file_path.name}"
             for image_id, file_path in image_paths.items()
@@ -45,7 +45,7 @@ class PixivTagParser(IContentParser):
 
     def _get_replacement_strategies(
         self,
-    ) -> List[Tuple[re.Pattern, Union[str, Callable]]]:
+    ) -> list[tuple[re.Pattern, str | Callable]]:
         return [
             (
                 re.compile(r"\[(uploadedimage|pixivimage):(\d+)\]"),
@@ -80,7 +80,7 @@ class PixivTagParser(IContentParser):
 class FanboxBlockParser(IContentParser):
     """Fanboxの本文ブロック（JSON）をHTMLに変換するパーサー。"""
 
-    def parse(self, raw_content: PostBodyArticle, image_paths: Dict[str, Path]) -> str:
+    def parse(self, raw_content: PostBodyArticle, image_paths: dict[str, Path]) -> str:
         self.image_relative_paths = {
             image_id: f"../assets/{IMAGES_DIR_NAME}/{file_path.name}"
             for image_id, file_path in image_paths.items()
@@ -134,7 +134,7 @@ class FanboxBlockParser(IContentParser):
             return "<br />"
 
         text = escape(block.text)
-        tags_to_insert: List[Tuple[int, str]] = []
+        tags_to_insert: list[tuple[int, str]] = []
 
         if block.styles:
             for style in block.styles:

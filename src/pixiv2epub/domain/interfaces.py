@@ -1,14 +1,14 @@
 # FILE: src/pixiv2epub/domain/interfaces.py
 from pathlib import Path
-from typing import Any, List, Protocol, runtime_checkable, Optional, Dict
+from typing import Any, Protocol, runtime_checkable
 
-from ..models.workspace import Workspace, WorkspaceManifest
-from ..shared.settings import Settings
 from ..models.domain import UnifiedContentManifest
-from ..models.pixiv import NovelApiResponse
 from ..models.fanbox import Post
-from ..shared.enums import Provider as ProviderEnum
+from ..models.pixiv import NovelApiResponse
+from ..models.workspace import Workspace, WorkspaceManifest
 from ..shared.enums import ContentType
+from ..shared.enums import Provider as ProviderEnum
+from ..shared.settings import Settings
 
 
 class IBuilder(Protocol):
@@ -40,7 +40,7 @@ class IProvider(Protocol):
         """プロバイダの名前を返すクラスメソッド。"""
         ...
 
-    def get_works(self, identifier: Any, content_type: ContentType) -> List[Workspace]:
+    def get_works(self, identifier: Any, content_type: ContentType) -> list[Workspace]:
         """
         指定された識別子とコンテンツ種別に基づいて作品を取得し、
         処理済みのWorkspaceのリストを返します。
@@ -53,13 +53,13 @@ class IProvider(Protocol):
 class IPixivImageDownloader(Protocol):
     """Pixivの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
 
-    def download_cover(self, novel_detail: dict, image_dir: Path) -> Optional[Path]:
+    def download_cover(self, novel_detail: dict, image_dir: Path) -> Path | None:
         """小説の表紙画像をダウンロードします。"""
         ...
 
     def download_embedded_images(
         self, novel_data: NovelApiResponse, image_dir: Path
-    ) -> Dict[str, Path]:
+    ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         ...
 
@@ -68,13 +68,13 @@ class IPixivImageDownloader(Protocol):
 class IFanboxImageDownloader(Protocol):
     """Fanboxの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
 
-    def download_cover(self, post_data: Post, image_dir: Path) -> Optional[Path]:
+    def download_cover(self, post_data: Post, image_dir: Path) -> Path | None:
         """投稿のカバー画像をダウンロードします。"""
         ...
 
     def download_embedded_images(
         self, post_data: Post, image_dir: Path
-    ) -> Dict[str, Path]:
+    ) -> dict[str, Path]:
         """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
         ...
 

@@ -2,9 +2,9 @@
 
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 from loguru import logger
 from pydantic import ValidationError
@@ -20,8 +20,8 @@ from ....shared.settings import Settings
 from ...strategies.mappers import FanboxMetadataMapper
 from ...strategies.parsers import FanboxBlockParser
 from .client import FanboxApiClient
-from .downloader import FanboxImageDownloader
 from .constants import FANBOX_EPOCH
+from .downloader import FanboxImageDownloader
 
 
 class FanboxProvider(IProvider):
@@ -56,7 +56,7 @@ class FanboxProvider(IProvider):
     def get_provider_name(cls) -> str:
         return "fanbox"
 
-    def get_works(self, identifier: Any, content_type: ContentType) -> List[Workspace]:
+    def get_works(self, identifier: Any, content_type: ContentType) -> list[Workspace]:
         """
         IProviderインターフェースの統一エントリーポイント。
         コンテンツ種別に応じて適切な内部メソッドに処理を委譲します。
@@ -72,14 +72,14 @@ class FanboxProvider(IProvider):
                 self.get_provider_name(),
             )
 
-    def _get_creator_works(self, creator_id: str) -> List[Workspace]:
+    def _get_creator_works(self, creator_id: str) -> list[Workspace]:
         """
         クリエイターの全投稿を効率的に同期し、Workspaceのリストを返します。
         APIコール前に更新チェックを行うことで、不要なデータ取得をスキップします。
         """
         logger.info(f"クリエイター ({creator_id}) の作品同期を開始します。")
         post_summaries = self._fetch_all_creator_posts_summary(creator_id)
-        workspaces: List[Workspace] = []
+        workspaces: list[Workspace] = []
         total = len(post_summaries)
 
         for i, (post_id, post_summary_data) in enumerate(post_summaries, 1):
@@ -109,7 +109,7 @@ class FanboxProvider(IProvider):
                 )
         return workspaces
 
-    def _get_single_work(self, post_id: str) -> Optional[Workspace]:
+    def _get_single_work(self, post_id: str) -> Workspace | None:
         """
         単一の投稿を取得し、Workspaceを生成します。
         有料コンテンツへのアクセス可否を判定し、アクセス不能な場合は
@@ -147,7 +147,7 @@ class FanboxProvider(IProvider):
 
             manifest = WorkspaceManifest(
                 provider_name=self.get_provider_name(),
-                created_at_utc=datetime.now(timezone.utc).isoformat(),
+                created_at_utc=datetime.now(UTC).isoformat(),
                 source_identifier=source_identifier,
                 content_etag=post_data_model.body.updated_datetime,
                 workspace_schema_version="1.0",
@@ -169,14 +169,14 @@ class FanboxProvider(IProvider):
 
     def _fetch_all_creator_posts_summary(
         self, creator_id: str
-    ) -> List[Tuple[str, Dict[str, Any]]]:
+    ) -> list[tuple[str, dict[str, Any]]]:
         """
         ページネーションを利用して、クリエイターの全投稿のIDとサマリーデータのタプルリストを取得します。
         (旧 _fetch_all_creator_post_ids の改良版)
         """
         log = logger.bind(creator_id=creator_id)
         log.info("クリエイターの全投稿サマリーの取得を開始")
-        summaries: List[Tuple[str, Dict[str, Any]]] = []
+        summaries: list[tuple[str, dict[str, Any]]] = []
         try:
             paginate_response = self.api_client.post_paginate_creator(creator_id)
             page_urls = paginate_response.get("body", [])
@@ -216,7 +216,7 @@ class FanboxProvider(IProvider):
             # content_etag フィールドにタイムスタンプが格納されている
             local_timestamp = manifest_data.get("content_etag")
             return not (local_timestamp and local_timestamp == api_timestamp)
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return True  # マニフェストが壊れている = 要更新
 
     def _is_content_accessible(self, post: Post) -> bool:

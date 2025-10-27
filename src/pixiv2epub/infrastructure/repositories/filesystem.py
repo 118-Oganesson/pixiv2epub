@@ -1,8 +1,8 @@
 # FILE: src/pixiv2epub/infrastructure/repositories/filesystem.py
 import json
 from dataclasses import asdict
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 from loguru import logger
 
@@ -53,14 +53,14 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         workspace: Workspace,
         metadata: UnifiedContentManifest,
         manifest: WorkspaceManifest,
-    ):
+    ) -> None:
         """メタデータ(UCM)とマニフェストをワークスペースに永続化します。"""
         # manifest.jsonの保存
         try:
             with open(workspace.manifest_path, "w", encoding="utf-8") as f:
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
             logger.debug(f"'{MANIFEST_FILE_NAME}' の保存が完了しました。")
-        except IOError as e:
+        except OSError as e:
             logger.bind(error=str(e)).error(
                 f"'{MANIFEST_FILE_NAME}' の保存に失敗しました。"
             )
@@ -73,7 +73,7 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
             with open(detail_path, "w", encoding="utf-8") as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
             logger.debug(f"'{DETAIL_FILE_NAME}' の保存が完了しました。")
-        except IOError as e:
+        except OSError as e:
             logger.bind(error=str(e)).error(
                 f"'{DETAIL_FILE_NAME}' の保存に失敗しました。"
             )

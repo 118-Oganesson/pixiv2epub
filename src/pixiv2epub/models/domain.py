@@ -7,7 +7,7 @@ Unified Content Manifest (UCM) を中心とします。
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
@@ -18,19 +18,19 @@ class CompressionResult:
     """画像圧縮処理の結果を格納します。"""
 
     input_path: Path
-    output_path: Optional[Path]
-    original_size: Optional[int]
-    compressed_size: Optional[int]
-    saved_bytes: Optional[int]
-    saved_percent: Optional[float]
-    tool: Optional[str]
-    command: Optional[str]
-    stdout: Optional[str]
-    stderr: Optional[str]
+    output_path: Path | None
+    original_size: int | None
+    compressed_size: int | None
+    saved_bytes: int | None
+    saved_percent: float | None
+    tool: str | None
+    command: str | None
+    stdout: str | None
+    stderr: str | None
     success: bool
     skipped: bool = False
-    duration: Optional[float] = None
-    output_bytes: Optional[bytes] = None
+    duration: float | None = None
+    output_bytes: bytes | None = None
 
 
 # --- EPUBビルド関連 ---
@@ -59,11 +59,11 @@ class EpubComponents(BaseModel):
 
     model_config = ConfigDict(frozen=True)
 
-    final_pages: List[PageAsset]
-    final_images: List[ImageAsset]
+    final_pages: list[PageAsset]
+    final_images: list[ImageAsset]
     info_page: PageAsset
-    cover_page: Optional[PageAsset]
-    css_asset: Optional[PageAsset]
+    cover_page: PageAsset | None
+    css_asset: PageAsset | None
     content_opf: bytes
     nav_xhtml: bytes
 
@@ -85,22 +85,22 @@ class UCMCoreSeries(UCMBaseModel):
     type_: str = Field("CreativeWorkSeries", alias="@type")
     name: str
     identifier: str # 例: "tag:pixiv.net,2007-09-10:series:112233"
-    order: Optional[int] = None # シリーズ内の順序
+    order: int | None = None # シリーズ内の順序
 
 class UCMCoreMetadata(UCMBaseModel):
     """コンテンツの核となるメタデータ (JSON-LD準拠)"""
-    context_: Dict[str, str] = Field(..., alias="@context")
+    context_: dict[str, str] = Field(..., alias="@context")
     type_: str = Field(..., alias="@type") # 例: "BlogPosting", "Article"
     id_: str = Field(..., alias="@id") # 正規ID (tag: URI)
     name: str # title
     author: UCMCoreAuthor
-    isPartOf: Optional[UCMCoreSeries] = None # series
+    isPartOf: UCMCoreSeries | None = None # series
     datePublished: datetime
-    dateModified: Optional[datetime] = None
-    keywords: List[str] = Field(default_factory=list) # tags
+    dateModified: datetime | None = None
+    keywords: list[str] = Field(default_factory=list) # tags
     description: str
     mainEntityOfPage: HttpUrl # original_source
-    image: Optional[str] = None # cover_pathの代わり (リソースキーを指す)
+    image: str | None = None # cover_pathの代わり (リソースキーを指す)
 
 class UCMResource(UCMBaseModel):
     """リソースマニフェストのエントリ"""
@@ -128,9 +128,9 @@ class UnifiedContentManifest(UCMBaseModel):
     model_config = ConfigDict(frozen=True, populate_by_name=True) # populate_by_name を追加
 
     core: UCMCoreMetadata
-    contentStructure: List[UCMContentBlock]
-    resources: Dict[str, UCMResource]
-    providerData: List[UCMProviderData] = Field(default_factory=list)
+    contentStructure: list[UCMContentBlock]
+    resources: dict[str, UCMResource]
+    providerData: list[UCMProviderData] = Field(default_factory=list)
 
     @classmethod
     def load(cls, path: Path) -> "UnifiedContentManifest":

@@ -1,6 +1,6 @@
 # FILE: src/pixiv2epub/entrypoints/provider_factory.py
 
-from typing import Callable, Dict
+from collections.abc import Callable
 
 from pybreaker import CircuitBreaker
 
@@ -33,7 +33,7 @@ class ProviderFactory:
         )
 
         # プロバイダー種別と、そのプロバイダーを構築するメソッドを紐付けるレジストリ
-        self._builders: Dict[ProviderEnum, Callable[[], IProvider]] = {
+        self._builders: dict[ProviderEnum, Callable[[], IProvider]] = {
             ProviderEnum.PIXIV: self._build_pixiv_provider,
             ProviderEnum.FANBOX: self._build_fanbox_provider,
         }

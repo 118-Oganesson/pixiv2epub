@@ -2,14 +2,14 @@
 import hashlib
 import json
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import canonicaljson
 from loguru import logger
-from pydantic import ValidationError
 from pixivpy3 import PixivError
+from pydantic import ValidationError
 
 from ....domain.interfaces import IProvider, IWorkspaceRepository
 from ....models.domain import UnifiedContentManifest
@@ -22,11 +22,11 @@ from ....shared.settings import Settings
 from ...strategies.mappers import PixivMetadataMapper
 from ...strategies.parsers import PixivTagParser
 from .client import PixivApiClient
-from .downloader import ImageDownloader as PixivImageDownloader
 from .constants import PIXIV_EPOCH
+from .downloader import ImageDownloader as PixivImageDownloader
 
 
-def _extract_critical_data_for_hash(raw_data: Dict[str, Any]) -> Dict[str, Any]:
+def _extract_critical_data_for_hash(raw_data: dict[str, Any]) -> dict[str, Any]:
     """EPUB生成に不可欠なデータのみを抽出する。"""
     # この関数はハッシュ計算に使用されるため、キー名はAPIレスポンスのままとする
     return {
@@ -44,7 +44,7 @@ def _extract_critical_data_for_hash(raw_data: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def _generate_content_hash(raw_json_data: Dict[str, Any]) -> str:
+def _generate_content_hash(raw_json_data: dict[str, Any]) -> str:
     """JSON辞書からSHA-256ハッシュを計算する。"""
     critical_data = _extract_critical_data_for_hash(raw_json_data)
     canonical_bytes = canonicaljson.encode_canonical_json(critical_data)
@@ -78,7 +78,7 @@ class PixivProvider(IProvider):
     def get_provider_name(cls) -> str:
         return "pixiv"
 
-    def get_works(self, identifier: Any, content_type: ContentType) -> List[Workspace]:
+    def get_works(self, identifier: Any, content_type: ContentType) -> list[Workspace]:
         """
         IProviderインターフェースの統一エントリーポイント。
         コンテンツ種別に応じて適切な内部メソッドに処理を委譲します。
@@ -105,7 +105,7 @@ class PixivProvider(IProvider):
             logger.error("予期せぬエラーが発生しました。", exc_info=True)
             raise ProviderError(f"予期せぬエラー: {e}", self.get_provider_name()) from e
 
-    def _get_single_work(self, novel_id: int) -> Optional[Workspace]:
+    def _get_single_work(self, novel_id: int) -> Workspace | None:
         """
         単一の小説を取得し、Workspaceを生成します。
         ハッシュチェックを行い、更新がある場合のみ詳細データを取得・処理します。
@@ -157,7 +157,7 @@ class PixivProvider(IProvider):
 
         manifest = WorkspaceManifest(
             provider_name=self.get_provider_name(),
-            created_at_utc=datetime.now(timezone.utc).isoformat(),
+            created_at_utc=datetime.now(UTC).isoformat(),
             source_identifier=source_identifier,
             content_etag=new_hash,
             workspace_schema_version="1.0",
@@ -169,7 +169,7 @@ class PixivProvider(IProvider):
         )
         return workspace
 
-    def _get_multiple_works(self, series_id: int) -> List[Workspace]:
+    def _get_multiple_works(self, series_id: int) -> list[Workspace]:
         """シリーズ作品をダウンロードし、ビルドします。"""
         logger.info("シリーズの処理を開始")
         series_data = self.get_series_info(series_id)
@@ -201,7 +201,7 @@ class PixivProvider(IProvider):
         )
         return downloaded_workspaces
 
-    def _get_creator_works(self, user_id: int) -> List[Workspace]:
+    def _get_creator_works(self, user_id: int) -> list[Workspace]:
         """クリエイターの全作品をダウンロードし、ビルドします。"""
         logger.info("ユーザーの全作品の処理を開始")
         single_ids, series_ids = self._fetch_all_user_novel_ids(user_id)
@@ -243,8 +243,8 @@ class PixivProvider(IProvider):
         return downloaded_workspaces
 
     def _perform_hash_check(
-        self, manifest_path: Path, api_response: Dict
-    ) -> Tuple[bool, str]:
+        self, manifest_path: Path, api_response: dict
+    ) -> tuple[bool, str]:
         """
         コンテンツのハッシュ値を比較して更新を判断します。
         """
@@ -252,18 +252,18 @@ class PixivProvider(IProvider):
         if not manifest_path.is_file():
             return True, new_hash
         try:
-            with open(manifest_path, "r", encoding="utf-8") as f:
+            with open(manifest_path, encoding="utf-8") as f:
                 old_hash = json.load(f).get("content_etag")
             if old_hash and old_hash == new_hash:
                 return False, new_hash
-        except (json.JSONDecodeError, IOError):
+        except (OSError, json.JSONDecodeError):
             return True, new_hash
         return True, new_hash
 
     def _process_and_populate_workspace(
         self,
         workspace: Workspace,
-        fetched_data: Dict[str, Dict],
+        fetched_data: dict[str, dict],
     ) -> UnifiedContentManifest:
         """
         コンテンツをパースし、画像をダウンロードし、XHTMLを保存し、
@@ -291,7 +291,7 @@ class PixivProvider(IProvider):
             filename = workspace.source_path / f"page-{i + 1}.xhtml"
             try:
                 filename.write_text(page_content, encoding="utf-8")
-            except IOError as e:
+            except OSError as e:
                 logger.bind(page=i + 1, error=str(e)).error(
                     "ページの保存に失敗しました。"
                 )
@@ -327,7 +327,7 @@ class PixivProvider(IProvider):
                 self.get_provider_name(),
             ) from e
 
-    def _fetch_all_user_novel_ids(self, user_id: int) -> Tuple[List[int], List[int]]:
+    def _fetch_all_user_novel_ids(self, user_id: int) -> tuple[list[int], list[int]]:
         """指定されたユーザーの全小説IDを取得し、単独作品とシリーズ作品IDに分離します。"""
         single_ids, series_ids = [], set()
         next_url = None

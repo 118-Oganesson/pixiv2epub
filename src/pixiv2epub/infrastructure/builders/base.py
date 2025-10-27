@@ -1,7 +1,7 @@
 # FILE: src/pixiv2epub/infrastructure/builders/base.py
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from loguru import logger
 
@@ -25,7 +25,7 @@ class BaseBuilder(ABC):
         self.settings = settings
 
     def _load_metadata(
-        self, workspace: Workspace, custom_metadata: Dict[str, Any] | None = None
+        self, workspace: Workspace, custom_metadata: dict[str, Any] | None = None
     ) -> UnifiedContentManifest:
         """ビルド対象のメタデータを読み込みます。"""
         if custom_metadata:

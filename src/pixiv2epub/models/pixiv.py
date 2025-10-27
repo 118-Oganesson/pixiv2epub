@@ -6,16 +6,16 @@ Pixiv APIのJSONレスポンスをマッピングするためのPydanticデー�
 直接インポートしてはいけません。
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from pydantic import (
     BaseModel,
     ConfigDict,
     Field,
     HttpUrl,
+    computed_field,
     field_validator,
     model_validator,
-    computed_field,
 )
 
 
@@ -37,13 +37,13 @@ class Rating(PixivBaseModel):
 
 class IllustTag(PixivBaseModel):
     tag: str
-    user_id: Optional[str] = Field(None, alias="userId")
+    user_id: str | None = Field(None, alias="userId")
 
 
 class IllustImageUrls(PixivBaseModel):
-    small: Optional[HttpUrl] = None
-    medium: Optional[HttpUrl] = None
-    original: Optional[HttpUrl] = None
+    small: HttpUrl | None = None
+    medium: HttpUrl | None = None
+    original: HttpUrl | None = None
 
 
 class IllustDetails(PixivBaseModel):
@@ -52,7 +52,7 @@ class IllustDetails(PixivBaseModel):
     restrict: int
     x_restrict: int = Field(alias="xRestrict")
     sl: int
-    tags: List[IllustTag] = Field(default_factory=list)
+    tags: list[IllustTag] = Field(default_factory=list)
     images: IllustImageUrls = Field(default_factory=IllustImageUrls)
 
 
@@ -68,7 +68,7 @@ class PixivIllust(PixivBaseModel):
     page: int
     illust: IllustDetails
     user: IllustUser
-    available_message: Optional[str] = Field(None, alias="availableMessage")
+    available_message: str | None = Field(None, alias="availableMessage")
 
 
 class UploadedImageUrls(PixivBaseModel):
@@ -87,12 +87,12 @@ class SeriesNavigationNovel(PixivBaseModel):
     viewable: bool
     title: str
     cover_url: HttpUrl = Field(alias="coverUrl")
-    viewable_message: Optional[str] = Field(None, alias="viewableMessage")
+    viewable_message: str | None = Field(None, alias="viewableMessage")
 
 
 class SeriesNavigation(PixivBaseModel):
-    next_novel: Optional[SeriesNavigationNovel] = Field(None, alias="nextNovel")
-    prev_novel: Optional[SeriesNavigationNovel] = Field(None, alias="prevNovel")
+    next_novel: SeriesNavigationNovel | None = Field(None, alias="nextNovel")
+    prev_novel: SeriesNavigationNovel | None = Field(None, alias="prevNovel")
 
 
 class NovelApiResponse(PixivBaseModel):
@@ -107,14 +107,14 @@ class NovelApiResponse(PixivBaseModel):
     text: str
     ai_type: int = Field(alias="aiType")
     is_original: bool = Field(alias="isOriginal")
-    tags: List[str] = Field(default_factory=list)
+    tags: list[str] = Field(default_factory=list)
     rating: Rating = Field(default_factory=Rating)
-    illusts: Dict[str, PixivIllust] = Field(default_factory=dict)
-    images: Dict[str, UploadedImage] = Field(default_factory=dict)
-    series_id: Optional[int] = Field(None, alias="seriesId")
-    series_title: Optional[str] = Field(None, alias="seriesTitle")
-    series_is_watched: Optional[bool] = Field(None, alias="seriesIsWatched")
-    series_navigation: Optional[SeriesNavigation] = Field(
+    illusts: dict[str, PixivIllust] = Field(default_factory=dict)
+    images: dict[str, UploadedImage] = Field(default_factory=dict)
+    series_id: int | None = Field(None, alias="seriesId")
+    series_title: str | None = Field(None, alias="seriesTitle")
+    series_is_watched: bool | None = Field(None, alias="seriesIsWatched")
+    series_navigation: SeriesNavigation | None = Field(
         None, alias="seriesNavigation"
     )
 
@@ -128,7 +128,7 @@ class NovelApiResponse(PixivBaseModel):
 
     @computed_field
     @property
-    def computed_series_order(self) -> Optional[int]:
+    def computed_series_order(self) -> int | None:
         """series_navigationデータからシリーズ内の順序を導出します。"""
         if not self.series_id or not self.series_navigation:
             return None
@@ -164,15 +164,15 @@ class SeriesDetail(PixivBaseModel):
 class NovelInSeries(PixivBaseModel):
     id: int
     title: str
-    order: Optional[int] = None  # APIレスポンスに無いため、最初はOptionalとして定義
+    order: int | None = None  # APIレスポンスに無いため、最初はOptionalとして定義
 
 
 class NovelSeriesApiResponse(PixivBaseModel):
     """Pixiv API (novel_series) からの応答データ全体を格納します。"""
 
     novel_series_detail: SeriesDetail = Field(alias="novel_series_detail")
-    novels: List[NovelInSeries]
-    next_url: Optional[HttpUrl] = Field(None, alias="next_url")
+    novels: list[NovelInSeries]
+    next_url: HttpUrl | None = Field(None, alias="next_url")
 
     @model_validator(mode="after")
     def assign_order_if_missing(self) -> "NovelSeriesApiResponse":

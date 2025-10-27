@@ -1,10 +1,9 @@
 # FILE: src/pixiv2epub/domain/orchestrator.py
 import shutil
 from pathlib import Path
-from typing import List
 
-from loguru import logger
 from jinja2 import TemplateError
+from loguru import logger
 
 from ..domain.interfaces import IBuilder, IProviderFactory
 from ..models.workspace import Workspace
@@ -29,7 +28,7 @@ class DownloadBuildOrchestrator:
         self.settings = settings
         self.provider_factory = provider_factory
 
-    def run_from_input(self, input_str: str, download_only: bool = False) -> List[Path]:
+    def run_from_input(self, input_str: str, download_only: bool = False) -> list[Path]:
         """
         単一の入力（URLやID）から適切な処理を判断し、実行する。
         """
@@ -59,7 +58,7 @@ class DownloadBuildOrchestrator:
         """クリーンアップが有効かどうかを判定する。"""
         return self.settings.builder.cleanup_after_build
 
-    def _handle_cleanup(self, workspace: Workspace):
+    def _handle_cleanup(self, workspace: Workspace) -> None:
         """中間ファイル（ワークスペース）を削除する。"""
         if self._is_cleanup_enabled():
             log = logger.bind(workspace_path=str(workspace.root_path))
@@ -71,16 +70,16 @@ class DownloadBuildOrchestrator:
 
     def _build_workspaces(
         self,
-        workspaces: List[Workspace],
+        workspaces: list[Workspace],
         collection_type: str,
-    ) -> List[Path]:
+    ) -> list[Path]:
         """作品群を処理するための共通ロジック。"""
 
         if not workspaces:
             logger.warning("処理対象の作品が見つかりませんでした。")
             return []
 
-        output_paths: List[Path] = []
+        output_paths: list[Path] = []
         total = len(workspaces)
         logger.bind(total_works=total).info(f"{collection_type} のビルドを開始")
 

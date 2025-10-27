@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/utils/url_parser.py
 import re
-from typing import Tuple, Union
 
 from ..shared.enums import ContentType, Provider
 from ..shared.exceptions import InvalidInputError
@@ -24,7 +23,7 @@ URL_PATTERNS = {
 
 def parse_content_identifier(
     input_str: str,
-) -> Tuple[Provider, ContentType, Union[int, str]]:
+) -> tuple[Provider, ContentType, int | str]:
     """
     入力された文字列 (URL) を解析し、対象のProvider、ContentType、およびIDを返します。
     どのパターンにも一致しない場合は InvalidInputError を送出します。

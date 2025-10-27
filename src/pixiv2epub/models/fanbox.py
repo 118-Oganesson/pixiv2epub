@@ -6,7 +6,8 @@ FANBOX APIのJSONレスポンスをマッピングするためのPydanticデー�
 直接インポートしてはいけません。
 """
 
-from typing import Any, Dict, List, Literal, Optional, Union, Annotated
+from typing import Annotated, Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl
 
 
@@ -15,16 +16,16 @@ class FanboxBaseModel(BaseModel):
 
     model_config = ConfigDict(
         populate_by_name=True,
-        extra="ignore",
+        extra='ignore',
     )
 
 
 class FanboxUser(FanboxBaseModel):
     """投稿者のユーザー情報"""
 
-    user_id: str = Field(..., alias="userId")
+    user_id: str = Field(..., alias='userId')
     name: str
-    icon_url: Optional[HttpUrl] = Field(None, alias="iconUrl")
+    icon_url: HttpUrl | None = Field(None, alias='iconUrl')
 
 
 # --- "article" 形式の本文ブロック定義 ---
@@ -49,43 +50,43 @@ class Link(FanboxBaseModel):
 class ParagraphBlock(FanboxBaseModel):
     """段落ブロック"""
 
-    type: Literal["p"]
+    type: Literal['p']
     text: str
-    styles: Optional[List[Style]] = None
-    links: Optional[List[Link]] = None
+    styles: list[Style] | None = None
+    links: list[Link] | None = None
 
 
 class HeaderBlock(FanboxBaseModel):
     """見出しブロック"""
 
-    type: Literal["header"]
+    type: Literal['header']
     text: str
 
 
 class ImageBlock(FanboxBaseModel):
     """画像ブロック"""
 
-    type: Literal["image"]
-    image_id: str = Field(..., alias="imageId")
+    type: Literal['image']
+    image_id: str = Field(..., alias='imageId')
 
 
 class FileBlock(FanboxBaseModel):
     """ファイル添付ブロック"""
 
-    type: Literal["file"]
-    file_id: str = Field(..., alias="fileId")
+    type: Literal['file']
+    file_id: str = Field(..., alias='fileId')
 
 
 class UrlEmbedBlock(FanboxBaseModel):
     """URL埋め込みブロック"""
 
-    type: Literal["url_embed"]
-    url_embed_id: str = Field(..., alias="urlEmbedId")
+    type: Literal['url_embed']
+    url_embed_id: str = Field(..., alias='urlEmbedId')
 
 
 BodyBlock = Annotated[
-    Union[ParagraphBlock, HeaderBlock, ImageBlock, FileBlock, UrlEmbedBlock],
-    Field(discriminator="type"),
+    ParagraphBlock | HeaderBlock | ImageBlock | FileBlock | UrlEmbedBlock,
+    Field(discriminator='type'),
 ]
 
 
@@ -93,8 +94,8 @@ class ImageMapItem(FanboxBaseModel):
     """imageMap内の画像アイテム"""
 
     id: str
-    original_url: HttpUrl = Field(..., alias="originalUrl")
-    thumbnail_url: HttpUrl = Field(..., alias="thumbnailUrl")
+    original_url: HttpUrl = Field(..., alias='originalUrl')
+    thumbnail_url: HttpUrl = Field(..., alias='thumbnailUrl')
     width: int
     height: int
     extension: str
@@ -119,7 +120,7 @@ class UrlEmbedPostInfo(FanboxBaseModel):
     id: str
     title: str
     user: FanboxUser
-    cover: Optional[Dict[str, Any]] = None
+    cover: dict[str, Any] | None = None
     excerpt: str
 
 
@@ -127,25 +128,25 @@ class UrlEmbedFanboxPost(FanboxBaseModel):
     """埋め込みアイテム: FANBOX投稿"""
 
     id: str
-    type: Literal["fanbox.post"]
-    post_info: UrlEmbedPostInfo = Field(..., alias="postInfo")
+    type: Literal['fanbox.post']
+    post_info: UrlEmbedPostInfo = Field(..., alias='postInfo')
 
 
 class CreatorProfile(FanboxBaseModel):
     """埋め込みクリエイターのプロフィール情報"""
 
     user: FanboxUser
-    creator_id: str = Field(..., alias="creatorId")
+    creator_id: str = Field(..., alias='creatorId')
     description: str
-    has_adult_content: bool = Field(..., alias="hasAdultContent")
-    cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
+    has_adult_content: bool = Field(..., alias='hasAdultContent')
+    cover_image_url: HttpUrl | None = Field(None, alias='coverImageUrl')
 
 
 class UrlEmbedFanboxCreator(FanboxBaseModel):
     """埋め込みアイテム: FANBOXクリエイター"""
 
     id: str
-    type: Literal["fanbox.creator"]
+    type: Literal['fanbox.creator']
     profile: CreatorProfile
 
 
@@ -153,26 +154,26 @@ class UrlEmbedHtmlCard(FanboxBaseModel):
     """埋め込みアイテム: 外部サイト (DLsiteなど)"""
 
     id: str
-    type: Literal["html.card"]
+    type: Literal['html.card']
     html: str
 
 
 UrlEmbedMapItem = Annotated[
-    Union[UrlEmbedFanboxPost, UrlEmbedFanboxCreator, UrlEmbedHtmlCard],
-    Field(discriminator="type"),
+    UrlEmbedFanboxPost | UrlEmbedFanboxCreator | UrlEmbedHtmlCard,
+    Field(discriminator='type'),
 ]
 
 
 class PostBodyArticle(FanboxBaseModel):
     """typeが "article" のときの本文"""
 
-    blocks: List[BodyBlock] = Field(default_factory=list)
-    image_map: Dict[str, ImageMapItem] = Field(default_factory=dict, alias="imageMap")
-    file_map: Dict[str, FileMapItem] = Field(default_factory=dict, alias="fileMap")
-    url_embed_map: Dict[str, UrlEmbedMapItem] = Field(
-        default_factory=dict, alias="urlEmbedMap"
+    blocks: list[BodyBlock] = Field(default_factory=list)
+    image_map: dict[str, ImageMapItem] = Field(default_factory=dict, alias='imageMap')
+    file_map: dict[str, FileMapItem] = Field(default_factory=dict, alias='fileMap')
+    url_embed_map: dict[str, UrlEmbedMapItem] = Field(
+        default_factory=dict, alias='urlEmbedMap'
     )
-    embed_map: Dict = Field(default_factory=dict, alias="embedMap")
+    embed_map: dict = Field(default_factory=dict, alias='embedMap')
 
 
 class PostBodyText(FanboxBaseModel):
@@ -186,15 +187,15 @@ class Post(FanboxBaseModel):
 
     id: str
     title: str
-    fee_required: int = Field(..., alias="feeRequired")
-    published_datetime: str = Field(..., alias="publishedDatetime")
-    updated_datetime: str = Field(..., alias="updatedDatetime")
-    excerpt: str = ""
+    fee_required: int = Field(..., alias='feeRequired')
+    published_datetime: str = Field(..., alias='publishedDatetime')
+    updated_datetime: str = Field(..., alias='updatedDatetime')
+    excerpt: str = ''
     user: FanboxUser
-    creator_id: str = Field(..., alias="creatorId")
-    cover_image_url: Optional[HttpUrl] = Field(None, alias="coverImageUrl")
-    tags: List[str]
-    body: Optional[Union[PostBodyArticle, PostBodyText]] = None
+    creator_id: str = Field(..., alias='creatorId')
+    cover_image_url: HttpUrl | None = Field(None, alias='coverImageUrl')
+    tags: list[str]
+    body: PostBodyArticle | PostBodyText | None = None
     type: str
 
 

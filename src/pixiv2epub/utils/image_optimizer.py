@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 from loguru import logger
 
@@ -13,7 +12,7 @@ from ..models.domain import CompressionResult
 from ..shared.settings import Settings
 
 
-def _human_readable_size(size_bytes: Optional[int]) -> str:
+def _human_readable_size(size_bytes: int | None) -> str:
     """バイト数を人間が読みやすい形式の文字列 (kB, MBなど) に変換します。"""
     if size_bytes is None:
         return "N/A"
@@ -40,7 +39,7 @@ class ImageCompressor:
         """
         self.settings = settings.compression
 
-        self.tools_available: Dict[str, bool] = {}
+        self.tools_available: dict[str, bool] = {}
         for tool in self.REQUIRED_TOOLS:
             if shutil.which(tool):
                 self.tools_available[tool] = True
@@ -51,7 +50,7 @@ class ImageCompressor:
                     tool,
                 )
 
-    def detect_format(self, path: Union[str, Path]) -> Optional[str]:
+    def detect_format(self, path: str | Path) -> str | None:
         """ファイルパスの拡張子から画像フォーマットを判定します。"""
         path = Path(path)
         ext = path.suffix.lower()
@@ -64,7 +63,7 @@ class ImageCompressor:
         else:
             return None
 
-    def _make_output_path(self, input_path: Path, output_dir: Optional[Path]) -> Path:
+    def _make_output_path(self, input_path: Path, output_dir: Path | None) -> Path:
         """出力ファイルのパスを生成し、必要に応じて出力ディレクトリを作成します。"""
         if output_dir is None:
             output_dir = input_path.parent
@@ -73,8 +72,8 @@ class ImageCompressor:
 
     def compress_file(
         self,
-        input_path: Union[str, Path],
-        output_dir: Optional[Union[str, Path]] = None,
+        input_path: str | Path,
+        output_dir: str | Path | None = None,
         *,
         return_bytes: bool = False,
         write_output: bool = True,
@@ -200,7 +199,7 @@ class ImageCompressor:
                     output_bytes=data,
                 )
 
-            output_bytes: Optional[bytes] = None
+            output_bytes: bytes | None = None
             if return_bytes:
                 output_bytes = tmp_out_path.read_bytes()
 
@@ -244,16 +243,16 @@ class ImageCompressor:
 
     def compress_batch(
         self,
-        input_paths: Union[List[Union[str, Path]], str],
+        input_paths: list[str | Path] | str,
         recursive: bool = False,
-        output_dir: Optional[Union[str, Path]] = None,
-        max_workers: Optional[int] = None,
+        output_dir: str | Path | None = None,
+        max_workers: int | None = None,
         *,
         return_bytes: bool = False,
         write_output: bool = True,
-    ) -> List[CompressionResult]:
+    ) -> list[CompressionResult]:
         """複数の画像ファイルやディレクトリを並列で圧縮します。"""
-        paths_to_process: List[Path] = []
+        paths_to_process: list[Path] = []
         if isinstance(input_paths, (str, Path)) and Path(input_paths).is_dir():
             base_dir = Path(input_paths)
             pattern = "**/*" if recursive else "*"
@@ -266,7 +265,7 @@ class ImageCompressor:
             )
 
         workers = max_workers or self.settings.max_workers
-        results: List[CompressionResult] = []
+        results: list[CompressionResult] = []
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             futures = [
                 executor.submit(
@@ -286,8 +285,8 @@ class ImageCompressor:
         return results
 
     def _run_command(
-        self, cmd: List[str], timeout: int = 60
-    ) -> Dict[str, Union[bytes, int]]:
+        self, cmd: list[str], timeout: int = 60
+    ) -> dict[str, bytes | int]:
         """外部コマンドを実行し、結果をキャプチャします。"""
         try:
             logger.debug("コマンド実行: {}", " ".join(cmd))
@@ -311,8 +310,8 @@ class ImageCompressor:
         input_path: Path,
         tmp_out_path: Path,
         tool_name: str,
-        cmd: List[str],
-        result: Dict,
+        cmd: list[str],
+        result: dict,
     ) -> CompressionResult:
         """コマンド実行結果をCompressionResultに変換するヘルパー。"""
         success = result["returncode"] == 0 and tmp_out_path.is_file()

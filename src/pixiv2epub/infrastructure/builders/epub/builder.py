@@ -75,13 +75,13 @@ class EpubBuilder(BaseBuilder):
         default_theme = self.settings.builder.default_theme_name
         provider_name = default_theme
         try:
-            with open(workspace.manifest_path, "r", encoding="utf-8") as f:
+            with open(workspace.manifest_path, encoding="utf-8") as f:
                 manifest_data = json.load(f)
             provider_name = manifest_data.get("provider_name", default_theme)
             logger.bind(provider_name=provider_name).debug(
                 "プロバイダーのテーマを使用します。"
             )
-        except (IOError, json.JSONDecodeError):
+        except (OSError, json.JSONDecodeError):
             logger.bind(workspace_path=str(workspace.root_path)).warning(
                 f"'{MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
             )
@@ -140,7 +140,7 @@ class EpubBuilder(BaseBuilder):
         final_path.parent.mkdir(parents=True, exist_ok=True)
         return final_path
 
-    def _cleanup_failed_build(self, path: Path):
+    def _cleanup_failed_build(self, path: Path) -> None:
         """ビルド失敗時に、不完全な出力ファイルを削除します。"""
         try:
             if path.exists():

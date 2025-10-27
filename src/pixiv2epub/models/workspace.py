@@ -1,10 +1,10 @@
 # FILE: src/pixiv2epub/models/workspace.py
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
-from ..shared.constants import DETAIL_FILE_NAME, MANIFEST_FILE_NAME
 from ..models.domain import UnifiedContentManifest
+from ..shared.constants import DETAIL_FILE_NAME, MANIFEST_FILE_NAME
 
 
 @dataclass(frozen=True)
@@ -78,6 +78,6 @@ class WorkspaceManifest:
     provider_name: str
     created_at_utc: str
     source_identifier: str
-    content_etag: Optional[str] = None
+    content_etag: str | None = None
     workspace_schema_version: str = "1.0"
-    provider_specific_data: Optional[Dict[str, Any]] = None
+    provider_specific_data: dict[str, Any] | None = None

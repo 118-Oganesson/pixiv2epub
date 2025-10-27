@@ -3,7 +3,7 @@ from loguru import logger
 from rich.logging import RichHandler
 
 
-def setup_logging(level: str = "INFO", serialize_to_file: bool = False):
+def setup_logging(level: str = "INFO", serialize_to_file: bool = False) -> None:
     """
     LoguruをRichHandlerとJSONファイル出力用に設定します。
     """

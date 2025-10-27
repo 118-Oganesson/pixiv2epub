@@ -1,6 +1,5 @@
 # FILE: src/pixiv2epub/infrastructure/builders/epub/component_generator.py
 import re
-from typing import Dict, List, Optional
 
 from jinja2 import Environment
 from loguru import logger
@@ -29,8 +28,8 @@ class EpubComponentGenerator:
 
     def generate_components(
         self,
-        image_assets: List[ImageAsset],
-        cover_asset: Optional[ImageAsset],
+        image_assets: list[ImageAsset],
+        cover_asset: ImageAsset | None,
     ) -> EpubComponents:
         """EPUBの全構成要素を生成し、EpubComponentsオブジェクトとして返します。"""
         css_asset = self._generate_css()
@@ -67,7 +66,7 @@ class EpubComponentGenerator:
             nav_xhtml=nav_xhtml,
         )
 
-    def _generate_css(self) -> Optional[PageAsset]:
+    def _generate_css(self) -> PageAsset | None:
         """style.css.j2 テンプレートをレンダリングします。"""
         try:
             content_bytes = self._render_template("style.css.j2", {})
@@ -81,12 +80,12 @@ class EpubComponentGenerator:
             logger.warning(f"CSSテンプレートのレンダリングに失敗: {e}")
             return None
 
-    def _render_template(self, template_name: str, context: Dict) -> bytes:
+    def _render_template(self, template_name: str, context: dict) -> bytes:
         template = self.template_env.get_template(template_name)
         rendered_str = template.render(context)
         return rendered_str.encode("utf-8")
 
-    def _generate_main_pages(self, css_path: Optional[str]) -> List[PageAsset]:
+    def _generate_main_pages(self, css_path: str | None) -> list[PageAsset]:
         """本文の各ページをXHTMLに変換します。"""
         pages = []
         # UCM の contentStructure をループ
@@ -126,7 +125,7 @@ class EpubComponentGenerator:
         return pages
 
     def _generate_info_page(
-        self, css_path: Optional[str], cover_asset: Optional[ImageAsset]
+        self, css_path: str | None, cover_asset: ImageAsset | None
     ) -> PageAsset:
         """作品情報ページを生成します。"""
         core = self.manifest.core
@@ -155,8 +154,8 @@ class EpubComponentGenerator:
         )
 
     def _generate_cover_page(
-        self, cover_asset: Optional[ImageAsset]
-    ) -> Optional[PageAsset]:
+        self, cover_asset: ImageAsset | None
+    ) -> PageAsset | None:
         """カバーページを生成します。"""
         if not cover_asset:
             return None
@@ -171,12 +170,12 @@ class EpubComponentGenerator:
 
     def _generate_opf(
         self,
-        pages: List[PageAsset],
-        images: List[ImageAsset],
+        pages: list[PageAsset],
+        images: list[ImageAsset],
         info_page: PageAsset,
-        cover_page: Optional[PageAsset],
-        cover_asset: Optional[ImageAsset],
-        css_asset: Optional[PageAsset],
+        cover_page: PageAsset | None,
+        cover_asset: ImageAsset | None,
+        css_asset: PageAsset | None,
         plain_description: str,
     ) -> bytes:
         """content.opf ファイルの内容を生成します。"""
@@ -254,7 +253,7 @@ class EpubComponentGenerator:
         return self._render_template("content.opf.j2", context)
 
     def _generate_nav(
-        self, pages: List[PageAsset], info_page: PageAsset, has_cover: bool
+        self, pages: list[PageAsset], info_page: PageAsset, has_cover: bool
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
         # 構造化された単一のコンテキスト辞書を作成

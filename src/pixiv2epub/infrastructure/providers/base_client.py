@@ -1,7 +1,8 @@
 # FILE: src/pixiv2epub/infrastructure/providers/base_client.py
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Callable, Dict, Type
+from collections.abc import Callable
+from typing import Any
 
 from loguru import logger
 from pybreaker import CircuitBreaker, CircuitBreakerError
@@ -27,7 +28,7 @@ class BaseApiClient(ABC):
 
     @property
     @abstractmethod
-    def _api_exception_class(self) -> Type[Exception]:
+    def _api_exception_class(self) -> type[Exception]:
         """具象クライアントが捕捉すべきメインの例外クラスを返します。"""
         raise NotImplementedError
 
@@ -44,7 +45,7 @@ class BaseApiClient(ABC):
                 status_code = getattr(getattr(e, "response", None), "status_code", None)
 
                 # kwargsから処理対象のIDを抽出し、ログに含めることでデバッグを容易にします。
-                context: Dict[str, Any] = {
+                context: dict[str, Any] = {
                     "func_name": func.__name__,
                     "attempt": attempt,
                     "total_retries": self.retries,

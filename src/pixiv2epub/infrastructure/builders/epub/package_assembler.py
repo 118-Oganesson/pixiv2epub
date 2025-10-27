@@ -12,9 +12,9 @@ from .constants import (
     CONTAINER_XML_PATH,
     MIMETYPE_FILE_NAME,
     MIMETYPE_STRING,
+    NAV_XHTML_PATH,
     OEBPS_DIR,
     ROOT_FILE_PATH,
-    NAV_XHTML_PATH,
 )
 
 
@@ -29,7 +29,7 @@ class EpubPackageAssembler:
             else None
         )
 
-    def archive(self, components: "EpubComponents", output_path: Path):
+    def archive(self, components: "EpubComponents", output_path: Path) -> None:
         """準備されたコンポーネントをZIPファイルに書き込み、EPUBを生成します。"""
         with zipfile.ZipFile(output_path, "w") as zip_file:
             zip_file.writestr(
@@ -73,7 +73,7 @@ class EpubPackageAssembler:
 
     def _write_image(
         self, zip_file: zipfile.ZipFile, image: ImageAsset, prefix_path: Path
-    ):
+    ) -> None:
         """単一の画像ファイルを読み込み、必要に応じて圧縮してZIPファイルに書き込みます。"""
         try:
             file_bytes = image.path.read_bytes()
@@ -86,5 +86,5 @@ class EpubPackageAssembler:
 
             # 修正: 監査報告書 §3.1 に基づき、str() を .as_posix() に変更
             zip_file.writestr((prefix_path / image.href).as_posix(), file_bytes)
-        except IOError as e:
+        except OSError as e:
             logger.error(f"画像ファイルの読み込み/書き込み失敗: {image.path}, {e}")

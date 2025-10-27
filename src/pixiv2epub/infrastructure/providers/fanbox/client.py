@@ -2,7 +2,6 @@
 import time
 import urllib.parse
 from pathlib import Path
-from typing import Dict, Optional, Type
 
 import cloudscraper
 from loguru import logger
@@ -46,10 +45,10 @@ class FanboxApiClient(BaseApiClient):
         logger.debug("Fanbox APIクライアントの認証が完了しました。")
 
     @property
-    def _api_exception_class(self) -> Type[Exception]:
+    def _api_exception_class(self) -> type[Exception]:
         return RequestException
 
-    def _get_json(self, endpoint: str, params: Optional[Dict] = None) -> Dict:
+    def _get_json(self, endpoint: str, params: dict | None = None) -> dict:
         """GETリクエストを送信し、JSONレスポンスを返します。"""
         url = self.base_url + endpoint
         response = self.session.get(url, params=params)
@@ -58,25 +57,25 @@ class FanboxApiClient(BaseApiClient):
 
     # --- データ取得メソッド ---
 
-    def creator_info(self, creator_id: str) -> Dict:
+    def creator_info(self, creator_id: str) -> dict:
         """指定されたクリエイターのプロフィール情報を取得します。"""
         return self._safe_api_call(
             self._get_json, "creator.get", params={"creatorId": creator_id}
         )
 
-    def post_info(self, post_id: str) -> Dict:
+    def post_info(self, post_id: str) -> dict:
         """指定された投稿IDの詳細な情報を取得します。"""
         return self._safe_api_call(
             self._get_json, "post.info", params={"postId": post_id}
         )
 
-    def post_paginate_creator(self, creator_id: str) -> Dict:
+    def post_paginate_creator(self, creator_id: str) -> dict:
         """クリエイターの投稿ページのURLリストを取得します。"""
         return self._safe_api_call(
             self._get_json, "post.paginateCreator", params={"creatorId": creator_id}
         )
 
-    def post_list_creator(self, url: str) -> Dict:
+    def post_list_creator(self, url: str) -> dict:
         """ページURLから投稿リストを取得します。"""
         query_str = urllib.parse.urlparse(url).query
         params = dict(urllib.parse.parse_qsl(query_str))
@@ -106,7 +105,7 @@ class FanboxApiClient(BaseApiClient):
             raise ApiError(
                 f"ファイルのダウンロードに失敗しました: {url}", self.provider_name
             ) from e
-        except IOError as e:
+        except OSError as e:
             logger.error("ファイル書き込みに失敗しました: {}, エラー: {}", save_path, e)
             raise ApiError(
                 f"ファイルの書き込みに失敗しました: {save_path}", self.provider_name
