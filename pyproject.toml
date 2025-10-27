@@ -17,6 +17,7 @@ dependencies = [
     "typer>=0.20.0",
     "python-dotenv>=1.2.1",
     "pybreaker>=1.4.1",
+    "types-requests>=2.32.4.20250913",
 ]
 [dependency-groups]
 dev = [
@@ -166,6 +167,10 @@ explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = "pixivpy3.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "cloudscraper.*"
 ignore_missing_imports = true
 
 [tool.bandit]

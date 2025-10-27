@@ -2,7 +2,7 @@
 
 import tomllib
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from pydantic import (
     BaseModel,
@@ -38,7 +38,7 @@ def get_project_defaults() -> dict[str, Any]:
     """pyproject.tomlから[tool.pixiv2epub]セクションを読み込みます。"""
     pyproject_path = Path.cwd() / 'pyproject.toml'
     config = load_toml_config(pyproject_path)
-    return config.get('tool', {}).get('pixiv2epub', {})
+    return cast(dict[str, Any], config.get('tool', {}).get('pixiv2epub', {}))
 
 
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
@@ -53,7 +53,7 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
 
     def get_field_value(
         self, field: object, field_name: str
-    ) -> tuple[None, None, bool]:
+    ) -> tuple[Any, str | None, bool]:
         """このカスタムソースはフィールドごとの値取得をサポートしないため、__call__に処理を委ねます。"""
         # Pydanticの仕様に合わせ、(値, キー, 複合的か)のタプルを返す
         return None, None, False
@@ -70,7 +70,8 @@ class PixivAuthSettings(BaseModel):
     """Pixiv認証に特化した設定モデル。"""
 
     refresh_token: SecretStr | None = Field(
-        None, description='Pixiv APIのリフレッシュトークン。'
+        default=None,
+        description='Pixiv APIのリフレッシュトークン。',
     )
     client_id: SecretStr = Field(
         default=SecretStr('MOBrBDS8blbauoSck0ZfDbtuzpyT'),
@@ -81,18 +82,19 @@ class PixivAuthSettings(BaseModel):
         description='Pixiv APIのクライアントシークレット。',
     )
     user_agent: str = Field(
-        'PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)',
+        default='PixivIOSApp/7.13.3 (iOS 14.6; iPhone13,2)',
         description='APIリクエストに使用するユーザーエージェント。',
     )
     login_url: str = Field(
-        'https://app-api.pixiv.net/web/v1/login', description='ログインページのURL。'
+        default='https://app-api.pixiv.net/web/v1/login',
+        description='ログインページのURL。',
     )
     auth_token_url: str = Field(
-        'https://oauth.secure.pixiv.net/auth/token',
+        default='https://oauth.secure.pixiv.net/auth/token',
         description='認証トークン取得エンドポイント。',
     )
     redirect_uri: str = Field(
-        'https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback',
+        default='https://app-api.pixiv.net/web/v1/users/auth/pixiv/callback',
         description='OAuthリダイレクトURI。',
     )
 
@@ -107,7 +109,7 @@ class PixivAuthSettings(BaseModel):
         if not secret_value or 'your_refresh_token_here' in secret_value:
             raise ValueError(
                 '無効なPixivプレースホルダートークンが検出されました。'
-                " 'auth' コマンドを実行するか、設定を更新してください。"
+                " 'auth' コンドを実行するか、設定を更新してください。"
             )
         return value
 
@@ -116,11 +118,12 @@ class FanboxAuthSettings(BaseModel):
     """Fanbox認証に特化した設定モデル。"""
 
     sessid: SecretStr | None = Field(
-        None, description='FANBOXにログインした際のFANBOXSESSIDクッキー。'
+        default=None,
+        description='FANBOXにログインした際のFANBOXSESSIDクッキー。',
     )
-
     base_url: str = Field(
-        'https://api.fanbox.cc/', description='Fanbox APIのベースURL。'
+        default='https://api.fanbox.cc/',
+        description='Fanbox APIのベースURL。',
     )
 
     @field_validator('sessid')
@@ -142,57 +145,66 @@ class FanboxAuthSettings(BaseModel):
 class ProviderSettings(BaseModel):
     """各プロバイダの設定をまとめるモデル。"""
 
-    pixiv: PixivAuthSettings = PixivAuthSettings()
-    fanbox: FanboxAuthSettings = FanboxAuthSettings()
+    pixiv: PixivAuthSettings = Field(default_factory=PixivAuthSettings)
+    fanbox: FanboxAuthSettings = Field(default_factory=FanboxAuthSettings)
 
 
 class CircuitBreakerSettings(BaseModel):
     """サーキットブレーカーに関する設定。"""
 
     fail_max: int = Field(
-        5, description='何回連続で失敗したらサーキットをOpen状態にするか。'
+        default=5,
+        description='何回連続で失敗したらサーキットをOpen状態にするか。',
     )
     reset_timeout: int = Field(
-        60, description='サーキットがOpenしてからHalf-Open状態に移行するまでの秒数。'
+        default=60,
+        description='サーキットがOpenしてからHalf-Open状態に移行するまでの秒数。',
     )
 
 
 class DownloaderSettings(BaseModel):
     """ダウンロード処理に関する設定。"""
 
-    api_delay: float = Field(1.0, description='APIリクエスト間の遅延時間(秒)。')
+    api_delay: float = Field(default=1.0, description='APIリクエスト間の遅延時間(秒)。')
     api_retries: int = Field(
-        3, description='APIリクエストが失敗した場合のリトライ回数。'
+        default=3,
+        description='APIリクエストが失敗した場合のリトライ回数。',
     )
     overwrite_existing_images: bool = Field(
-        False, description='同名の画像が既に存在する場合に上書きするかどうか。'
+        default=False,
+        description='同名の画像が既に存在する場合に上書きするかどうか。',
     )
-    circuit_breaker: CircuitBreakerSettings = CircuitBreakerSettings()
+    circuit_breaker: CircuitBreakerSettings = Field(
+        default_factory=CircuitBreakerSettings
+    )
 
 
 class BuilderSettings(BaseModel):
     """EPUB生成処理に関する設定。"""
 
     output_directory: Path = Field(
-        Path('./epubs'), description='生成されたEPUBファイルの保存先ディレクトリ。'
+        default=Path('./epubs'),
+        description='生成されたEPUBファイルの保存先ディレクトリ。',
     )
     filename_template: str = Field(
-        '{author_name}/{title}.epub', description='単独作品のファイル名テンプレート。'
+        default='{author_name}/{title}.epub',
+        description='単独作品のファイル名テンプレート。',
     )
     series_filename_template: str = Field(
-        '{author_name}/{series_title}/{title}.epub',
+        default='{author_name}/{series_title}/{title}.epub',
         description='シリーズ作品のファイル名テンプレート。',
     )
     max_filename_length: int = Field(
-        50,
+        default=50,
         description='ファイル/ディレクトリ名の最大長。長すぎる場合は自動的に切り詰められます。',
     )
     cleanup_after_build: bool = Field(
-        False,
+        default=False,
         description='EPUB生成後に中間ファイル(ワークスペース)を削除するかどうか。',
     )
     default_theme_name: str = Field(
-        'default', description='EPUBテーマ(テンプレート)のデフォルト名。'
+        default='default',
+        description='EPUBテーマ(テンプレート)のデフォルト名。',
     )
 
 
@@ -225,24 +237,25 @@ class CwebpSettings(BaseModel):
 class CompressionSettings(BaseModel):
     """画像圧縮に関する全体設定。"""
 
-    enabled: bool = Field(True, description='画像圧縮を有効にするかどうか。')
+    enabled: bool = Field(default=True, description='画像圧縮を有効にするかどうか。')
     skip_if_larger: bool = Field(
-        True,
+        default=True,
         description='圧縮後のファイルサイズが元より大きい場合に圧縮をスキップするかどうか。',
     )
     max_workers: int = Field(
-        4, description='画像圧縮を並列実行する際の最大ワーカー数。'
+        default=4,
+        description='画像圧縮を並列実行する際の最大ワーカー数。',
     )
-    pngquant: PngquantSettings = PngquantSettings()
-    jpegoptim: JpegoptimSettings = JpegoptimSettings()
-    cwebp: CwebpSettings = CwebpSettings()
+    pngquant: PngquantSettings = Field(default_factory=PngquantSettings)
+    jpegoptim: JpegoptimSettings = Field(default_factory=JpegoptimSettings)
+    cwebp: CwebpSettings = Field(default_factory=CwebpSettings)
 
 
 class WorkspaceSettings(BaseModel):
     """ワークスペースに関する設定。"""
 
     root_directory: Path = Field(
-        Path('./.workspace'),
+        default=Path('./.workspace'),
         description='中間ファイルを保存するワークスペースのルートディレクトリ。',
     )
 
@@ -259,11 +272,11 @@ class Settings(BaseSettings):
     6. モデルで定義されたデフォルト値
     """
 
-    providers: ProviderSettings = ProviderSettings()
-    downloader: DownloaderSettings = DownloaderSettings()
-    builder: BuilderSettings = BuilderSettings()
-    compression: CompressionSettings = CompressionSettings()
-    workspace: WorkspaceSettings = WorkspaceSettings()
+    providers: ProviderSettings = Field(default_factory=ProviderSettings)
+    downloader: DownloaderSettings = Field(default_factory=DownloaderSettings)
+    builder: BuilderSettings = Field(default_factory=BuilderSettings)
+    compression: CompressionSettings = Field(default_factory=CompressionSettings)
+    workspace: WorkspaceSettings = Field(default_factory=WorkspaceSettings)
     log_level: str = 'INFO'
 
     _config_file: Path | None = None
@@ -271,7 +284,9 @@ class Settings(BaseSettings):
     def __init__(self, **values: object):
         config_file_path = values.pop('_config_file', None)
         require_auth = values.pop('require_auth', True)
-        self._config_file = Path(config_file_path) if config_file_path else None
+        self._config_file = (
+            Path(cast(Path | str, config_file_path)) if config_file_path else None
+        )
 
         try:
             super().__init__(**values)

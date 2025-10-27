@@ -1,7 +1,11 @@
 # FILE: src/pixiv2epub/infrastructure/strategies/mappers.py
 
+from datetime import datetime
 from html import escape
 from pathlib import Path
+from typing import Any, cast
+
+from pydantic import HttpUrl
 
 from ...models.domain import (
     UCMContentBlock,
@@ -16,15 +20,11 @@ from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
 from ...shared.constants import IMAGES_DIR_NAME
-
-# 修正: 共通ユーティリティからインポート
 from ...utils.common import get_media_type_from_filename
 from ..providers.fanbox.constants import FANBOX_EPOCH
 from ..providers.pixiv.constants import PIXIV_EPOCH, PIXIV_NOVEL_URL
 from .interfaces import IMetadataMapper
 from .parsers import PixivTagParser
-
-# 修正: get_media_type_from_filename のローカル定義を削除
 
 
 class PixivMetadataMapper(IMetadataMapper):
@@ -49,15 +49,17 @@ class PixivMetadataMapper(IMetadataMapper):
                 parsed_description (str): パース済みの作品概要 (HTML)。
                 image_paths (Dict[str, Path]): (新規) ダウンロードされた埋め込み画像。
         """
-        novel_data: NovelApiResponse = kwargs['novel_data']
-        detail_data: dict = kwargs['detail_data']
-        parsed_text: str = kwargs['parsed_text']
-        parsed_description: str = kwargs['parsed_description']
-        # 修正: image_paths を kwargs から取得
-        image_paths: dict[str, Path] = kwargs.get('image_paths', {})
+
+        novel_data: NovelApiResponse = cast(NovelApiResponse, kwargs['novel_data'])
+        detail_data: dict[str, Any] = cast(dict[str, Any], kwargs['detail_data'])
+        parsed_text: str = cast(str, kwargs['parsed_text'])
+        parsed_description: str = cast(str, kwargs['parsed_description'])
+        image_paths: dict[str, Path] = cast(
+            dict[str, Path], kwargs.get('image_paths', {})
+        )
 
         novel = detail_data.get('novel', {})
-        # ... (IDとURLの定義は変更なし) ...
+        # --- 1. IDとURLの定義 ---
         novel_id = novel.get('id')
         user_id = novel.get('user', {}).get('id')
         series_info_dict = novel.get('series')
@@ -76,8 +78,6 @@ class PixivMetadataMapper(IMetadataMapper):
                 mediaType=get_media_type_from_filename(cover_path.name),
                 role='cover',
             )
-
-        # 修正: 埋め込み画像リソースをここに追加
         for image_id, image_path in image_paths.items():
             resource_key = f'resource-embedded-image-{image_id}'
             resources[resource_key] = UCMResource(
@@ -87,7 +87,6 @@ class PixivMetadataMapper(IMetadataMapper):
             )
 
         # --- 3. コンテンツ構造の構築 ---
-        # ... (変更なし) ...
         content_structure: list[UCMContentBlock] = []
         pages_content = parsed_text.split('[newpage]')
         for i, content in enumerate(pages_content):
@@ -105,8 +104,6 @@ class PixivMetadataMapper(IMetadataMapper):
                     source=page_key,
                 )
             )
-
-        # ... (コアメタデータとプロバイダデータの構築は変更なし) ...
         series_order = novel_data.computed_series_order
         series_core = None
         if series_info_dict:
@@ -114,37 +111,39 @@ class PixivMetadataMapper(IMetadataMapper):
                 f'tag:pixiv.net,{PIXIV_EPOCH}:series:{series_info_dict.get("id")}'
             )
             series_core = UCMCoreSeries(
-                type_='CreativeWorkSeries',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'CreativeWorkSeries'},
                 name=series_info_dict.get('title'),
                 identifier=series_tag_id,
                 order=series_order,
             )
 
         core_metadata = UCMCoreMetadata(
-            context_={
-                '@vocab': 'https://schema.org/',
-                'pixiv': 'https://www.pixiv.net/terms.php#',
-            },  # フィールド名を使用
-            type_='BlogPosting',  # エイリアスではなくフィールド名を使用
-            id_=novel_tag_id,  # エイリアスではなくフィールド名を使用
+            **{
+                '@context': {
+                    '@vocab': 'https://schema.org/',
+                    'pixiv': 'https://www.pixiv.net/terms.php#',
+                }
+            },
+            **{'@type': 'BlogPosting'},
+            **{'@id': novel_tag_id},
             name=novel.get('title'),
             author=UCMCoreAuthor(
-                type_='Person',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'Person'},
                 name=novel.get('user', {}).get('name'),
                 identifier=author_tag_id,
             ),
             isPartOf=series_core,
             datePublished=novel.get('create_date'),
-            dateModified=novel.get('create_date'),  # フォールバック
+            dateModified=novel.get('create_date'),
             keywords=[t.get('name') for t in novel.get('tags', [])],
             description=parsed_description,
-            mainEntityOfPage=source_url,
+            mainEntityOfPage=HttpUrl(source_url),
             image=cover_key,
         )
 
         provider_data = [
             UCMProviderData(
-                type_='PropertyValue',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'PropertyValue'},
                 propertyID='pixiv:textLength',
                 value=novel.get('text_length'),
             )
@@ -178,12 +177,13 @@ class FanboxMetadataMapper(IMetadataMapper):
                 post_data (Post): `post.info` API から取得したPydanticモデル。
                 image_paths (Dict[str, Path]): (新規) ダウンロードされた埋め込み画像。
         """
-        post_data: Post = kwargs['post_data']
-        # 修正: image_paths を kwargs から取得
-        image_paths: dict[str, Path] = kwargs.get('image_paths', {})
+
+        post_data: Post = cast(Post, kwargs['post_data'])
+        image_paths: dict[str, Path] = cast(
+            dict[str, Path], kwargs.get('image_paths', {})
+        )
 
         # --- 1. IDとURLの定義 ---
-        # ... (変更なし) ...
         author_id_str = post_data.creator_id
         post_id_str = post_data.id
         author_tag_id = f'tag:fanbox.cc,{FANBOX_EPOCH}:creator:{author_id_str}'
@@ -200,8 +200,6 @@ class FanboxMetadataMapper(IMetadataMapper):
                 mediaType=get_media_type_from_filename(cover_path.name),
                 role='cover',
             )
-
-        # 修正: 埋め込み画像リソースをここに追加
         for image_id, image_path in image_paths.items():
             resource_key = f'resource-embedded-image-{image_id}'
             resources[resource_key] = UCMResource(
@@ -217,39 +215,40 @@ class FanboxMetadataMapper(IMetadataMapper):
             role='content',
         )
 
-        # ... (コンテンツ構造、コアメタデータ、プロバイダデータの構築は変更なし) ...
         content_structure = [UCMContentBlock(title='本文', source=content_key)]
 
         core_metadata = UCMCoreMetadata(
-            context_={
-                '@vocab': 'https://schema.org/',
-                'fanbox': 'https://www.pixiv.net/terms.php#',
-            },  # フィールド名を使用
-            type_='BlogPosting',  # エイリアスではなくフィールド名を使用
-            id_=post_tag_id,  # エイリアスではなくフィールド名を使用
+            **{
+                '@context': {
+                    '@vocab': 'https://schema.org/',
+                    'fanbox': 'https://www.pixiv.net/terms.php#',
+                }
+            },
+            **{'@type': 'BlogPosting'},
+            **{'@id': post_tag_id},
             name=post_data.title,
             author=UCMCoreAuthor(
-                type_='Person',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'Person'},
                 name=post_data.user.name,
                 identifier=author_tag_id,
             ),
             isPartOf=None,  # Fanbox にはシリーズ概念なし
-            datePublished=post_data.published_datetime,
-            dateModified=post_data.updated_datetime,
+            datePublished=datetime.fromisoformat(post_data.published_datetime),
+            dateModified=datetime.fromisoformat(post_data.updated_datetime),
             keywords=post_data.tags,
             description=escape(post_data.excerpt).replace('\n', '<br />'),
-            mainEntityOfPage=source_url,
+            mainEntityOfPage=HttpUrl(source_url),
             image=cover_key,
         )
 
         provider_data = [
             UCMProviderData(
-                type_='PropertyValue',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'PropertyValue'},
                 propertyID='fanbox:feeRequired',
                 value=post_data.fee_required,
             ),
             UCMProviderData(
-                type_='PropertyValue',  # エイリアスではなくフィールド名を使用
+                **{'@type': 'PropertyValue'},
                 propertyID='fanbox:textLength',
                 value=self._get_body_text_length(post_data.body),
             ),
