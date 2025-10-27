@@ -34,13 +34,6 @@ def load_toml_config(toml_file: Path) -> dict[str, Any]:
         ) from e
 
 
-def get_project_defaults() -> dict[str, Any]:
-    """pyproject.tomlから[tool.pixiv2epub]セクションを読み込みます。"""
-    pyproject_path = Path.cwd() / 'pyproject.toml'
-    config = load_toml_config(pyproject_path)
-    return cast(dict[str, Any], config.get('tool', {}).get('pixiv2epub', {}))
-
-
 class TomlConfigSettingsSource(PydanticBaseSettingsSource):
     """ユーザー指定のTOML設定ファイルを読み込むためのカスタムソース。"""
 
@@ -59,6 +52,26 @@ class TomlConfigSettingsSource(PydanticBaseSettingsSource):
     def __call__(self) -> dict[str, Any]:
         """設定ファイル全体を辞書として一度に返します。"""
         return self._toml_config
+
+
+class PyProjectTomlSource(PydanticBaseSettingsSource):
+    """pyproject.tomlから[tool.pixiv2epub]セクションを読み込むソース。"""
+
+    def __init__(self, settings_cls: type[BaseSettings]):
+        super().__init__(settings_cls)
+        self._config = self._load_pyproject_toml()
+
+    def _load_pyproject_toml(self) -> dict[str, Any]:
+        """pyproject.tomlから[tool.pixiv2epub]セクションを読み込みます。"""
+        pyproject_path = Path.cwd() / 'pyproject.toml'
+        config = load_toml_config(pyproject_path)  # 既存のヘルパーを利用
+        return cast(dict[str, Any], config.get('tool', {}).get('pixiv2epub', {}))
+
+    def get_field_value(self, field: object, field_name: str) -> tuple[Any, str, bool]:
+        return None, field_name, False
+
+    def __call__(self) -> dict[str, Any]:
+        return self._config
 
 
 # --- 設定モデル定義 ---
@@ -287,7 +300,7 @@ class Settings(BaseSettings):
         )
 
         try:
-            super().__init__(**values)  # type: ignore[arg-type]
+            super().__init__(**values)  # type: ignore [arg-type]
         except (ValidationError, ValueError) as e:
             raise SettingsError(f'設定の検証に失敗しました:\n{e}') from e
 
@@ -318,10 +331,8 @@ class Settings(BaseSettings):
         dotenv_settings: PydanticBaseSettingsSource,
         file_secret_settings: PydanticBaseSettingsSource,
     ) -> tuple[PydanticBaseSettingsSource, ...]:
-        config_file_path = None
-        if hasattr(init_settings, 'init_kwargs'):
-            config_file_path = init_settings.init_kwargs.get('_config_file')
-
+        # [FIX] `getattr` を使用して `init_data` に安全にアクセス
+        config_file_path = getattr(init_settings, 'init_data', {}).get('_config_file')
         if config_file_path and not isinstance(config_file_path, Path):
             config_file_path = Path(config_file_path)
 
@@ -330,5 +341,5 @@ class Settings(BaseSettings):
             TomlConfigSettingsSource(settings_cls, config_file_path),
             env_settings,
             dotenv_settings,
-            get_project_defaults,
+            PyProjectTomlSource(settings_cls),
         )

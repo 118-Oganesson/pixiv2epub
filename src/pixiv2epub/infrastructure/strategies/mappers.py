@@ -105,20 +105,23 @@ class PixivMetadataMapper(IMetadataMapper):
                 )
             )
         series_order = novel_data.computed_series_order
+        series_order_value = cast(int | None, series_order)
         series_core = None
         if series_info_dict:
             series_tag_id = (
                 f'tag:pixiv.net,{PIXIV_EPOCH}:series:{series_info_dict.get("id")}'
             )
+            # [FIX] mypy が Pydantic のエイリアス付きフィールドを認識できないため、type: ignore を追加
             series_core = UCMCoreSeries(
-                type_='CreativeWorkSeries',
+                type_='CreativeWorkSeries',  # type: ignore [call-arg]
                 name=series_info_dict.get('title'),
                 identifier=series_tag_id,
-                order=series_order,
+                order=series_order_value,
             )
 
+        # [FIX] mypy が Pydantic のエイリアス付きフィールドを認識できないため、type: ignore を追加
         core_metadata = UCMCoreMetadata(
-            context_={
+            context_={  # type: ignore [call-arg]
                 '@vocab': 'https://schema.org/',
                 'pixiv': 'https://www.pixiv.net/terms.php#',
             },
@@ -126,7 +129,7 @@ class PixivMetadataMapper(IMetadataMapper):
             id_=novel_tag_id,
             name=novel.get('title'),
             author=UCMCoreAuthor(
-                type_='Person',
+                type_='Person',  # type: ignore [call-arg]
                 name=novel.get('user', {}).get('name'),
                 identifier=author_tag_id,
             ),
@@ -140,8 +143,9 @@ class PixivMetadataMapper(IMetadataMapper):
         )
 
         provider_data = [
+            # [FIX] mypy が Pydantic のエイリアス付きフィールドを認識できないため、type: ignore を追加
             UCMProviderData(
-                type_='PropertyValue',
+                type_='PropertyValue',  # type: ignore [call-arg]
                 propertyID='pixiv:textLength',
                 value=novel.get('text_length'),
             )
@@ -215,8 +219,9 @@ class FanboxMetadataMapper(IMetadataMapper):
 
         content_structure = [UCMContentBlock(title='本文', source=content_key)]
 
+        # [FIX] mypy が Pydantic のエイリアス付きフィールドを認識できないため、type: ignore を追加
         core_metadata = UCMCoreMetadata(
-            context_={
+            context_={  # type: ignore [call-arg]
                 '@vocab': 'https://schema.org/',
                 'fanbox': 'https://www.pixiv.net/terms.php#',
             },
@@ -224,7 +229,7 @@ class FanboxMetadataMapper(IMetadataMapper):
             id_=post_tag_id,
             name=post_data.title,
             author=UCMCoreAuthor(
-                type_='Person',
+                type_='Person',  # type: ignore [call-arg]
                 name=post_data.user.name,
                 identifier=author_tag_id,
             ),
@@ -238,13 +243,14 @@ class FanboxMetadataMapper(IMetadataMapper):
         )
 
         provider_data = [
+            # [FIX] mypy が Pydantic のエイリアス付きフィールドを認識できないため、type: ignore を追加
             UCMProviderData(
-                type_='PropertyValue',
+                type_='PropertyValue',  # type: ignore [call-arg]
                 propertyID='fanbox:feeRequired',
                 value=post_data.fee_required,
             ),
             UCMProviderData(
-                type_='PropertyValue',
+                type_='PropertyValue',  # type: ignore [call-arg]
                 propertyID='fanbox:textLength',
                 value=self._get_body_text_length(post_data.body),
             ),

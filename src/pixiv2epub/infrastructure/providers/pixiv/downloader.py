@@ -21,6 +21,9 @@ class ImageDownloader(BaseDownloader):
     ネットワークI/Oに特化します。
     """
 
+    # [FIX] 基底クラスの型ヒントを上書きし、self.api_client が PixivApiClient であることを mypy に伝える
+    api_client: PixivApiClient
+
     def __init__(
         self,
         api_client: PixivApiClient,
@@ -84,6 +87,7 @@ class ImageDownloader(BaseDownloader):
 
         for illust_id in pixiv_ids:
             try:
+                # [FIX] self.api_client は PixivApiClient と型付けされたため、この呼び出しは mypy で通る
                 illust_resp = self.api_client.illust_detail(int(illust_id))
                 illust = illust_resp.get('illust', {})
                 illust_url: str | None = (

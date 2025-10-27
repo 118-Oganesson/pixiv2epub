@@ -59,8 +59,9 @@ class EpubBuilder(BaseBuilder):
             log.success('EPUBファイルの作成成功')
             return output_path
         except TemplateError as e:
-            logger.bind(template_name=e.name).error(
-                f"テンプレート '{e.name}' のレンダリングに失敗しました。",
+            template_name = getattr(e, 'name', 'N/A')
+            logger.bind(template_name=template_name).error(
+                f"テンプレート '{template_name}' のレンダリングに失敗しました。",
                 exc_info=True,  # スタックトレースを出力
             )
             self._cleanup_failed_build(output_path)

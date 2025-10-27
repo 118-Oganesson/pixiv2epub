@@ -114,8 +114,11 @@ class DownloadBuildOrchestrator:
                 )
             # テンプレートエラーを個別に捕捉
             except TemplateError as e:
-                logger.bind(workspace_id=workspace.id, template_name=e.name).error(
-                    f"テンプレート '{e.name}' のレンダリングに失敗しました。",
+                template_name = getattr(e, 'name', 'N/A')
+                logger.bind(
+                    workspace_id=workspace.id, template_name=template_name
+                ).error(
+                    f"テンプレート '{template_name}' のレンダリングに失敗しました。",
                     exc_info=True,  # スタックトレースを出力
                 )
             # 予期せぬエラーは .exception() でスタックトレースを記録
