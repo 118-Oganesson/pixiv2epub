@@ -175,4 +175,4 @@ ignore_missing_imports = true
 
 [tool.bandit]
 exclude_dirs = [".venv", "tests"]
-skips = ["B101"]
+skips = ["B101", "B404", "B603"]

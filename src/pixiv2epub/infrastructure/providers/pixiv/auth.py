@@ -111,7 +111,12 @@ def _get_refresh_token(
         'App-OS-Version': '14.6',
         'App-OS': 'ios',
     }
-    response = requests.post(settings.auth_token_url, data=data, headers=headers)
+    response = requests.post(
+        settings.auth_token_url,
+        data=data,
+        headers=headers,
+        timeout=(10, 30),
+    )
 
     response_data = response.json()
     if 'refresh_token' not in response_data:
