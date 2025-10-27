@@ -14,8 +14,8 @@ dependencies = [
     "requests>=2.32.5",
     "poethepoet>=0.37.0",
     "loguru>=0.7.3",
-    "typer>=0.19.2",
-    "python-dotenv>=1.1.1",
+    "typer>=0.20.0",
+    "python-dotenv>=1.2.1",
     "pybreaker>=1.4.1",
 ]
 [dependency-groups]
@@ -56,7 +56,7 @@ reset_timeout = 60
 output_directory = "./epubs"
 filename_template = "{author_name}/{title}.epub"
 series_filename_template = "{author_name}/{series_title}/{title}.epub"
-max_filename_length = 50 
+max_filename_length = 50
 cleanup_after_build = false
 
 [tool.pixiv2epub.compression]
