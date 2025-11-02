@@ -155,7 +155,7 @@ docstring-code-format = true
 
 [tool.vulture]
 paths = ["src", "whitelist.py"]
-min_confidence = 80
+min_confidence = 50
 sort_by_size = true
 exclude = [".venv/", "*/settings.py"]
 
