@@ -1,14 +1,11 @@
 # FILE: src/pixiv2epub/domain/interfaces.py
 
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Protocol, runtime_checkable
 
 from ..models.domain import UnifiedContentManifest
-from ..models.fanbox import Post
-from ..models.pixiv import NovelApiResponse
 from ..models.workspace import Workspace, WorkspaceManifest
 from ..shared.enums import ContentType
-from ..shared.enums import Provider as ProviderEnum
 from ..shared.settings import Settings
 
 
@@ -53,38 +50,6 @@ class IProvider(Protocol):
 
 
 @runtime_checkable
-class IPixivImageDownloader(Protocol):
-    """Pixivの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
-
-    def download_cover(
-        self, novel_detail: dict[str, Any], image_dir: Path
-    ) -> Path | None:
-        """小説の表紙画像をダウンロードします。"""
-        ...
-
-    def download_embedded_images(
-        self, novel_data: NovelApiResponse, image_dir: Path
-    ) -> dict[str, Path]:
-        """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
-        ...
-
-
-@runtime_checkable
-class IFanboxImageDownloader(Protocol):
-    """Fanboxの画像ダウンロード処理の振る舞いを定義するプロトコル。"""
-
-    def download_cover(self, post_data: Post, image_dir: Path) -> Path | None:
-        """投稿のカバー画像をダウンロードします。"""
-        ...
-
-    def download_embedded_images(
-        self, post_data: Post, image_dir: Path
-    ) -> dict[str, Path]:
-        """本文中のすべての画像をダウンロードし、IDとパスのマッピングを返します。"""
-        ...
-
-
-@runtime_checkable
 class IWorkspaceRepository(Protocol):
     """ワークスペースのファイルシステム操作を抽象化するインターフェース。"""
 
@@ -106,13 +71,4 @@ class IWorkspaceRepository(Protocol):
         manifest: WorkspaceManifest,
     ) -> None:
         """メタデータとマニフェストをワークスペースに永続化します。"""
-        ...
-
-
-@runtime_checkable
-class IProviderFactory(Protocol):
-    """Providerインスタンスを生成するためのファクトリのインターフェース。"""
-
-    def create(self, provider_type: ProviderEnum) -> IProvider:
-        """指定された種類のProviderインスタンスを生成し、依存関係を注入して返します。"""
         ...
