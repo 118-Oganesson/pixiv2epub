@@ -14,15 +14,4 @@ ROOT_FILE_PATH = f'{OEBPS_DIR}/content.opf'
 NAV_XHTML_PATH = f'{OEBPS_DIR}/nav.xhtml'
 
 # MIMEタイプ
-MIMETYPE_STRING = 'application/epub+zip'
 OEBPS_PACKAGE_MIMETYPE = 'application/oebps-package+xml'
-
-# container.xml のテンプレート
-# このファイルは固定なので、テンプレートエンジンを使わず定数として定義します。
-CONTAINER_XML_CONTENT = f"""<?xml version="1.0" encoding="UTF-8"?>
-<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
-  <rootfiles>
-    <rootfile full-path="{ROOT_FILE_PATH}" media-type="{OEBPS_PACKAGE_MIMETYPE}"/>
-  </rootfiles>
-</container>
-""".encode()
