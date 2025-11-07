@@ -3,6 +3,8 @@ import re
 from dataclasses import dataclass
 from typing import Final
 
+from .enums import ContentType, Provider
+
 
 # --- 1. Workspace Structure ---
 # (models/workspace.py や repositories/filesystem.py がこれを参照)
@@ -61,6 +63,51 @@ class Patterns:
         r'(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc'
     )
 
+    # [変更] Python SSOT の核となるメソッドを追加
+    def to_js_provider_config(self) -> list[dict[str, str]]:
+        """injector.js が消費するための設定リストを生成する"""
+        # (Provider, ContentType) と (name, regex) のマッピング
+        # **重要**: このリストの順序 (より具体的なWORKが先) が
+        # injector.js と url_parser.py の両方の
+        # マッチングロジックの基礎となります。
+        config_map: list[tuple[Provider, ContentType, str, re.Pattern]] = [
+            (
+                Provider.FANBOX,
+                ContentType.WORK,
+                'fanbox-work',
+                self.FANBOX_WORK,
+            ),
+            (
+                Provider.FANBOX,
+                ContentType.CREATOR,
+                'fanbox-creator',
+                self.FANBOX_CREATOR,
+            ),
+            (
+                Provider.PIXIV,
+                ContentType.WORK,
+                'pixiv-work',
+                self.PIXIV_WORK,
+            ),
+            (
+                Provider.PIXIV,
+                ContentType.SERIES,
+                'pixiv-series',
+                self.PIXIV_SERIES,
+            ),
+            (
+                Provider.PIXIV,
+                ContentType.CREATOR,
+                'pixiv-creator',
+                self.PIXIV_CREATOR,
+            ),
+        ]
+
+        return [
+            {'name': name, 'regex': pattern.pattern}  # .pattern で文字列を抽出
+            for _, _, name, pattern in config_map
+        ]
+
 
 PATTERNS: Final = Patterns()
 
@@ -96,5 +143,6 @@ class AssetNames:
     COVER_IMAGE_STEM: str = 'cover'
     UPLOADED_IMAGE_PREFIX: str = 'uploaded_'
     PIXIV_IMAGE_PREFIX: str = 'pixiv_'
+
 
 ASSET_NAMES: Final = AssetNames()
