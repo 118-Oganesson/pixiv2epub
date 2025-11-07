@@ -7,7 +7,7 @@ from loguru import logger
 
 from .domain.interfaces import IBuilder, IProvider, IWorkspaceRepository
 from .models.workspace import Workspace
-from .shared.constants import MANIFEST_FILE_NAME
+from .shared.constants import WORKSPACE_PATHS
 from .shared.enums import Provider as ProviderEnum
 from .shared.exceptions import (
     AssetMissingError,
@@ -108,7 +108,7 @@ class ApplicationService:
             logger.bind(search_path=str(base_path)).info(
                 'ビルド可能なワークスペースを再帰的に検索します...'
             )
-            for manifest_path in base_path.rglob(MANIFEST_FILE_NAME):
+            for manifest_path in base_path.rglob(WORKSPACE_PATHS.MANIFEST_FILE_NAME):
                 workspaces_to_build.append(manifest_path.parent)
 
         if not workspaces_to_build:

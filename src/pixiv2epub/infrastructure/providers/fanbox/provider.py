@@ -13,7 +13,7 @@ from ....domain.interfaces import IProvider, IWorkspaceRepository
 from ....models.domain import UnifiedContentManifest
 from ....models.fanbox import FanboxPostApiResponse, Post
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.constants import IMAGES_DIR_NAME, MANIFEST_FILE_NAME
+from ....shared.constants import WORKSPACE_PATHS
 from ....shared.enums import ContentType
 from ....shared.exceptions import DataProcessingError, ProviderError
 from ....shared.settings import Settings
@@ -89,7 +89,7 @@ class FanboxProvider(IProvider):
             workspace_path = self.repository.get_workspace_path(
                 post_id, self.get_provider_name()
             )
-            manifest_path = workspace_path / MANIFEST_FILE_NAME
+            manifest_path = workspace_path / WORKSPACE_PATHS.MANIFEST_FILE_NAME
 
             # APIレスポンスから直接タイムスタンプを取得
             api_timestamp = post_summary_data.get('updatedDatetime', '')
@@ -235,7 +235,7 @@ class FanboxProvider(IProvider):
         最終的なメタデータ(UCM)を生成して返します。
         """
         try:
-            image_dir = workspace.assets_path / IMAGES_DIR_NAME
+            image_dir = workspace.assets_path / WORKSPACE_PATHS.IMAGES_DIR_NAME
             cover_path = self._downloader.download_cover(post_data, image_dir=image_dir)
             image_paths = self._downloader.download_embedded_images(
                 post_data, image_dir=image_dir

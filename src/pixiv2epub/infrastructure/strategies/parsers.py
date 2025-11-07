@@ -14,7 +14,7 @@ from ...models.fanbox import (
     PostBodyArticle,
     PostBodyText,
 )
-from ...shared.constants import IMAGES_DIR_NAME
+from ...shared.constants import WORKSPACE_PATHS
 from ..providers.pixiv.constants import PIXIV_ARTWORK_URL, PIXIV_NOVEL_URL
 from .interfaces import IContentParser
 
@@ -27,7 +27,7 @@ class PixivTagParser(IContentParser):
 
     def parse(self, raw_content: object, image_paths: dict[str, Path]) -> str:
         self.image_relative_paths = {
-            image_id: f'../assets/{IMAGES_DIR_NAME}/{file_path.name}'
+            image_id: f'../assets/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{file_path.name}'
             for image_id, file_path in image_paths.items()
         }
         if not isinstance(raw_content, str):
@@ -96,7 +96,7 @@ class FanboxBlockParser(IContentParser):
 
     def parse(self, raw_content: object, image_paths: dict[str, Path]) -> str:
         self.image_relative_paths = {
-            image_id: f'../assets/{IMAGES_DIR_NAME}/{file_path.name}'
+            image_id: f'../assets/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{file_path.name}'
             for image_id, file_path in image_paths.items()
         }
 

@@ -19,7 +19,7 @@ from ...models.domain import (
 from ...models.fanbox import Post, PostBodyArticle, PostBodyText
 from ...models.pixiv import NovelApiResponse
 from ...models.workspace import Workspace
-from ...shared.constants import IMAGES_DIR_NAME
+from ...shared.constants import WORKSPACE_PATHS
 from ...utils.media_types import get_media_type_from_filename
 from ..providers.fanbox.constants import FANBOX_EPOCH
 from ..providers.pixiv.constants import PIXIV_EPOCH, PIXIV_NOVEL_URL
@@ -74,14 +74,14 @@ class PixivMetadataMapper(IMetadataMapper):
         if cover_path:
             cover_key = 'resource-cover-image'
             resources[cover_key] = UCMResource(
-                path=f'../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{cover_path.name}',
+                path=f'../{workspace.assets_path.name}/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{cover_path.name}',
                 mediaType=get_media_type_from_filename(cover_path.name),
                 role='cover',
             )
         for image_id, image_path in image_paths.items():
             resource_key = f'resource-embedded-image-{image_id}'
             resources[resource_key] = UCMResource(
-                path=f'../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{image_path.name}',
+                path=f'../{workspace.assets_path.name}/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{image_path.name}',
                 mediaType=get_media_type_from_filename(image_path.name),
                 role='embeddedImage',
             )
@@ -198,14 +198,14 @@ class FanboxMetadataMapper(IMetadataMapper):
         if cover_path:
             cover_key = 'resource-cover-image'
             resources[cover_key] = UCMResource(
-                path=f'../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{cover_path.name}',
+                path=f'../{workspace.assets_path.name}/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{cover_path.name}',
                 mediaType=get_media_type_from_filename(cover_path.name),
                 role='cover',
             )
         for image_id, image_path in image_paths.items():
             resource_key = f'resource-embedded-image-{image_id}'
             resources[resource_key] = UCMResource(
-                path=f'../{workspace.assets_path.name}/{IMAGES_DIR_NAME}/{image_path.name}',
+                path=f'../{workspace.assets_path.name}/{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{image_path.name}',
                 mediaType=get_media_type_from_filename(image_path.name),
                 role='embeddedImage',
             )

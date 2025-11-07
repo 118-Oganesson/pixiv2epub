@@ -6,7 +6,7 @@ from loguru import logger
 
 from ....models.domain import ImageAsset, UCMResource, UnifiedContentManifest
 from ....models.workspace import Workspace
-from ....shared.constants import IMAGES_DIR_NAME
+from ....shared.constants import WORKSPACE_PATHS
 from ....utils.media_types import get_media_type_from_filename
 
 
@@ -21,7 +21,7 @@ class AssetManager:
         self.workspace = workspace
         self.manifest = manifest
         self.source_dir = workspace.source_path
-        self.image_dir = workspace.assets_path / IMAGES_DIR_NAME
+        self.image_dir = workspace.assets_path / WORKSPACE_PATHS.IMAGES_DIR_NAME
 
     def gather_assets(
         self,
@@ -54,7 +54,7 @@ class AssetManager:
             image_assets.append(
                 ImageAsset(
                     id=f'img_{i}',
-                    href=f'{IMAGES_DIR_NAME}/{path.name}',
+                    href=f'{WORKSPACE_PATHS.IMAGES_DIR_NAME}/{path.name}',
                     path=path,
                     media_type=get_media_type_from_filename(path.name),
                     properties='',

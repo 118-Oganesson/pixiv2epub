@@ -6,11 +6,7 @@ from typing import Any
 from loguru import logger
 
 from ....models.pixiv import NovelApiResponse
-from ....shared.constants import (
-    COVER_IMAGE_STEM,
-    PIXIV_IMAGE_PREFIX,
-    UPLOADED_IMAGE_PREFIX,
-)
+from ....shared.constants import ASSET_NAMES
 from ..base_downloader import BaseDownloader
 from .client import PixivApiClient
 
@@ -48,7 +44,7 @@ class ImageDownloader(BaseDownloader):
             return None
 
         ext = cover_url.split('.')[-1].split('?')[0]
-        cover_filename = f'{COVER_IMAGE_STEM}.{ext}'
+        cover_filename = f'{ASSET_NAMES.COVER_IMAGE_STEM}.{ext}'
 
         logger.info('カバー画像をダウンロードします。')
         # 高解像度版、オリジナル版の順で試行
@@ -81,7 +77,7 @@ class ImageDownloader(BaseDownloader):
             if image_meta and image_meta.urls.original:
                 url = str(image_meta.urls.original)
                 ext = url.split('.')[-1].split('?')[0]
-                filename = f'{UPLOADED_IMAGE_PREFIX}{image_id}.{ext}'
+                filename = f'{ASSET_NAMES.UPLOADED_IMAGE_PREFIX}{image_id}.{ext}'
                 if path := self._download_single_image(url, filename, image_dir):
                     image_paths[image_id] = path
 
@@ -101,7 +97,7 @@ class ImageDownloader(BaseDownloader):
                 )
                 if illust_url:
                     ext = illust_url.split('.')[-1].split('?')[0]
-                    filename = f'{PIXIV_IMAGE_PREFIX}{illust_id}.{ext}'
+                    filename = f'{ASSET_NAMES.PIXIV_IMAGE_PREFIX}{illust_id}.{ext}'
                     if path := self._download_single_image(
                         illust_url, filename, image_dir
                     ):

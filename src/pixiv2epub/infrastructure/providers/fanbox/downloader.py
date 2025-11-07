@@ -4,7 +4,7 @@ from pathlib import Path
 from loguru import logger
 
 from ....models.fanbox import Post, PostBodyArticle
-from ....shared.constants import COVER_IMAGE_STEM
+from ....shared.constants import ASSET_NAMES
 from ..base_downloader import BaseDownloader
 from .client import FanboxApiClient
 
@@ -38,7 +38,7 @@ class FanboxImageDownloader(BaseDownloader):
 
         cover_url = str(post_data.cover_image_url)
         ext = cover_url.split('.')[-1].split('?')[0]  # URLから拡張子を安全に取得
-        cover_filename = f'{COVER_IMAGE_STEM}.{ext}'
+        cover_filename = f'{ASSET_NAMES.COVER_IMAGE_STEM}.{ext}'
 
         logger.info('カバー画像をダウンロードします。')
         return self._download_single_image(cover_url, cover_filename, image_dir)

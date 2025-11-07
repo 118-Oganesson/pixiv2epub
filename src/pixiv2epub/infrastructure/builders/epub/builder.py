@@ -8,7 +8,7 @@ from loguru import logger
 
 from ....models.domain import UnifiedContentManifest
 from ....models.workspace import Workspace
-from ....shared.constants import MANIFEST_FILE_NAME
+from ....shared.constants import WORKSPACE_PATHS
 from ....shared.exceptions import BuildError
 from ....shared.settings import Settings
 from ....utils.filesystem_sanitizer import generate_sanitized_path
@@ -84,7 +84,7 @@ class EpubBuilder(BaseBuilder):
             )
         except (OSError, json.JSONDecodeError):
             logger.bind(workspace_path=str(workspace.root_path)).warning(
-                f"'{MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
+                f"'{WORKSPACE_PATHS.MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
             )
 
         assets_root = Path(__file__).parent.parent.parent.parent / 'assets'

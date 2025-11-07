@@ -1,23 +1,14 @@
-# FILE: src/pixiv2epub/utils/url_parser.py
-import re
-
+# src/pixiv2epub/utils/url_parser.py
+from ..shared.constants import PATTERNS
 from ..shared.enums import ContentType, Provider
 from ..shared.exceptions import InvalidInputError
 
-PIXIV_WORK_PATTERN = re.compile(r'pixiv\.net/novel/show\.php\?id=(\d+)')
-PIXIV_SERIES_PATTERN = re.compile(r'pixiv\.net/novel/series/(\d+)')
-PIXIV_CREATOR_PATTERN = re.compile(r'pixiv\.net/users/(\d+)')
-FANBOX_WORK_PATTERN = re.compile(r'fanbox\.cc/(?:@[\w\-]+/)?posts/(\d+)')
-FANBOX_CREATOR_PATTERN = re.compile(
-    r'(?:www\.)?fanbox\.cc/@([\w\-]+)|([\w\-]+)\.fanbox\.cc'
-)
-
 URL_PATTERNS = {
-    (Provider.PIXIV, ContentType.WORK): PIXIV_WORK_PATTERN,
-    (Provider.PIXIV, ContentType.SERIES): PIXIV_SERIES_PATTERN,
-    (Provider.PIXIV, ContentType.CREATOR): PIXIV_CREATOR_PATTERN,
-    (Provider.FANBOX, ContentType.WORK): FANBOX_WORK_PATTERN,
-    (Provider.FANBOX, ContentType.CREATOR): FANBOX_CREATOR_PATTERN,
+    (Provider.PIXIV, ContentType.WORK): PATTERNS.PIXIV_WORK,
+    (Provider.PIXIV, ContentType.SERIES): PATTERNS.PIXIV_SERIES,
+    (Provider.PIXIV, ContentType.CREATOR): PATTERNS.PIXIV_CREATOR,
+    (Provider.FANBOX, ContentType.WORK): PATTERNS.FANBOX_WORK,
+    (Provider.FANBOX, ContentType.CREATOR): PATTERNS.FANBOX_CREATOR,
 }
 
 

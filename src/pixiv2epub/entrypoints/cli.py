@@ -19,6 +19,7 @@ from ..infrastructure.providers.pixiv.client import PixivApiClient
 from ..infrastructure.providers.pixiv.provider import PixivProvider
 from ..infrastructure.repositories.filesystem import FileSystemWorkspaceRepository
 from ..services import ApplicationService
+from ..shared.constants import ENV_KEYS
 from ..shared.enums import Provider as ProviderEnum
 from ..shared.exceptions import (
     AuthenticationError,
@@ -207,7 +208,7 @@ def auth(
             )
             set_key(
                 str(env_path),
-                'PIXIV2EPUB_PROVIDERS__PIXIV__REFRESH_TOKEN',
+                ENV_KEYS.PIXIV_TOKEN,
                 refresh_token,
             )
             logger.bind(env_path=str(env_path.resolve())).success(
@@ -216,7 +217,11 @@ def auth(
         elif service == ProviderEnum.FANBOX:
             logger.info('FANBOX認証を開始します...')
             sessid = asyncio.run(get_fanbox_sessid(session_path))
-            set_key(str(env_path), 'PIXIV2EPUB_PROVIDERS__FANBOX__SESSID', sessid)
+            set_key(
+                str(env_path),
+                ENV_KEYS.FANBOX_SESSID,
+                sessid,
+            )
             logger.bind(env_path=str(env_path.resolve())).success(
                 'FANBOX認証成功! FANBOXSESSIDを保存しました。'
             )

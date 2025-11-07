@@ -1,4 +1,5 @@
-# FILE: src/pixiv2epub/infrastructure/repositories/filesystem.py
+# src/pixiv2epub/infrastructure/repositories/filesystem.py
+
 import json
 from dataclasses import asdict
 from pathlib import Path
@@ -8,13 +9,7 @@ from loguru import logger
 from ...domain.interfaces import IWorkspaceRepository
 from ...models.domain import UnifiedContentManifest
 from ...models.workspace import Workspace, WorkspaceManifest
-from ...shared.constants import (
-    ASSETS_DIR_NAME,
-    DETAIL_FILE_NAME,
-    IMAGES_DIR_NAME,
-    MANIFEST_FILE_NAME,
-    SOURCE_DIR_NAME,
-)
+from ...shared.constants import WORKSPACE_PATHS
 from ...shared.settings import WorkspaceSettings
 
 
@@ -32,10 +27,14 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         workspace = Workspace(id=workspace_id, root_path=workspace_path)
 
         workspace.root_path.mkdir(parents=True, exist_ok=True)
-        (workspace.root_path / SOURCE_DIR_NAME).mkdir(parents=True, exist_ok=True)
-        (workspace.root_path / ASSETS_DIR_NAME / IMAGES_DIR_NAME).mkdir(
+        (workspace.root_path / WORKSPACE_PATHS.SOURCE_DIR_NAME).mkdir(
             parents=True, exist_ok=True
         )
+        (
+            workspace.root_path
+            / WORKSPACE_PATHS.ASSETS_DIR_NAME
+            / WORKSPACE_PATHS.IMAGES_DIR_NAME
+        ).mkdir(parents=True, exist_ok=True)
 
         logger.bind(workspace_path=str(workspace.root_path)).debug(
             'ワークスペースを準備しました。'
@@ -58,21 +57,23 @@ class FileSystemWorkspaceRepository(IWorkspaceRepository):
         try:
             with open(workspace.manifest_path, 'w', encoding='utf-8') as f:
                 json.dump(asdict(manifest), f, ensure_ascii=False, indent=2)
-            logger.debug(f"'{MANIFEST_FILE_NAME}' の保存が完了しました。")
+            logger.debug(
+                f"'{WORKSPACE_PATHS.MANIFEST_FILE_NAME}' の保存が完了しました。"
+            )
         except OSError as e:
             logger.bind(error=str(e)).error(
-                f"'{MANIFEST_FILE_NAME}' の保存に失敗しました。"
+                f"'{WORKSPACE_PATHS.MANIFEST_FILE_NAME}' の保存に失敗しました。"
             )
 
         # detail.jsonの保存 (UCMを保存)
         try:
             # by_alias=True で @context などのエイリアスが正しく出力される
             metadata_dict = metadata.model_dump(mode='json', by_alias=True)
-            detail_path = workspace.source_path / DETAIL_FILE_NAME
+            detail_path = workspace.source_path / WORKSPACE_PATHS.DETAIL_FILE_NAME
             with open(detail_path, 'w', encoding='utf-8') as f:
                 json.dump(metadata_dict, f, ensure_ascii=False, indent=2)
-            logger.debug(f"'{DETAIL_FILE_NAME}' の保存が完了しました。")
+            logger.debug(f"'{WORKSPACE_PATHS.DETAIL_FILE_NAME}' の保存が完了しました。")
         except OSError as e:
             logger.bind(error=str(e)).error(
-                f"'{DETAIL_FILE_NAME}' の保存に失敗しました。"
+                f"'{WORKSPACE_PATHS.DETAIL_FILE_NAME}' の保存に失敗しました。"
             )

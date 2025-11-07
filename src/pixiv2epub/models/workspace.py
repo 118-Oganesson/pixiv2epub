@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from ..models.domain import UnifiedContentManifest
-from ..shared.constants import DETAIL_FILE_NAME, MANIFEST_FILE_NAME
+from ..shared.constants import WORKSPACE_PATHS
 
 
 @dataclass(frozen=True)
@@ -17,17 +17,17 @@ class Workspace:
     @property
     def source_path(self) -> Path:
         """小説のメタデータや本文ファイルが格納されるパス。"""
-        return self.root_path / 'source'
+        return self.root_path / WORKSPACE_PATHS.SOURCE_DIR_NAME
 
     @property
     def assets_path(self) -> Path:
         """画像やCSSなどの補助リソースが格納されるパス。"""
-        return self.root_path / 'assets'
+        return self.root_path / WORKSPACE_PATHS.ASSETS_DIR_NAME
 
     @property
     def manifest_path(self) -> Path:
         """ワークスペース自体のメタデータを記述したファイルのパス。"""
-        return self.root_path / MANIFEST_FILE_NAME
+        return self.root_path / WORKSPACE_PATHS.MANIFEST_FILE_NAME
 
     @classmethod
     def from_path(cls, path: Path) -> 'Workspace':
@@ -35,7 +35,7 @@ class Workspace:
         指定されたパスからWorkspaceインスタンスを生成します。
         パスに 'manifest.json' が存在しない場合はValueErrorを送出します。
         """
-        manifest_path = path / MANIFEST_FILE_NAME
+        manifest_path = path / WORKSPACE_PATHS.MANIFEST_FILE_NAME
         if not manifest_path.is_file():
             raise ValueError(
                 f'指定されたパスにマニフェストファイルが見つかりません: {path}'
@@ -49,7 +49,7 @@ class Workspace:
         Raises:
             FileNotFoundError: メタデータファイルが見つからない場合。
         """
-        detail_path = self.source_path / DETAIL_FILE_NAME
+        detail_path = self.source_path / WORKSPACE_PATHS.DETAIL_FILE_NAME
         return UnifiedContentManifest.load(detail_path)
 
     def get_page_content(self, page_body_path: str) -> str:
@@ -63,7 +63,7 @@ class Workspace:
             FileNotFoundError: ページファイルが見つからない場合。
 
         Returns:
-             str: ページのHTMLコンテンツ。
+            str: ページのHTMLコンテンツ。
         """
         page_file = self.source_path / page_body_path.lstrip('./')
         if not page_file.is_file():

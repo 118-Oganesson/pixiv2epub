@@ -6,6 +6,7 @@ from loguru import logger
 from playwright.sync_api import Page
 
 from ...services import ApplicationService
+from ...shared.constants import ASSET_NAMES
 from ...shared.enums import GuiStatus
 from ...shared.exceptions import Pixiv2EpubError
 
@@ -45,7 +46,9 @@ class GuiManager:
         try:
             self.page.expose_function('pixiv2epub_run', self._run_task_from_browser)
 
-            injector_path = Path(__file__).parent / 'assets' / 'injector.js'
+            injector_path = (
+                Path(__file__).parent / 'assets' / ASSET_NAMES.INJECTOR_SCRIPT
+            )
             if not injector_path.is_file():
                 raise FileNotFoundError(
                     f'インジェクタースクリプトが見つかりません: {injector_path}'

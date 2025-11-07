@@ -15,7 +15,7 @@ from ....domain.interfaces import IProvider, IWorkspaceRepository
 from ....models.domain import UnifiedContentManifest
 from ....models.pixiv import NovelApiResponse, NovelSeriesApiResponse
 from ....models.workspace import Workspace, WorkspaceManifest
-from ....shared.constants import IMAGES_DIR_NAME, MANIFEST_FILE_NAME
+from ....shared.constants import WORKSPACE_PATHS
 from ....shared.enums import ContentType
 from ....shared.exceptions import ApiError, DataProcessingError, ProviderError
 from ....shared.settings import Settings
@@ -120,7 +120,7 @@ class PixivProvider(IProvider):
         workspace_path = self.repository.get_workspace_path(
             novel_id, self.get_provider_name()
         )
-        manifest_path = workspace_path / MANIFEST_FILE_NAME
+        manifest_path = workspace_path / WORKSPACE_PATHS.MANIFEST_FILE_NAME
 
         update_required, new_hash = self._perform_hash_check(
             manifest_path, raw_webview_novel_data
@@ -277,7 +277,7 @@ class PixivProvider(IProvider):
         raw_novel_detail_data = fetched_data['secondary_data']
 
         # 1. アセットのダウンロード
-        image_dir = workspace.assets_path / IMAGES_DIR_NAME
+        image_dir = workspace.assets_path / WORKSPACE_PATHS.IMAGES_DIR_NAME
         cover_path = self._downloader.download_cover(
             raw_novel_detail_data.get('novel', {}), image_dir=image_dir
         )
