@@ -199,7 +199,7 @@ def auth(
     )
 
     try:
-        if service == 'pixiv':
+        if service == ProviderEnum.PIXIV:
             logger.info('Pixiv認証を開始します...')
             refresh_token = get_pixiv_refresh_token(
                 save_session_path=session_path,
@@ -213,7 +213,7 @@ def auth(
             logger.bind(env_path=str(env_path.resolve())).success(
                 'Pixiv認証成功! リフレッシュトークンを保存しました。'
             )
-        elif service == 'fanbox':
+        elif service == ProviderEnum.FANBOX:
             logger.info('FANBOX認証を開始します...')
             sessid = asyncio.run(get_fanbox_sessid(session_path))
             set_key(str(env_path), 'PIXIV2EPUB_PROVIDERS__FANBOX__SESSID', sessid)
@@ -308,7 +308,7 @@ def gui(
         logger.info('初回起動時、またはセッションが切れた場合はログインが必要です。')
 
     # サービスに基づいて開始URLを決定
-    if service == 'fanbox':
+    if service == ProviderEnum.FANBOX:
         start_url = 'https://www.fanbox.cc/'
         service_name = 'Fanbox'
     else:

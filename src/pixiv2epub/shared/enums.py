@@ -2,11 +2,22 @@
 from enum import Enum, auto
 
 
-class Provider(Enum):
-    """サポートされているコンテンツプロバイダー"""
+class Provider(str, Enum):
+    """
+    サポートされているコンテンツプロバイダー。
+    strを継承することで、'=='による文字列比較とEnumの型安全性を両立する。
+    """
 
-    PIXIV = auto()
-    FANBOX = auto()
+    PIXIV = 'pixiv'
+    FANBOX = 'fanbox'
+
+    @classmethod
+    def _missing_(cls, value: object) -> 'Provider | None':
+        # 'PIXIV' のような大文字のキーでもアクセス可能にする
+        for member in cls:
+            if member.name == str(value).upper():
+                return member
+        return None
 
 
 class ContentType(Enum):
