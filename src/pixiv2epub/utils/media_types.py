@@ -2,6 +2,7 @@
 """
 ファイル拡張子とMIMEタイプに関連する共有ユーティリティ。
 """
+from typing import cast
 
 from ..shared.constants import MIME_TYPES
 
@@ -25,7 +26,7 @@ def get_media_type_from_filename(filename: str) -> str:
 
     if attr_name:
         # 'JPEG' などの属性名を使って dataclass から値を取得
-        return getattr(MIME_TYPES, attr_name)
+        return cast(str, getattr(MIME_TYPES, attr_name))
 
     # 不明な拡張子はデフォルト値を返す
     return MIME_TYPES.OCTET_STREAM
