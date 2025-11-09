@@ -2,8 +2,14 @@
 import json
 import os
 from pathlib import Path
+from typing import Any, cast
 
-from jinja2 import ChoiceLoader, Environment, FileSystemLoader, TemplateError
+from jinja2 import (
+    ChoiceLoader,
+    Environment,
+    FileSystemLoader,
+    TemplateError,
+)
 from loguru import logger
 
 from ....models.domain import UnifiedContentManifest
@@ -11,6 +17,11 @@ from ....models.workspace import Workspace
 from ....shared.constants import WORKSPACE_PATHS
 from ....shared.exceptions import BuildError
 from ....shared.settings import Settings
+from ....shared.themes import (
+    DEFAULT_THEME,
+    Theme,
+    get_theme_config,
+)
 from ....utils.filesystem_sanitizer import generate_sanitized_path
 from ..base import BaseBuilder
 from .asset_manager import AssetManager
@@ -44,10 +55,9 @@ class EpubBuilder(BaseBuilder):
             log.warning('出力ファイルは既に存在するため上書きします。')
 
         try:
-            # テンプレートエンジンとジェネレータを動的に初期化
-            template_env = self._create_template_env(workspace)
+            template_env, theme = self._create_template_env(workspace)
             asset_manager = AssetManager(workspace, manifest)
-            generator = EpubComponentGenerator(manifest, workspace, template_env)
+            generator = EpubComponentGenerator(manifest, workspace, template_env, theme)
 
             final_images, cover_asset = asset_manager.gather_assets()
 
@@ -62,7 +72,7 @@ class EpubBuilder(BaseBuilder):
             template_name = getattr(e, 'name', 'N/A')
             logger.bind(template_name=template_name).error(
                 f"テンプレート '{template_name}' のレンダリングに失敗しました。",
-                exc_info=True,  # スタックトレースを出力
+                exc_info=True,
             )
             self._cleanup_failed_build(output_path)
             raise BuildError(f'テンプレートエラー: {e}') from e
@@ -71,39 +81,44 @@ class EpubBuilder(BaseBuilder):
             self._cleanup_failed_build(output_path)
             raise BuildError(f'EPUBのビルドに失敗しました: {e}') from e
 
-    def _create_template_env(self, workspace: Workspace) -> Environment:
-        """ワークスペースのプロバイダーに基づいてJinja2環境を生成します。"""
-        default_theme = self.settings.builder.default_theme_name
-        provider_name = default_theme
+    def _get_provider_name_from_manifest(self, workspace: Workspace) -> str:
+        """(ヘルパー関数に分離) マニフェストからプロバイダ名を安全に読み取る"""
         try:
             with open(workspace.manifest_path, encoding='utf-8') as f:
-                manifest_data = json.load(f)
-            provider_name = manifest_data.get('provider_name', default_theme)
-            logger.bind(provider_name=provider_name).debug(
-                'プロバイダーのテーマを使用します。'
-            )
+                manifest_data = cast(dict[str, Any], json.load(f))
+            provider_name = manifest_data.get('provider_name', DEFAULT_THEME.name)
+            return cast(str, provider_name)
         except (OSError, json.JSONDecodeError):
             logger.bind(workspace_path=str(workspace.root_path)).warning(
                 f"'{WORKSPACE_PATHS.MANIFEST_FILE_NAME}'が読み取れないため、デフォルトテーマを使用します。"
             )
+            return DEFAULT_THEME.name
 
-        assets_root = Path(__file__).parent.parent.parent.parent / 'assets'
-        epub_assets_root = assets_root / 'epub'
-        provider_template_dir = epub_assets_root / provider_name
-        default_template_dir = epub_assets_root / default_theme
+    def _create_template_env(self, workspace: Workspace) -> tuple[Environment, Theme]:
+        """
+        Jinja2環境と、使用するThemeオブジェクトのタプルを生成します。
+        (ComponentGeneratorがThemeを必要とするため、タプルで返す)
+        """
+        provider_name = self._get_provider_name_from_manifest(workspace)
+        theme = get_theme_config(provider_name)
 
+        logger.bind(provider_name=provider_name, theme=theme.name).debug(
+            'プロバイダーのテーマを使用します。'
+        )
         loaders = []
-        if provider_template_dir.is_dir() and provider_name != default_theme:
-            loaders.append(FileSystemLoader(str(provider_template_dir)))
-        if default_template_dir.is_dir():
-            loaders.append(FileSystemLoader(str(default_template_dir)))
+        if theme.name != DEFAULT_THEME.name and theme.path.is_dir():
+            loaders.append(FileSystemLoader(str(theme.path)))
+
+        if DEFAULT_THEME.path.is_dir():
+            loaders.append(FileSystemLoader(str(DEFAULT_THEME.path)))
         else:
             raise BuildError(
-                f'デフォルトのテンプレートディレクトリが見つかりません: {default_template_dir}'
+                f'デフォルトのテンプレートディレクトリが見つかりません: {DEFAULT_THEME.path}'
             )
-
         loader = ChoiceLoader(loaders)
-        return Environment(loader=loader, autoescape=True)
+        env = Environment(loader=loader, autoescape=True)
+        env.globals['strings'] = theme.strings
+        return env, theme
 
     def _determine_output_path(self, manifest: UnifiedContentManifest) -> Path:
         """メタデータと設定に基づき、最終的な出力ファイルパスを決定します。"""
@@ -146,9 +161,9 @@ class EpubBuilder(BaseBuilder):
         try:
             if path.exists():
                 os.remove(path)
-                logger.bind(file_path=str(path)).info(
-                    '不完全な出力ファイルを削除しました。'
-                )
+            logger.bind(file_path=str(path)).info(
+                '不完全な出力ファイルを削除しました。'
+            )
         except OSError as e:
             logger.bind(file_path=str(path), error=str(e)).error(
                 '出力ファイルの削除に失敗しました。'

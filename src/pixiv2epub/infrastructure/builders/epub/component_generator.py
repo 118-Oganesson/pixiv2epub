@@ -12,6 +12,7 @@ from ....models.domain import (
     UnifiedContentManifest,
 )
 from ....models.workspace import Workspace
+from ....shared.themes import Theme
 
 
 class EpubComponentGenerator:
@@ -22,10 +23,12 @@ class EpubComponentGenerator:
         manifest: UnifiedContentManifest,
         workspace: Workspace,
         template_env: Environment,
+        theme: Theme,
     ):
         self.manifest = manifest
         self.workspace = workspace
         self.template_env = template_env
+        self.theme = theme
 
     def generate_components(
         self,
@@ -70,7 +73,8 @@ class EpubComponentGenerator:
     def _generate_css(self) -> PageAsset | None:
         """style.css.j2 テンプレートをレンダリングします。"""
         try:
-            content_bytes = self._render_template('style.css.j2', {})
+            template_name = self.theme.templates.CSS
+            content_bytes = self._render_template(template_name, {})
             return PageAsset(
                 id='css_style',
                 href='css/style.css',
@@ -83,6 +87,8 @@ class EpubComponentGenerator:
 
     def _render_template(self, template_name: str, context: dict[str, Any]) -> bytes:
         template = self.template_env.get_template(template_name)
+        # (注意) context に strings を追加する必要はありません。
+        # Builder側 (env.globals) でJinja2環境にグローバル変数として注入済みです。
         rendered_str = template.render(context)
         return rendered_str.encode('utf-8')
 
@@ -102,7 +108,9 @@ class EpubComponentGenerator:
                 content = self.workspace.get_page_content(page_resource.path)
                 # "../assets/images/foo.jpg" -> "../images/foo.jpg"
                 content = re.sub(
-                    r'src="\.\./assets/(images/.+?)"', r'src="../\1"', content
+                    r'src="\.\./assets/(images/.+?)"',
+                    r'src="../\1"',
+                    content,
                 )
 
                 context: dict[str, Any] = {
@@ -111,7 +119,7 @@ class EpubComponentGenerator:
                     'css_path': css_path,
                 }
                 page_content_bytes = self._render_template(
-                    'page_wrapper.xhtml.j2', context
+                    self.theme.templates.PAGE_WRAPPER, context
                 )
                 pages.append(
                     PageAsset(
@@ -144,14 +152,15 @@ class EpubComponentGenerator:
             'css_path': css_path,
             'formatted_date': formatted_date,
             'text_length': text_length,
-            'cover_href': f'../{cover_asset.href}' if cover_asset else None,
+            'cover_href': (f'../{cover_asset.href}' if cover_asset else None),
         }
-        content_bytes = self._render_template('info_page.xhtml.j2', context)
+        template_name = self.theme.templates.INFO_PAGE
+        content_bytes = self._render_template(template_name, context)
         return PageAsset(
             id='info_page',
             href='text/info.xhtml',
             content=content_bytes,
-            title='作品情報',
+            title=self.theme.strings.INFO_PAGE_TITLE,
         )
 
     def _generate_cover_page(self, cover_asset: ImageAsset | None) -> PageAsset | None:
@@ -159,12 +168,13 @@ class EpubComponentGenerator:
         if not cover_asset:
             return None
         context = {'cover_image_href': f'../{cover_asset.href}'}
-        content_bytes = self._render_template('cover_page.xhtml.j2', context)
+        template_name = self.theme.templates.COVER_PAGE
+        content_bytes = self._render_template(template_name, context)
         return PageAsset(
             id='cover_page',
             href='text/cover.xhtml',
             content=content_bytes,
-            title='表紙',
+            title=self.theme.strings.COVER_TITLE,
         )
 
     def _generate_opf(
@@ -233,8 +243,8 @@ class EpubComponentGenerator:
         content_id_str = core.id_.split(':')[-1]
 
         provider_ids = {
-            'novel_id': content_id_str if 'pixiv.net' in core.id_ else None,
-            'post_id': content_id_str if 'fanbox.cc' in core.id_ else None,
+            'novel_id': (content_id_str if 'pixiv.net' in core.id_ else None),
+            'post_id': (content_id_str if 'fanbox.cc' in core.id_ else None),
             'series_id': (
                 core.isPartOf.identifier.split(':')[-1]
                 if core.isPartOf and core.isPartOf.identifier
@@ -250,10 +260,14 @@ class EpubComponentGenerator:
             'cover_image_id': cover_asset.id if cover_asset else None,
             'plain_description': plain_description,
         }
-        return self._render_template('content.opf.j2', context)
+        template_name = self.theme.templates.CONTENT_OPF
+        return self._render_template(template_name, context)
 
     def _generate_nav(
-        self, pages: list[PageAsset], info_page: PageAsset, has_cover: bool
+        self,
+        pages: list[PageAsset],
+        info_page: PageAsset,
+        has_cover: bool,
     ) -> bytes:
         """nav.xhtml (目次) ファイルの内容を生成します。"""
         # 構造化された単一のコンテキスト辞書を作成
@@ -276,4 +290,5 @@ class EpubComponentGenerator:
                 'start_page_href': pages[0].href if pages else None,
             },
         }
-        return self._render_template('nav.xhtml.j2', nav_context)
+        template_name = self.theme.templates.NAV
+        return self._render_template(template_name, nav_context)
